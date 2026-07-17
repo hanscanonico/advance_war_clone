@@ -166,9 +166,10 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state</h3>
-          <p class="text-sm"><code>~/Projets/advance_war_clone</code> is an <strong>empty directory</strong>.
-          No engine project, no assets, no code. Everything below is to be built.</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0+M1 done</span></h3>
+          <p class="text-sm">Bootstrapped 2026-07-17: Godot 4.7.1 project with GUT tests (19 passing),
+          terrain/map simulation core, generated placeholder tiles, and a battle scene with scrolling
+          camera, grid cursor, and terrain info panel. Next up: <strong>M2 — units &amp; movement</strong>.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -455,8 +456,8 @@ stateDiagram-v2
     earlier one from being fun.</p>
 
     <ul class="steps steps-vertical lg:steps-horizontal w-full text-sm">
-      <li class="step step-primary">Setup</li>
-      <li class="step step-primary">Map</li>
+      <li class="step step-primary" data-content="✓">Setup</li>
+      <li class="step step-primary" data-content="✓">Map</li>
       <li class="step step-primary">Movement</li>
       <li class="step step-primary">Combat</li>
       <li class="step step-primary">Game loop</li>
@@ -472,13 +473,13 @@ stateDiagram-v2
         </thead>
         <tbody>
           <tr>
-            <td class="font-bold whitespace-nowrap">M0 · Bootstrap</td>
+            <td class="font-bold whitespace-nowrap">M0 · Bootstrap <span class="badge badge-success badge-sm">Done</span></td>
             <td>Godot 4.4+ project, folder layout above, git repo, GUT test addon, input map
             (confirm/cancel/arrows/mouse), autoload <code>EventBus</code>, placeholder 16×16 tile set.</td>
             <td>…open the project, run an empty battle scene, run a passing test.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M1 · Map on screen</td>
+            <td class="font-bold whitespace-nowrap">M1 · Map on screen <span class="badge badge-success badge-sm">Done</span></td>
             <td>TerrainType resources, TileSet with custom data layer → terrain id, one hand-built map
             (TileMapLayer), camera pan/zoom with edge clamping, grid cursor (keyboard + mouse),
             terrain info panel (name, ★, move costs).</td>
@@ -580,6 +581,11 @@ stateDiagram-v2
     <p>Pick an option in each card — selections stay local until you press <em>Queue answer</em>,
     then hit <strong>Send to Agent</strong> in the Lavish panel. Recommended options are pre-selected;
     you can also annotate any part of this page with free-form feedback.</p>
+    <div role="alert" class="alert alert-success">
+      <span><strong>Kickoff approved (2026-07-17):</strong> implementation started with the recommended
+      defaults — GDScript, classic ground-game scope, generated placeholder art for now. Q1–Q3 below
+      stay open to override at any time; the art pass to a free licensed pack is still planned.</span>
+    </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
 
@@ -663,23 +669,13 @@ stateDiagram-v2
 
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Q4 · First code milestone</h3>
-          <form data-lavish-question="kickoff" class="space-y-2"
-            onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('kickoff'); if (c) window.lavish.queuePrompt('Decision Q4 — kickoff: ' + c, { tag: 'choice', text: 'Kickoff: ' + c, element: event.currentTarget, data: { question: 'kickoff', answer: c } });">
-            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
-              <input type="radio" name="kickoff" class="radio radio-primary radio-sm mt-1" checked
-                value="Approve the plan and start implementing M0 + M1 now (project bootstrap, then map on screen)">
-              <span class="text-sm"><strong>Start M0 + M1 now</strong> <span class="badge badge-primary badge-sm">Recommended</span><br>
-              Bootstrap the Godot project and get a scrollable map with cursor and terrain panel on screen.</span>
-            </label>
-            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
-              <input type="radio" name="kickoff" class="radio radio-sm mt-1"
-                value="Revise the plan first based on my annotations before writing any code">
-              <span class="text-sm"><strong>Iterate on the plan first</strong><br>
-              You'll annotate sections of this page; the plan gets revised before implementation.</span>
-            </label>
-            <button type="submit" class="btn btn-primary btn-sm">Queue answer</button>
-          </form>
+          <h3 class="card-title text-base">Q4 · First code milestone <span class="badge badge-success badge-sm">Resolved</span></h3>
+          <p class="text-sm">You approved starting M0+M1 on 2026-07-17, and both are now built:
+          Godot 4.7.1 project (vendored engine in <code>bin/</code>, gitignored), GUT test suite
+          (19 tests passing), terrain/map simulation core, generated placeholder tileset, and the
+          battle scene with camera, cursor, and terrain panel — six focused commits on
+          <code>main</code>. Next milestone: <strong>M2 — units &amp; movement</strong>
+          (unit resources, Dijkstra movement range, path arrow, move + undo).</p>
         </div>
       </div>
 
