@@ -14,5 +14,9 @@ extends Resource
 @export var vision: int = 2
 ## Infantry and mechs capture properties (used from M4).
 @export var can_capture: bool = false
+## Weapon range in tiles; 0/0 means unarmed (APC). min_range > 1 = indirect:
+## cannot move and fire, never counters, and is never countered.
+@export var min_range: int = 0
+@export var max_range: int = 0
 ## Column of this unit in the generated units atlas texture.
 @export var atlas_col: int = 0

@@ -12,4 +12,6 @@ move_points = 5
 move_class = &"treads"
 vision = 1
 can_capture = false
+min_range = 1
+max_range = 1
 atlas_col = 4

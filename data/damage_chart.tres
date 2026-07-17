@@ -1,0 +1,96 @@
+[gd_resource type="Resource" script_class="DamageChart" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/damage_chart.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+chart = {
+&"anti_air": {
+&"anti_air": 45,
+&"apc": 50,
+&"artillery": 50,
+&"infantry": 105,
+&"md_tank": 10,
+&"mech": 105,
+&"recon": 60,
+&"rockets": 55,
+&"tank": 25
+},
+&"artillery": {
+&"anti_air": 75,
+&"apc": 70,
+&"artillery": 75,
+&"infantry": 90,
+&"md_tank": 45,
+&"mech": 85,
+&"recon": 80,
+&"rockets": 80,
+&"tank": 70
+},
+&"infantry": {
+&"anti_air": 5,
+&"apc": 14,
+&"artillery": 15,
+&"infantry": 55,
+&"md_tank": 1,
+&"mech": 45,
+&"recon": 12,
+&"rockets": 25,
+&"tank": 5
+},
+&"md_tank": {
+&"anti_air": 105,
+&"apc": 105,
+&"artillery": 105,
+&"infantry": 30,
+&"md_tank": 55,
+&"mech": 35,
+&"recon": 105,
+&"rockets": 105,
+&"tank": 85
+},
+&"mech": {
+&"anti_air": 65,
+&"apc": 75,
+&"artillery": 70,
+&"infantry": 65,
+&"md_tank": 15,
+&"mech": 55,
+&"recon": 85,
+&"rockets": 85,
+&"tank": 55
+},
+&"recon": {
+&"anti_air": 4,
+&"apc": 45,
+&"artillery": 45,
+&"infantry": 70,
+&"md_tank": 1,
+&"mech": 65,
+&"recon": 35,
+&"rockets": 55,
+&"tank": 6
+},
+&"rockets": {
+&"anti_air": 85,
+&"apc": 80,
+&"artillery": 80,
+&"infantry": 95,
+&"md_tank": 55,
+&"mech": 90,
+&"recon": 90,
+&"rockets": 85,
+&"tank": 80
+},
+&"tank": {
+&"anti_air": 65,
+&"apc": 75,
+&"artillery": 70,
+&"infantry": 25,
+&"md_tank": 15,
+&"mech": 30,
+&"recon": 85,
+&"rockets": 85,
+&"tank": 55
+}
+}
