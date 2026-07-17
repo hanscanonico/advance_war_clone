@@ -10,11 +10,18 @@ extends RefCounted
 ##   <one row of terrain symbols per line, all rows the same width>
 ##   [owners]
 ##   <team> <x> <y>       # team is 1-based; only property tiles may be owned
+##   [units]
+##   <team> <symbol> <x> <y>   # starting units; symbols defined by UnitType
+##
+## [owners] and [units] must come after [terrain] (they need the bounds).
+## Unit symbols are validated later by GameState.create, which has the UnitDB.
 
 const NEUTRAL := 0
 
 var width := 0
 var height := 0
+## Raw starting-unit entries: {team: int, symbol: String, cell: Vector2i}.
+var starting_units: Array[Dictionary] = []
 var _terrain: Array[TerrainType] = []  # row-major, width * height entries
 var _owners: Dictionary = {}  # Vector2i -> int (team); missing key = neutral
 
@@ -44,6 +51,9 @@ static func parse(text: String, db: TerrainDB) -> MapData:
 					return null
 			"[owners]":
 				if not map._set_owner_from_line(line):
+					return null
+			"[units]":
+				if not map._append_unit_from_line(line):
 					return null
 			_:
 				push_error("MapData: line outside a known section: '%s'" % line)
@@ -115,4 +125,21 @@ func _set_owner_from_line(line: String) -> bool:
 		push_error("MapData: cell %s is not a property, cannot be owned" % cell)
 		return false
 	_owners[cell] = team
+	return true
+
+
+func _append_unit_from_line(line: String) -> bool:
+	var parts := line.split(" ", false)
+	if parts.size() != 4:
+		push_error("MapData: bad unit line '%s' (expected: team symbol x y)" % line)
+		return false
+	var team := int(parts[0])
+	var cell := Vector2i(int(parts[2]), int(parts[3]))
+	if team <= 0:
+		push_error("MapData: unit team must be >= 1 in '%s'" % line)
+		return false
+	if not in_bounds(cell):
+		push_error("MapData: unit cell %s out of bounds" % cell)
+		return false
+	starting_units.append({"team": team, "symbol": parts[1], "cell": cell})
 	return true

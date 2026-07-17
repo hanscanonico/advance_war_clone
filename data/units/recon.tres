@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/unit_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"recon"
+display_name = "Recon"
+symbol = "r"
+cost = 4000
+move_points = 8
+move_class = &"tires"
+vision = 5
+can_capture = false
+atlas_col = 2

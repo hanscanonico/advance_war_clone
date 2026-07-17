@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/unit_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"infantry"
+display_name = "Infantry"
+symbol = "i"
+cost = 1000
+move_points = 3
+move_class = &"foot"
+vision = 2
+can_capture = true
+atlas_col = 0

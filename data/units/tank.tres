@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/unit_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"tank"
+display_name = "Tank"
+symbol = "t"
+cost = 7000
+move_points = 6
+move_class = &"treads"
+vision = 3
+can_capture = false
+atlas_col = 3

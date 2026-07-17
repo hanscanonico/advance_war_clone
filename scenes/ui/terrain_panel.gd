@@ -14,6 +14,7 @@ const CLASS_LABELS: Array = [
 @onready var def_label: Label = %DefLabel
 @onready var move_label: Label = %MoveLabel
 @onready var owner_label: Label = %OwnerLabel
+@onready var unit_label: Label = %UnitLabel
 
 
 func show_terrain(terrain: TerrainType, owner_team: int) -> void:
@@ -26,6 +27,18 @@ func show_terrain(terrain: TerrainType, owner_team: int) -> void:
 	move_label.text = "  ".join(parts)
 	owner_label.visible = terrain.is_property
 	owner_label.text = TEAM_NAMES.get(owner_team, "Team %d" % owner_team)
+
+
+## Shows the hovered unit's line, or hides it when unit is null.
+func show_unit(unit: Unit) -> void:
+	unit_label.visible = unit != null
+	if unit == null:
+		return
+	var team_name: String = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
+	var suffix := " (acted)" if unit.acted else ""
+	unit_label.text = "%s - HP %d - %s%s" % [
+		unit.type.display_name, unit.displayed_hp(), team_name, suffix,
+	]
 
 
 func set_side(on_right: bool) -> void:

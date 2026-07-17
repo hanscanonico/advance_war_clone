@@ -166,10 +166,11 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0+M1 done</span></h3>
-          <p class="text-sm">Bootstrapped 2026-07-17: Godot 4.7.1 project with GUT tests (19 passing),
-          terrain/map simulation core, generated placeholder tiles, and a battle scene with scrolling
-          camera, grid cursor, and terrain info panel. Next up: <strong>M2 — units &amp; movement</strong>.</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M2 done</span></h3>
+          <p class="text-sm">As of 2026-07-17: Godot 4.7.1 project, 50 GUT tests passing. The 9-unit
+          ground roster is in as Resources, and the battle scene supports the full AW selection flow —
+          Dijkstra movement range with per-class terrain costs, path arrow, animated moves, and
+          Wait/Cancel with true undo. Next up: <strong>M3 — combat</strong>.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -458,7 +459,7 @@ stateDiagram-v2
     <ul class="steps steps-vertical lg:steps-horizontal w-full text-sm">
       <li class="step step-primary" data-content="✓">Setup</li>
       <li class="step step-primary" data-content="✓">Map</li>
-      <li class="step step-primary">Movement</li>
+      <li class="step step-primary" data-content="✓">Movement</li>
       <li class="step step-primary">Combat</li>
       <li class="step step-primary">Game loop</li>
       <li class="step">AI</li>
@@ -486,7 +487,7 @@ stateDiagram-v2
             <td>…scroll around a map and inspect every tile, AW-style corner panel included.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M2 · Units &amp; movement</td>
+            <td class="font-bold whitespace-nowrap">M2 · Units &amp; movement <span class="badge badge-success badge-sm">Done</span></td>
             <td>UnitType resources + unit scene (sprite, HP badge, team tint), <code>GameState</code> +
             <code>MoveCommand</code>, Dijkstra movement range with per-class terrain costs, range
             highlight overlay, path arrow, move animation along path, undo before commit, Wait, greyed-out
@@ -673,9 +674,10 @@ stateDiagram-v2
           <p class="text-sm">You approved starting M0+M1 on 2026-07-17, and both are now built:
           Godot 4.7.1 project (vendored engine in <code>bin/</code>, gitignored), GUT test suite
           (19 tests passing), terrain/map simulation core, generated placeholder tileset, and the
-          battle scene with camera, cursor, and terrain panel — six focused commits on
-          <code>main</code>. Next milestone: <strong>M2 — units &amp; movement</strong>
-          (unit resources, Dijkstra movement range, path arrow, move + undo).</p>
+          battle scene with camera, cursor, and terrain panel. M2 (units &amp; movement) followed
+          the same day: 9-unit roster, Dijkstra ranges, path arrows, animated moves with undo.
+          Next milestone: <strong>M3 — combat</strong> (damage chart, attack targeting,
+          damage preview, counter-attacks).</p>
         </div>
       </div>
 

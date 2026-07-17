@@ -25,3 +25,16 @@ SSSSSSSSSSSSSSSSSSSS
 2 17 11
 2 16 11
 2 16 8
+[units]
+# team symbol x y — i infantry, m mech, r recon, t tank, T md tank,
+#                   a anti-air, g artillery, R rockets, p apc
+1 i 4 3
+1 m 2 4
+1 t 5 2
+1 r 6 4
+1 g 4 4
+2 i 15 10
+2 m 17 9
+2 t 14 11
+2 r 13 9
+2 g 15 12
