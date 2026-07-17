@@ -26,7 +26,7 @@ make screenshot   # boot the game, save screenshot.png, quit
 
 Any Godot 4.7+ works too — open the project folder in the editor.
 
-## Controls (M2)
+## Controls (M3)
 
 - Arrow keys / mouse hover: move the grid cursor
 - Mouse wheel or `+` / `-`: zoom
@@ -34,7 +34,10 @@ Any Godot 4.7+ works too — open the project folder in the editor.
   movement range; move the cursor within range to preview the path, then confirm a destination
   to move there
 - Cancel (`Esc` / `X` / `Backspace`): deselect, or undo an uncommitted move
-- After a move, the Wait/Cancel menu commits the move (Wait) or reverts it (Cancel)
+- After a move, the action menu opens: **Fire** (offered only when an enemy is in weapon range
+  from the destination), **Wait** (commit the move), or **Cancel** (revert it)
+- Choosing Fire enters targeting: attackable enemies get a red overlay and a panel previews the
+  attack and counter damage; confirm on a target to resolve combat, or cancel back to the menu
 - The corner panel shows the hovered tile's terrain, defense stars, move costs, and the unit
   standing there, if any
 
@@ -42,7 +45,7 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 
 - `core/` — pure simulation code. **Nothing here may reference a Node or a scene.**
   All rules are unit-testable and the future AI simulates through the same code.
-- `data/` — game data as `Resource` files (terrain and units now; the damage chart at M3).
+- `data/` — game data as `Resource` files (terrain, units, and the damage chart).
 - `maps/` — plain-text maps: an ASCII terrain grid, a property-ownership section, and a
   starting-units section. `MapData` (core) is authoritative; the TileMapLayer is just paint.
 - `scenes/` — presentation: battle scene, cursor, UI panels.
