@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="TerrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/terrain_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"sea"
+display_name = "Sea"
+symbol = "S"
+defense_stars = 0
+move_costs = {}
+is_property = false
+atlas_col = 8
+team_tinted = false
