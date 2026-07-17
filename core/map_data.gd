@@ -78,6 +78,12 @@ func owner_at(cell: Vector2i) -> int:
 	return _owners.get(cell, NEUTRAL)
 
 
+## Copy of the starting ownership for GameState; runtime capture never
+## mutates the map itself.
+func initial_owners() -> Dictionary:
+	return _owners.duplicate()
+
+
 func size() -> Vector2i:
 	return Vector2i(width, height)
 
