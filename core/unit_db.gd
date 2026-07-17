@@ -44,5 +44,14 @@ func by_symbol(symbol: String) -> UnitType:
 	return _by_symbol.get(symbol)
 
 
+## All unit types, cheapest first (build-menu order).
+func all() -> Array[UnitType]:
+	var result: Array[UnitType] = []
+	for unit_type in _by_id.values():
+		result.append(unit_type)
+	result.sort_custom(func(a: UnitType, b: UnitType) -> bool: return a.cost < b.cost)
+	return result
+
+
 func size() -> int:
 	return _by_id.size()
