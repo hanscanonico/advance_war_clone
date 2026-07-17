@@ -14,7 +14,7 @@ const MOVE_STEP_SECONDS := 0.06
 
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
-enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING }
+enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, VICTORY }
 
 const DIR_ACTIONS: Array = [
 	[&"cursor_up", Vector2i.UP],
@@ -30,11 +30,14 @@ const DIR_ACTIONS: Array = [
 @onready var units_root: Node2D = $Units
 @onready var cursor: Sprite2D = $Cursor
 @onready var camera: Camera2D = $Camera2D
-@onready var terrain_panel: PanelContainer = %TerrainPanel
+@onready var terrain_panel: TerrainPanel = %TerrainPanel
 @onready var action_menu: ActionMenu = %ActionMenu
 @onready var damage_preview: PanelContainer = %DamagePreview
 @onready var atk_label: Label = %AtkLabel
 @onready var counter_label: Label = %CounterLabel
+@onready var turn_label: Label = %TurnLabel
+@onready var turn_banner: PanelContainer = %TurnBanner
+@onready var banner_label: Label = %BannerLabel
 
 var db: TerrainDB
 var unit_db: UnitDB
@@ -47,6 +50,8 @@ var selected: Unit
 var move_range: MovementResolver.MoveRange
 var planned_path: Array[Vector2i] = []
 var _attack_targets: Array[Vector2i] = []
+var _menu_context: StringName = &"unit"
+var _build_cell := Vector2i.ZERO
 
 var _sprites: Dictionary = {}  # Unit -> UnitSprite
 var _zoom := 2.0
@@ -73,12 +78,13 @@ func _ready() -> void:
 	camera.position = cursor.position
 	camera.reset_smoothing()
 	_start_cursor_pulse()
+	_refresh_hud()
 	_check_screenshot_mode()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if state == State.ANIMATING or state == State.MENU:
-		return  # the menu handles its own input; animations block input
+	if state == State.ANIMATING or state == State.MENU or state == State.VICTORY:
+		return  # the menu handles its own input; animations and victory block it
 	if event.is_action_pressed(&"zoom_in"):
 		_set_zoom(_zoom + 1.0)
 	elif event.is_action_pressed(&"zoom_out"):
@@ -114,8 +120,12 @@ func _confirm_at(cell: Vector2i) -> void:
 	match state:
 		State.IDLE:
 			var unit := game.unit_at(cell)
-			if unit != null and not unit.acted:
+			if unit != null and unit.team == game.current_team and not unit.acted:
 				_select(unit)
+			elif _is_own_empty_base(cell):
+				_open_build_menu(cell)
+			elif unit == null:
+				_open_map_menu()
 		State.UNIT_SELECTED:
 			if move_range.has(cell) and move_range.can_stop_at(cell):
 				planned_path = move_range.path_to(cell)
@@ -169,11 +179,16 @@ func _animate_move() -> void:
 
 func _on_move_animation_done() -> void:
 	state = State.MENU
+	_menu_context = &"unit"
 	var dest: Vector2i = planned_path[planned_path.size() - 1]
 	_attack_targets = _attackable_cells(selected, dest, planned_path.size() > 1)
 	var actions: Array[Dictionary] = []
 	if not _attack_targets.is_empty():
 		actions.append({"id": &"fire", "label": "Fire"})
+	var dest_terrain := map.terrain_at(dest)
+	if selected.type.can_capture and dest_terrain.is_property \
+			and game.owner_at(dest) != selected.team:
+		actions.append({"id": &"capture", "label": "Capture"})
 	actions.append({"id": &"wait", "label": "Wait"})
 	actions.append({"id": &"cancel", "label": "Cancel"})
 	action_menu.open(actions, _screen_pos_for_cell(dest))
@@ -181,9 +196,39 @@ func _on_move_animation_done() -> void:
 
 func _on_menu_action(action: StringName) -> void:
 	action_menu.close()
+	match _menu_context:
+		&"unit":
+			_handle_unit_action(action)
+		&"base":
+			_handle_build_action(action)
+		&"map":
+			_handle_map_action(action)
+
+
+func _handle_unit_action(action: StringName) -> void:
 	match action:
 		&"fire":
 			_enter_targeting()
+		&"capture":
+			var command := CaptureCommand.new(selected, planned_path)
+			var error := command.validate(game)
+			if error != "":
+				# The UI only offers legal captures, so this is a bug guard.
+				push_error("CaptureCommand rejected: %s" % error)
+				_undo_move_preview()
+				return
+			var dest: Vector2i = planned_path[planned_path.size() - 1]
+			command.apply(game)
+			EventBus.unit_moved.emit(selected)
+			if game.owner_at(dest) == selected.team:
+				EventBus.property_captured.emit(dest, selected.team)
+				_repaint_property(dest)
+			_sprites[selected].refresh()
+			_clear_selection()
+			_refresh_panel()
+			_refresh_hud()
+			if game.winner != 0:
+				_enter_victory()
 		&"wait":
 			var command := MoveCommand.new(selected, planned_path)
 			var error := command.validate(game)
@@ -197,9 +242,118 @@ func _on_menu_action(action: StringName) -> void:
 			_sprites[selected].refresh()
 			_clear_selection()
 			_refresh_panel()
-			_refresh_round_if_exhausted()
 		&"cancel":
 			_undo_move_preview()
+
+
+func _handle_build_action(action: StringName) -> void:
+	if action == &"cancel":
+		state = State.IDLE
+		return
+	var command := BuildCommand.new(game.current_team, unit_db.by_id(action), _build_cell)
+	var error := command.validate(game)
+	if error != "":
+		push_error("BuildCommand rejected: %s" % error)
+		state = State.IDLE
+		return
+	command.apply(game)
+	var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
+	units_root.add_child(sprite)
+	sprite.setup(command.built_unit)
+	_sprites[command.built_unit] = sprite
+	EventBus.unit_built.emit(command.built_unit)
+	state = State.IDLE
+	_refresh_panel()
+	_refresh_hud()
+
+
+func _handle_map_action(action: StringName) -> void:
+	state = State.IDLE
+	if action != &"end_turn":
+		return
+	var command := EndTurnCommand.new()
+	var error := command.validate(game)
+	if error != "":
+		push_error("EndTurnCommand rejected: %s" % error)
+		return
+	command.apply(game)
+	_on_turn_started()
+
+
+func _is_own_empty_base(cell: Vector2i) -> bool:
+	return map.terrain_at(cell).id == &"base" \
+		and game.owner_at(cell) == game.current_team \
+		and game.unit_at(cell) == null
+
+
+func _open_build_menu(cell: Vector2i) -> void:
+	_menu_context = &"base"
+	_build_cell = cell
+	state = State.MENU
+	var actions: Array[Dictionary] = []
+	for unit_type in unit_db.all():
+		actions.append({
+			"id": unit_type.id,
+			"label": "%s  %d" % [unit_type.display_name, unit_type.cost],
+			"disabled": game.funds[game.current_team] < unit_type.cost,
+		})
+	actions.append({"id": &"cancel", "label": "Cancel"})
+	action_menu.open(actions, _screen_pos_for_cell(cell))
+
+
+func _open_map_menu() -> void:
+	_menu_context = &"map"
+	state = State.MENU
+	action_menu.open([
+		{"id": &"end_turn", "label": "End Turn"},
+		{"id": &"cancel", "label": "Cancel"},
+	], _screen_pos_for_cell(cursor_cell))
+
+
+func _on_turn_started() -> void:
+	for unit in game.units:
+		_sprites[unit].refresh()
+	_refresh_hud()
+	_refresh_panel()
+	_show_banner("Day %d - %s" % [
+		game.day, TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
+	])
+	var homes := game.properties_of(game.current_team)
+	if not homes.is_empty():
+		_set_cursor_cell(homes[0])
+	EventBus.turn_started.emit(game.current_team, game.day)
+
+
+func _enter_victory() -> void:
+	state = State.VICTORY
+	banner_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
+	turn_banner.show()
+	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+
+
+func _show_banner(text: String) -> void:
+	banner_label.text = text
+	turn_banner.show()
+	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	var tween := create_tween()
+	tween.tween_interval(1.2)
+	tween.tween_callback(turn_banner.hide)
+
+
+func _refresh_hud() -> void:
+	turn_label.text = "Day %d  -  %s  -  Funds %d" % [
+		game.day,
+		TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
+		game.funds[game.current_team],
+	]
+
+
+func _repaint_property(cell: Vector2i) -> void:
+	var terrain := map.terrain_at(cell)
+	if terrain.team_tinted:
+		terrain_layer.set_cell(
+			cell, ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, game.owner_at(cell))
+		)
 
 
 ## The move was never committed to the sim, so undo is just snapping the
@@ -211,18 +365,6 @@ func _undo_move_preview() -> void:
 	_set_cursor_cell(selected.cell)
 	planned_path = [selected.cell]
 	_update_path_line()
-
-
-## Placeholder for the M4 TurnManager: when every unit has acted, ready them
-## all again so the M2 sandbox never dead-ends.
-func _refresh_round_if_exhausted() -> void:
-	for unit in game.units:
-		if not unit.acted:
-			return
-	for unit in game.units:
-		unit.acted = false
-		_sprites[unit].refresh()
-	_refresh_panel()
 
 
 # --- attack flow -------------------------------------------------------------
@@ -282,7 +424,9 @@ func _execute_attack(target_cell: Vector2i) -> void:
 	await _animate_combat(command.result, attacker, target)
 	_clear_selection()
 	_refresh_panel()
-	_refresh_round_if_exhausted()
+	_refresh_hud()
+	if game.winner != 0:
+		_enter_victory()
 
 
 func _animate_combat(
@@ -362,7 +506,7 @@ func _paint_map() -> void:
 		for x in map.width:
 			var cell := Vector2i(x, y)
 			var terrain := map.terrain_at(cell)
-			var row := map.owner_at(cell) if terrain.team_tinted else 0
+			var row := game.owner_at(cell) if terrain.team_tinted else 0
 			terrain_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, row))
 
 
@@ -430,7 +574,10 @@ func _set_cursor_cell(cell: Vector2i) -> void:
 
 
 func _refresh_panel() -> void:
-	terrain_panel.show_terrain(map.terrain_at(cursor_cell), map.owner_at(cursor_cell))
+	terrain_panel.show_terrain(
+		map.terrain_at(cursor_cell), game.owner_at(cursor_cell),
+		game.capture_progress.get(cursor_cell, -1)
+	)
 	terrain_panel.show_unit(game.unit_at(cursor_cell))
 	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
 
@@ -486,25 +633,51 @@ func _check_screenshot_mode() -> void:
 		_save_screenshot_and_quit(shot_path)
 
 
-## Drives the real selection -> menu -> Fire -> target flow on the frontline
-## tanks, through the same handlers a player's input reaches.
+## Drives real flows through the same handlers a player's input reaches:
+## attack/resolve use the frontline tanks, capture takes the city at (3,4)
+## with the infantry at (4,3), endturn hands the turn to Blue.
 func _run_attack_demo(mode: String, shot_path: String) -> void:
 	await get_tree().process_frame
 	game.rng.seed = 2026  # deterministic demo
-	_confirm_at(Vector2i(8, 8))  # select the red tank
-	_confirm_at(Vector2i(8, 8))  # fire in place
-	while state != State.MENU:
-		await get_tree().process_frame
-	action_menu.choose(&"fire")
-	while state != State.TARGETING:
-		await get_tree().process_frame
-	if mode == "attack":
-		if shot_path != "":
-			_save_screenshot_and_quit(shot_path)
-		return
-	_confirm_at(cursor_cell)  # fire at the blue tank
-	while state != State.IDLE:
-		await get_tree().process_frame
+	match mode:
+		"attack", "resolve":
+			_confirm_at(Vector2i(8, 8))  # select the red tank
+			_confirm_at(Vector2i(8, 8))  # fire in place
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"fire")
+			while state != State.TARGETING:
+				await get_tree().process_frame
+			if mode == "attack":
+				if shot_path != "":
+					_save_screenshot_and_quit(shot_path)
+				return
+			_confirm_at(cursor_cell)  # fire at the blue tank
+			while state != State.IDLE:
+				await get_tree().process_frame
+		"capture":
+			_confirm_at(Vector2i(4, 3))  # select the red infantry
+			_confirm_at(Vector2i(3, 4))  # move onto the neutral city
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"capture")
+			while state != State.IDLE:
+				await get_tree().process_frame
+			_set_cursor_cell(Vector2i(3, 4))  # show capture progress in the panel
+		"build":
+			_set_cursor_cell(Vector2i(3, 2))  # red base
+			_confirm_at(Vector2i(3, 2))  # open the build menu (funds 2000)
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"infantry")
+			while state != State.IDLE:
+				await get_tree().process_frame
+		"endturn":
+			_confirm_at(Vector2i(10, 5))  # empty road tile -> map menu
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"end_turn")
+			await get_tree().process_frame
 	if shot_path != "":
 		_save_screenshot_and_quit(shot_path)
 
