@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advance Wars Clone — Godot Implementation Plan</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  .awp-stars { letter-spacing: 0.1em; white-space: nowrap; }
+  .awp-formula {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9rem;
+  }
+  .mermaid { display: flex; justify-content: center; overflow-x: auto; }
+</style>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+
+  // Render Mermaid in a theme that matches the artifact page, and re-render when
+  // the viewer flips the page theme - Mermaid never restyles an already-rendered
+  // SVG on its own, so a fixed theme clashes in either light or dark mode.
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, {
+      attributes: true,
+      attributeFilter: ["data-theme", "class", "style"],
+    });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener(
+    "transitionend",
+    ({ propertyName }) => {
+      if (propertyName === "background-color") queueRender();
+    },
+    true,
+  );
+  darkQuery.addEventListener("change", queueRender);
+</script>
+</head>
+<body class="bg-base-200 text-base-content">
+<main class="mx-auto max-w-6xl p-4 sm:p-6 lg:p-10 space-y-10">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero bg-base-100 rounded-box border border-base-content/10">
+    <div class="hero-content flex-col text-center py-10">
+      <p class="badge badge-soft badge-primary">Implementation plan · greenfield</p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight text-balance px-2">Advance Wars Clone in Godot</h1>
+      <p class="max-w-3xl text-base-content/80">
+        A turn-based tactics game in the style of <em>Advance Wars</em> (GBA): grid maps, terrain
+        that shapes movement and defense, a rock-paper-scissors unit roster, property capture and
+        income, and eventually a computer opponent. This plan proposes the architecture, the
+        mechanics to implement, and eight milestones that each end in something playable.
+      </p>
+      <div class="stats stats-vertical sm:stats-horizontal shadow mt-4">
+        <div class="stat">
+          <div class="stat-title">Engine</div>
+          <div class="stat-value text-2xl">Godot 4.4+</div>
+          <div class="stat-desc">TileMapLayer · Resources</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Language</div>
+          <div class="stat-value text-2xl">GDScript</div>
+          <div class="stat-desc">proposed — see decisions</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Milestones</div>
+          <div class="stat-value text-2xl">M0 – M7</div>
+          <div class="stat-desc">playable from M4</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">MVP</div>
+          <div class="stat-value text-2xl">Hot-seat</div>
+          <div class="stat-desc">AI at M5</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONTEXT ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">1 · Where we are, where we're going</h2>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Current state</h3>
+          <p class="text-sm"><code>~/Projets/advance_war_clone</code> is an <strong>empty directory</strong>.
+          No engine project, no assets, no code. Everything below is to be built.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Target (MVP, end of M4)</h3>
+          <p class="text-sm">Two players on one machine play a full match on a hand-made map:
+          move units, fight with real damage-chart combat, capture cities for income, build units
+          at bases, and win by HQ capture or destroying every enemy unit.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Target (full, end of M7)</h3>
+          <p class="text-sm">Single-player vs an AI, full ground roster with transports, fuel and
+          ammo, fog of war, sound, save/load — a complete small game. CO powers, naval/air units,
+          a map editor and online play stay on the stretch list.</p>
+        </div>
+      </div>
+    </div>
+    <div role="alert" class="alert alert-warning">
+      <span><strong>Legal note:</strong> Advance Wars' mechanics are fine to reimplement, but Nintendo's
+      sprites, music, unit names in combination with the trade dress, and the "Advance Wars" name are not.
+      The plan assumes original or freely-licensed assets (see the art decision below) and a different title.</span>
+    </div>
+  </section>
+
+  <!-- ============ STACK DECISIONS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">2 · Proposed technical decisions</h2>
+    <p>Four decisions shape everything else. Each is a proposal — the ones worth debating are also
+    surfaced as questions in <a class="link" href="#decisions">section 7</a>.</p>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Godot 4.4+ · GDScript</h3>
+          <p class="text-sm">Latest stable Godot 4. GDScript over C#: first-class docs and examples,
+          zero build step, fastest iteration for a solo gameplay-heavy project. Nothing here is
+          performance-bound enough to need C#. Typed GDScript everywhere
+          (<code>class_name</code>, typed vars) keeps refactors safe.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Simulation / presentation split</h3>
+          <p class="text-sm">The game state (map, units, funds, turn) lives in <strong>pure GDScript
+          classes with no Node dependencies</strong>. Scenes only render state and animate changes.
+          This makes rules unit-testable, lets the AI simulate moves cheaply, and keeps the door
+          open for replays and online play later.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Everything data-driven via Resources</h3>
+          <p class="text-sm">Unit stats, terrain properties, and the damage chart are custom
+          <code>Resource</code> files (<code>.tres</code>), not constants in code. Balancing means
+          editing data in the inspector; adding a unit means adding a file. The damage chart is a
+          single resource holding the attacker × defender base-damage matrix.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Command pattern for all actions</h3>
+          <p class="text-sm">Move, Attack, Capture, Build, EndTurn are command objects validated and
+          applied to the sim, which emits typed events the scene layer animates. Free wins: undo of
+          uncommitted moves (an AW staple), an AI that issues the exact same commands as the player,
+          and a serializable match log for save/replay.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">3 · Architecture</h2>
+    <p>How does input become an animated, rules-checked change on the board? One direction of flow:
+    input produces commands, the sim validates and applies them, events drive the visuals. The AI
+    plugs in at the same point the player does.</p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <pre class="mermaid">
+flowchart TD
+  subgraph inputs["Input sources"]
+    P["Player input<br/>(cursor, menus)"]
+    A["AI controller<br/>(M5)"]
+  end
+  subgraph core["Simulation core — pure GDScript, no Nodes"]
+    C["Commands<br/>Move · Attack · Capture · Build · EndTurn"]
+    S["GameState<br/>MapData · Units · Funds · Turn"]
+    R["Rules<br/>MovementResolver · CombatResolver · CaptureRules"]
+    C -->|"validate + apply"| S
+    R --- C
+  end
+  subgraph pres["Presentation — Godot scenes"]
+    B["Battle scene<br/>TileMapLayer terrain · unit sprites · path arrows"]
+    U["UI layer<br/>action menus · damage preview · funds/day panel"]
+  end
+  subgraph data["Data — Resources (.tres)"]
+    D["UnitType · TerrainType · DamageChart"]
+  end
+  P --> C
+  A --> C
+  S -->|"typed events<br/>(unit_moved, unit_damaged, ...)"| B
+  S --> U
+  D --> R
+        </pre>
+      </div>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Project layout</h3>
+          <div class="mockup-code text-sm">
+<pre data-prefix=" "><code>res://</code></pre>
+<pre data-prefix=" "><code>├─ core/        # sim: game_state.gd, commands/, rules/</code></pre>
+<pre data-prefix=" "><code>├─ data/        # .tres: units/, terrain/, damage_chart</code></pre>
+<pre data-prefix=" "><code>├─ scenes/</code></pre>
+<pre data-prefix=" "><code>│  ├─ battle/   # battle.tscn, cursor, unit_sprite</code></pre>
+<pre data-prefix=" "><code>│  └─ ui/       # menus, panels, damage preview</code></pre>
+<pre data-prefix=" "><code>├─ ai/          # ai_controller.gd, scoring</code></pre>
+<pre data-prefix=" "><code>├─ maps/        # map scenes / map resources</code></pre>
+<pre data-prefix=" "><code>├─ assets/      # sprites, audio, fonts</code></pre>
+<pre data-prefix=" "><code>└─ tests/       # GUT tests for core/ only</code></pre>
+          </div>
+          <p class="text-sm text-base-content/70">Rule of thumb: nothing in <code>core/</code> may
+          reference a Node, a scene, or anything in <code>scenes/</code>. Tests target
+          <code>core/</code> exclusively.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Key algorithms</h3>
+          <ul class="list-disc list-inside text-sm space-y-2">
+            <li><strong>Movement range</strong> — Dijkstra flood-fill from the unit's tile, edge
+            costs from the terrain × movement-class table, budget = unit's move points. Occupied
+            enemy tiles block; friendly tiles pass-through but can't be final destinations.</li>
+            <li><strong>Path arrow</strong> — walk the Dijkstra parent tree; if the player traces a
+            custom path with the cursor, keep it while it stays legal and within budget (AW behavior).</li>
+            <li><strong>Attack range</strong> — direct units: tiles adjacent to any reachable tile
+            (move-then-fire). Indirect units: ring of min–max range from the <em>current</em> tile
+            only (no move-and-fire).</li>
+            <li><strong>Damage preview</strong> — run CombatResolver in dry-run mode; show
+            "Atk 74% / Counter 22%" before the player confirms, exactly like AW.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TURN FLOW ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">4 · Turn flow</h2>
+    <p>The battle scene is a state machine. Every state maps to what the cursor and menus are doing;
+    <kbd class="kbd kbd-sm">B</kbd>/right-click cancels one level back, which is what makes AW feel good to play.</p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> UnitSelected : "select own ready unit"
+  Idle --> BuildMenu : "select own empty base"
+  Idle --> TurnMenu : "open menu (End Turn...)"
+  UnitSelected --> MovePreview : "choose reachable tile"
+  UnitSelected --> Idle : "cancel"
+  MovePreview --> ActionMenu : "confirm destination"
+  MovePreview --> UnitSelected : "cancel"
+  ActionMenu --> TargetSelect : "Fire"
+  ActionMenu --> Executing : "Wait / Capture / Supply"
+  ActionMenu --> MovePreview : "cancel (undo move)"
+  TargetSelect --> Executing : "confirm target (damage preview shown)"
+  TargetSelect --> ActionMenu : "cancel"
+  BuildMenu --> Executing : "buy unit"
+  BuildMenu --> Idle : "cancel"
+  TurnMenu --> TurnTransition : "End Turn"
+  TurnMenu --> Idle : "cancel"
+  Executing --> Idle : "animations done, unit greys out"
+  TurnTransition --> Idle : "income + repair + resupply,<br/>next player (or AI plays)"
+        </pre>
+      </div>
+    </div>
+    <p class="text-sm text-base-content/70">Start-of-turn sequence (in <code>TurnTransition</code>):
+    +1000 funds per owned property → repair +2 HP for units on friendly properties (paid from funds)
+    → resupply fuel/ammo on properties and next to APCs (M6) → daily fuel burn for air/naval (post-MVP)
+    → all units of the new player become ready.</p>
+  </section>
+
+  <!-- ============ MECHANICS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">5 · Core mechanics reference</h2>
+    <p>The numbers below are the classic Advance Wars 2 values — a proven-balanced starting point we
+    can tune later since it's all in Resource files. MVP roster is the 9 ground units; air and naval
+    columns of the damage chart get added at M6+ without code changes.</p>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Terrain <span class="badge badge-ghost badge-sm">defense ★ · move cost by class</span></h3>
+          <div class="overflow-x-auto rounded-box border border-base-content/5">
+            <table class="table table-sm table-zebra">
+              <thead>
+                <tr><th>Terrain</th><th>Def</th><th>Foot</th><th>Tires</th><th>Treads</th><th>Notes</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Road</td><td class="awp-stars">—</td><td>1</td><td>1</td><td>1</td><td></td></tr>
+                <tr><td>Plains</td><td class="awp-stars">★</td><td>1</td><td>2</td><td>1</td><td></td></tr>
+                <tr><td>Woods</td><td class="awp-stars">★★</td><td>1</td><td>3</td><td>2</td><td>hides units in fog</td></tr>
+                <tr><td>Mountain</td><td class="awp-stars">★★★★</td><td>2</td><td>✕</td><td>✕</td><td>infantry/mech only, +vision</td></tr>
+                <tr><td>River</td><td class="awp-stars">—</td><td>2</td><td>✕</td><td>✕</td><td>infantry/mech only</td></tr>
+                <tr><td>City</td><td class="awp-stars">★★★</td><td>1</td><td>1</td><td>1</td><td>capturable · income · repairs</td></tr>
+                <tr><td>Base</td><td class="awp-stars">★★★</td><td>1</td><td>1</td><td>1</td><td>capturable · builds units</td></tr>
+                <tr><td>HQ</td><td class="awp-stars">★★★★</td><td>1</td><td>1</td><td>1</td><td>capture = win</td></tr>
+                <tr><td>Sea / Shoal</td><td class="awp-stars">—</td><td>✕</td><td>✕</td><td>✕</td><td>post-MVP (naval)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">MVP unit roster <span class="badge badge-ghost badge-sm">ground forces</span></h3>
+          <div class="overflow-x-auto rounded-box border border-base-content/5">
+            <table class="table table-sm table-zebra">
+              <thead>
+                <tr><th>Unit</th><th>Cost</th><th>Move</th><th>Class</th><th>Range</th><th>Role</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Infantry</td><td>1 000</td><td>3</td><td>Foot</td><td>1</td><td>captures, cheap screen</td></tr>
+                <tr><td>Mech</td><td>3 000</td><td>2</td><td>Foot</td><td>1</td><td>captures, kills vehicles</td></tr>
+                <tr><td>Recon</td><td>4 000</td><td>8</td><td>Tires</td><td>1</td><td>fast, anti-infantry, vision</td></tr>
+                <tr><td>Tank</td><td>7 000</td><td>6</td><td>Treads</td><td>1</td><td>workhorse</td></tr>
+                <tr><td>Md&nbsp;Tank</td><td>16 000</td><td>5</td><td>Treads</td><td>1</td><td>heavy breakthrough</td></tr>
+                <tr><td>Anti-Air</td><td>8 000</td><td>6</td><td>Treads</td><td>1</td><td>shreds infantry (+ air later)</td></tr>
+                <tr><td>Artillery</td><td>6 000</td><td>5</td><td>Treads</td><td>2–3</td><td>indirect fire</td></tr>
+                <tr><td>Rockets</td><td>15 000</td><td>5</td><td>Tires</td><td>3–5</td><td>long-range siege</td></tr>
+                <tr><td>APC</td><td>5 000</td><td>6</td><td>Treads</td><td>—</td><td>carries 1 foot unit · resupplies (M6)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Combat resolution</h3>
+          <p class="awp-formula bg-base-200 rounded-box p-3">
+            damage% = base(atk_unit, def_unit)<br>
+            &nbsp;&nbsp;× attacker_hp / 10<br>
+            &nbsp;&nbsp;× (1 − 0.1 × terrain_★ × defender_hp / 10)<br>
+            &nbsp;&nbsp;+ luck(0…9)%
+          </p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>HP is 0–100 internally, displayed 1–10 (ceil). Damage% subtracts internal HP directly.</li>
+            <li><code>base()</code> comes from the DamageChart resource (attacker × defender matrix).</li>
+            <li>Defender <strong>counter-attacks</strong> with its post-damage HP if it survives, is a
+            direct unit, and the attacker is in its range. Indirect units never counter and are never countered.</li>
+            <li>Luck is a small uniform roll, AW-style; seedable RNG so tests and replays are deterministic.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Capture &amp; economy</h3>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Properties have <strong>20 capture points</strong>. A capturing Infantry/Mech subtracts
+            its displayed HP per turn; moving off or dying resets to 20.</li>
+            <li>Income: <strong>1 000 per owned property</strong> at the start of your day.</li>
+            <li>Bases build any unit you can afford; the new unit spawns exhausted (acts next turn).</li>
+            <li>Units on friendly properties repair +2 HP/turn, paid proportionally to unit cost.</li>
+            <li><strong>Victory:</strong> capture the enemy HQ, or destroy every enemy unit.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MILESTONES ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">6 · Milestones</h2>
+    <p>Each milestone ends in a demo you can actually run. M0–M4 build the playable hot-seat game;
+    M5–M7 turn it into a full single-player experience. Nothing in a later milestone blocks an
+    earlier one from being fun.</p>
+
+    <ul class="steps steps-vertical lg:steps-horizontal w-full text-sm">
+      <li class="step step-primary">Setup</li>
+      <li class="step step-primary">Map</li>
+      <li class="step step-primary">Movement</li>
+      <li class="step step-primary">Combat</li>
+      <li class="step step-primary">Game loop</li>
+      <li class="step">AI</li>
+      <li class="step">Depth</li>
+      <li class="step">Polish</li>
+    </ul>
+
+    <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+      <table class="table table-zebra">
+        <thead>
+          <tr><th class="whitespace-nowrap">Milestone</th><th>Scope</th><th>Demo checkpoint — "you can now…"</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M0 · Bootstrap</td>
+            <td>Godot 4.4+ project, folder layout above, git repo, GUT test addon, input map
+            (confirm/cancel/arrows/mouse), autoload <code>EventBus</code>, placeholder 16×16 tile set.</td>
+            <td>…open the project, run an empty battle scene, run a passing test.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M1 · Map on screen</td>
+            <td>TerrainType resources, TileSet with custom data layer → terrain id, one hand-built map
+            (TileMapLayer), camera pan/zoom with edge clamping, grid cursor (keyboard + mouse),
+            terrain info panel (name, ★, move costs).</td>
+            <td>…scroll around a map and inspect every tile, AW-style corner panel included.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M2 · Units &amp; movement</td>
+            <td>UnitType resources + unit scene (sprite, HP badge, team tint), <code>GameState</code> +
+            <code>MoveCommand</code>, Dijkstra movement range with per-class terrain costs, range
+            highlight overlay, path arrow, move animation along path, undo before commit, Wait, greyed-out
+            acted units. Unit tests on range/path math.</td>
+            <td>…select units, see their exact legal range, walk them around, change your mind (B-cancel).</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M3 · Combat</td>
+            <td>DamageChart resource (AW2 ground matrix), <code>AttackCommand</code> + CombatResolver
+            (formula above, seeded luck), direct move-and-fire + indirect min/max rings, damage preview
+            popup, hit/counter resolution, HP updates, unit death + removal. Unit tests on the resolver.</td>
+            <td>…fight battles with faithful AW numbers and see the damage preview before committing.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M4 · Full game loop <span class="badge badge-primary badge-sm">MVP</span></td>
+            <td>TurnManager (players, day counter), income, <code>CaptureCommand</code> with capture
+            points, <code>BuildCommand</code> + base build menu, funds UI, repair on properties,
+            HQ-capture and rout victory, win/lose screen, hot-seat 2-player, "End Turn" flow.</td>
+            <td>…play a complete match against a friend on one machine, start to victory screen.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M5 · AI opponent</td>
+            <td>AI issues the same commands as the player. Per-unit utility scoring: expected damage
+            dealt/taken (via dry-run resolver), capture value, threat map, retreat when weak; production
+            AI with simple funds heuristics. Difficulty = noise on scores. Turn cap per move so it never hangs.</td>
+            <td>…play 1-player and lose to the computer at least sometimes.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M6 · Depth pass</td>
+            <td>APC load/drop, fuel &amp; ammo with resupply (properties + APC), Join, more maps,
+            optionally first air units (T-Copter, B-Copter, Anti-Air matters). Damage chart already
+            supports new rows — mostly data + a few commands.</td>
+            <td>…run transport openings and supply lines like real AW strategy.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">M7 · Polish &amp; atmosphere</td>
+            <td>Fog of war (vision ranges, woods hiding, indirect-fire rules), sound effects + music,
+            battle animations or screen-shake feedback, save/load (serialize GameState), main menu +
+            map select, settings.</td>
+            <td>…hand the game to someone who has never seen the repo.</td>
+          </tr>
+          <tr>
+            <td class="font-bold whitespace-nowrap">Stretch</td>
+            <td>CO powers, naval units, in-game map editor, campaign scripting, online multiplayer
+            (the command log makes lockstep sync feasible).</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ RISKS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">7 · Risks</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div role="alert" class="alert alert-warning alert-vertical sm:alert-horizontal">
+        <div>
+          <h3 class="font-bold">Scope creep is the killer</h3>
+          <p class="text-sm">Full AW has 26 units, 4 armies, COs, fog, naval. The mitigation is baked
+          into the milestones: the game is fun and complete at M4 with 9 units; everything after is optional depth.</p>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-warning alert-vertical sm:alert-horizontal">
+        <div>
+          <h3 class="font-bold">AI quality (M5) is the hardest work</h3>
+          <p class="text-sm">Utility-scored greedy AI is achievable and fun to beat; a genuinely strong AI is a
+          research project. Plan for "credible", not "strong". The sim/presentation split keeps AI iteration cheap.</p>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-warning alert-vertical sm:alert-horizontal">
+        <div>
+          <h3 class="font-bold">Asset licensing</h3>
+          <p class="text-sm">No Nintendo assets, names, or trade dress. Use CC0/CC-BY packs or original
+          art (decision below). Keep all third-party licenses in <code>assets/LICENSES.md</code> from day one.</p>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-warning alert-vertical sm:alert-horizontal">
+        <div>
+          <h3 class="font-bold">Fog of war retrofit</h3>
+          <p class="text-sm">Fog touches rendering, AI, and rules. Mitigation: from M2 on, all
+          "what can this player see" queries go through one <code>Vision</code> API that simply returns
+          "everything" until M7 implements it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DECISIONS ============ -->
+  <section id="decisions" class="space-y-4">
+    <h2 class="text-3xl font-bold">8 · Decisions needed from you</h2>
+    <p>Pick an option in each card — selections stay local until you press <em>Queue answer</em>,
+    then hit <strong>Send to Agent</strong> in the Lavish panel. Recommended options are pre-selected;
+    you can also annotate any part of this page with free-form feedback.</p>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Q1 · Scripting language</h3>
+          <form data-lavish-question="language" class="space-y-2"
+            onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('language'); if (c) window.lavish.queuePrompt('Decision Q1 — scripting language: ' + c, { tag: 'choice', text: 'Language: ' + c, element: event.currentTarget, data: { question: 'language', answer: c } });">
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="language" class="radio radio-primary radio-sm mt-1" checked
+                value="GDScript (typed) for the whole project">
+              <span class="text-sm"><strong>GDScript</strong> <span class="badge badge-primary badge-sm">Recommended</span><br>
+              Fastest iteration, best docs/examples, no build step. Typed GDScript keeps it maintainable.</span>
+            </label>
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="language" class="radio radio-sm mt-1"
+                value="C# for the whole project">
+              <span class="text-sm"><strong>C#</strong><br>
+              Stronger tooling/refactoring if you prefer it; slower iteration loop, fewer Godot examples.</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-sm">Queue answer</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Q2 · MVP scope</h3>
+          <form data-lavish-question="scope" class="space-y-2"
+            onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('scope'); if (c) window.lavish.queuePrompt('Decision Q2 — MVP scope: ' + c, { tag: 'choice', text: 'Scope: ' + c, element: event.currentTarget, data: { question: 'scope', answer: c } });">
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="scope" class="radio radio-primary radio-sm mt-1" checked
+                value="Classic ground game as planned (9 ground units, capture + economy, hot-seat at M4)">
+              <span class="text-sm"><strong>Classic ground game</strong> <span class="badge badge-primary badge-sm">Recommended</span><br>
+              The 9-unit roster and M0–M4 as written above. Real AW feel, contained scope.</span>
+            </label>
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="scope" class="radio radio-sm mt-1"
+                value="Smaller first cut: only Infantry/Tank/Artillery, no economy, pre-placed armies; grow from there">
+              <span class="text-sm"><strong>Minimal skirmish first</strong><br>
+              3 units, no capture/economy, pre-placed armies. Playable sooner, but M4's economy loop is where AW's fun lives.</span>
+            </label>
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="scope" class="radio radio-sm mt-1"
+                value="Bigger MVP: include air units and fog of war before calling it MVP">
+              <span class="text-sm"><strong>Ambitious MVP</strong><br>
+              Air + fog before "done". Significantly delays the first complete match.</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-sm">Queue answer</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Q3 · Art direction</h3>
+          <form data-lavish-question="art" class="space-y-2"
+            onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('art'); if (c) window.lavish.queuePrompt('Decision Q3 — art direction: ' + c, { tag: 'choice', text: 'Art: ' + c, element: event.currentTarget, data: { question: 'art', answer: c } });">
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="art" class="radio radio-primary radio-sm mt-1" checked
+                value="Free licensed pixel-art packs (e.g. Kenney and itch.io CC0 tilesets), track licenses in assets/LICENSES.md">
+              <span class="text-sm"><strong>Free asset packs</strong> <span class="badge badge-primary badge-sm">Recommended</span><br>
+              CC0/CC-BY pixel-art tilesets and units (Kenney, itch.io). Looks decent immediately, zero legal risk.</span>
+            </label>
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="art" class="radio radio-sm mt-1"
+                value="Generated programmer-art placeholders (colored shapes/icons) now, real art much later">
+              <span class="text-sm"><strong>Placeholders only for now</strong><br>
+              Colored squares + icons. Fastest start, but the game reads worse during the whole build.</span>
+            </label>
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="art" class="radio radio-sm mt-1"
+                value="Custom pixel art drawn for this project (self-made or commissioned)">
+              <span class="text-sm"><strong>Custom pixel art</strong><br>
+              Unique look, big time/cost investment. Can layer on later regardless.</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-sm">Queue answer</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Q4 · First code milestone</h3>
+          <form data-lavish-question="kickoff" class="space-y-2"
+            onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('kickoff'); if (c) window.lavish.queuePrompt('Decision Q4 — kickoff: ' + c, { tag: 'choice', text: 'Kickoff: ' + c, element: event.currentTarget, data: { question: 'kickoff', answer: c } });">
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="kickoff" class="radio radio-primary radio-sm mt-1" checked
+                value="Approve the plan and start implementing M0 + M1 now (project bootstrap, then map on screen)">
+              <span class="text-sm"><strong>Start M0 + M1 now</strong> <span class="badge badge-primary badge-sm">Recommended</span><br>
+              Bootstrap the Godot project and get a scrollable map with cursor and terrain panel on screen.</span>
+            </label>
+            <label class="flex items-start gap-3 rounded-box border border-base-content/10 p-3 cursor-pointer">
+              <input type="radio" name="kickoff" class="radio radio-sm mt-1"
+                value="Revise the plan first based on my annotations before writing any code">
+              <span class="text-sm"><strong>Iterate on the plan first</strong><br>
+              You'll annotate sections of this page; the plan gets revised before implementation.</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-sm">Queue answer</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ OPEN QUESTIONS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">9 · Open questions</h2>
+    <ul class="list-disc list-inside space-y-2 text-sm bg-base-100 rounded-box border border-base-content/10 p-5">
+      <li><strong>Map size &amp; tile size</strong> — proposal: 16×16 px tiles, maps around 20×15 to 30×20
+      (AW-typical). Fine to confirm during M1 when we see it on screen.</li>
+      <li><strong>Working title</strong> — the repo says <code>advance_war_clone</code>, but the shipped
+      game needs its own name (see legal note). Not blocking; pick any time before M7.</li>
+      <li><strong>Controls</strong> — plan supports keyboard + mouse from M1. Gamepad support is cheap
+      via Godot's input map if wanted; say the word and it's added to M1's scope.</li>
+    </ul>
+  </section>
+
+  <footer class="text-center text-sm text-base-content/60 pb-6">
+    Annotate anything on this page, answer the four questions above, then press
+    <strong>Send to Agent</strong> — I'll fold the decisions into the plan and start building.
+  </footer>
+
+</main>
+</body>
+</html>
