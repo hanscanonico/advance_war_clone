@@ -6,3 +6,4 @@ extends Node
 ## to the battle scene.
 
 signal cursor_moved(cell: Vector2i)
+signal unit_moved(unit: Unit)
