@@ -7,13 +7,14 @@ const TILE := 16
 const MAP_PATH := "res://maps/first_steps.txt"
 const ATLAS_PATH := "res://assets/tiles/terrain_atlas.png"
 const OVERLAY_PATH := "res://assets/tiles/overlay.png"
+const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
 const ATLAS_SOURCE_ID := 0
 const MAX_ZOOM := 5.0
 const MOVE_STEP_SECONDS := 0.06
 
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
-enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU }
+enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING }
 
 const DIR_ACTIONS: Array = [
 	[&"cursor_up", Vector2i.UP],
@@ -24,12 +25,16 @@ const DIR_ACTIONS: Array = [
 
 @onready var terrain_layer: TileMapLayer = $TerrainLayer
 @onready var move_overlay: TileMapLayer = $MoveOverlay
+@onready var attack_overlay: TileMapLayer = $AttackOverlay
 @onready var path_line: Line2D = $PathLine
 @onready var units_root: Node2D = $Units
 @onready var cursor: Sprite2D = $Cursor
 @onready var camera: Camera2D = $Camera2D
 @onready var terrain_panel: PanelContainer = %TerrainPanel
 @onready var action_menu: ActionMenu = %ActionMenu
+@onready var damage_preview: PanelContainer = %DamagePreview
+@onready var atk_label: Label = %AtkLabel
+@onready var counter_label: Label = %CounterLabel
 
 var db: TerrainDB
 var unit_db: UnitDB
@@ -41,6 +46,7 @@ var state := State.IDLE
 var selected: Unit
 var move_range: MovementResolver.MoveRange
 var planned_path: Array[Vector2i] = []
+var _attack_targets: Array[Vector2i] = []
 
 var _sprites: Dictionary = {}  # Unit -> UnitSprite
 var _zoom := 2.0
@@ -52,10 +58,12 @@ func _ready() -> void:
 	unit_db = UnitDB.load_default()
 	map = MapData.load_from_file(MAP_PATH, db)
 	assert(map != null, "failed to load %s" % MAP_PATH)
-	game = GameState.create(map, unit_db)
+	game = GameState.create(map, unit_db, load(DAMAGE_CHART_PATH))
 	assert(game != null, "failed to build game state from %s" % MAP_PATH)
+	game.rng.randomize()
 	terrain_layer.tile_set = _build_tile_set()
 	move_overlay.tile_set = _build_overlay_tile_set()
+	attack_overlay.tile_set = move_overlay.tile_set
 	_paint_map()
 	_spawn_unit_sprites()
 	action_menu.action_chosen.connect(_on_menu_action)
@@ -112,11 +120,16 @@ func _confirm_at(cell: Vector2i) -> void:
 			if move_range.has(cell) and move_range.can_stop_at(cell):
 				planned_path = move_range.path_to(cell)
 				_animate_move()
+		State.TARGETING:
+			if cell in _attack_targets:
+				_execute_attack(cell)
 
 
 func _cancel() -> void:
 	if state == State.UNIT_SELECTED:
 		_clear_selection()
+	elif state == State.TARGETING:
+		_exit_targeting_to_menu()
 
 
 func _select(unit: Unit) -> void:
@@ -132,8 +145,11 @@ func _clear_selection() -> void:
 	selected = null
 	move_range = null
 	planned_path = []
+	_attack_targets = []
 	move_overlay.clear()
+	attack_overlay.clear()
 	path_line.clear_points()
+	damage_preview.visible = false
 	state = State.IDLE
 
 
@@ -154,15 +170,20 @@ func _animate_move() -> void:
 func _on_move_animation_done() -> void:
 	state = State.MENU
 	var dest: Vector2i = planned_path[planned_path.size() - 1]
-	action_menu.open([
-		{"id": &"wait", "label": "Wait"},
-		{"id": &"cancel", "label": "Cancel"},
-	], _screen_pos_for_cell(dest))
+	_attack_targets = _attackable_cells(selected, dest, planned_path.size() > 1)
+	var actions: Array[Dictionary] = []
+	if not _attack_targets.is_empty():
+		actions.append({"id": &"fire", "label": "Fire"})
+	actions.append({"id": &"wait", "label": "Wait"})
+	actions.append({"id": &"cancel", "label": "Cancel"})
+	action_menu.open(actions, _screen_pos_for_cell(dest))
 
 
 func _on_menu_action(action: StringName) -> void:
 	action_menu.close()
 	match action:
+		&"fire":
+			_enter_targeting()
 		&"wait":
 			var command := MoveCommand.new(selected, planned_path)
 			var error := command.validate(game)
@@ -202,6 +223,107 @@ func _refresh_round_if_exhausted() -> void:
 		unit.acted = false
 		_sprites[unit].refresh()
 	_refresh_panel()
+
+
+# --- attack flow -------------------------------------------------------------
+
+
+## Enemy cells the unit could fire at from `dest`. Indirect units lose their
+## shot if they moved this turn.
+func _attackable_cells(unit: Unit, dest: Vector2i, moved: bool) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var type := unit.type
+	if type.max_range <= 0:
+		return cells
+	if type.min_range > 1 and moved:
+		return cells
+	for other in game.units:
+		if other.team == unit.team:
+			continue
+		var dist := absi(other.cell.x - dest.x) + absi(other.cell.y - dest.y)
+		if dist < type.min_range or dist > type.max_range:
+			continue
+		if game.damage_chart.can_attack(type.id, other.type.id):
+			cells.append(other.cell)
+	cells.sort()
+	return cells
+
+
+func _enter_targeting() -> void:
+	state = State.TARGETING
+	attack_overlay.clear()
+	for cell in _attack_targets:
+		attack_overlay.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
+	_set_cursor_cell(_attack_targets[0])
+
+
+func _exit_targeting_to_menu() -> void:
+	attack_overlay.clear()
+	damage_preview.visible = false
+	_on_move_animation_done()  # recomputes targets and reopens the menu
+
+
+func _execute_attack(target_cell: Vector2i) -> void:
+	var target := game.unit_at(target_cell)
+	var command := AttackCommand.new(selected, planned_path, target_cell)
+	var error := command.validate(game)
+	if error != "":
+		# The UI only offers legal attacks, so this is a bug guard.
+		push_error("AttackCommand rejected: %s" % error)
+		_exit_targeting_to_menu()
+		return
+	var attacker := selected
+	attack_overlay.clear()
+	damage_preview.visible = false
+	path_line.clear_points()
+	state = State.ANIMATING
+	command.apply(game)
+	EventBus.unit_moved.emit(attacker)
+	await _animate_combat(command.result, attacker, target)
+	_clear_selection()
+	_refresh_panel()
+	_refresh_round_if_exhausted()
+
+
+func _animate_combat(
+	result: CombatResolver.CombatResult, attacker: Unit, defender: Unit
+) -> void:
+	var defender_sprite: UnitSprite = _sprites[defender]
+	var attacker_sprite: UnitSprite = _sprites[attacker]
+	attacker_sprite.refresh()  # snap to the committed destination
+	await defender_sprite.flash_hit()
+	if result.defender_died:
+		_sprites.erase(defender)
+		await defender_sprite.die()
+	else:
+		defender_sprite.refresh()
+	if result.countered:
+		await attacker_sprite.flash_hit()
+	if result.attacker_died:
+		_sprites.erase(attacker)
+		await attacker_sprite.die()
+	else:
+		attacker_sprite.refresh()
+
+
+func _update_damage_preview() -> void:
+	var target := game.unit_at(cursor_cell)
+	var valid := state == State.TARGETING and target != null and cursor_cell in _attack_targets
+	damage_preview.visible = valid
+	if not valid:
+		return
+	var dest: Vector2i = planned_path[planned_path.size() - 1]
+	var forecast := CombatResolver.forecast(game, selected, dest, target)
+	atk_label.text = "Atk %d%%" % forecast.attack_damage
+	counter_label.text = (
+		"Counter %d%%" % forecast.counter_damage if forecast.counter_damage >= 0
+		else "No counter"
+	)
+	var pos := _screen_pos_for_cell(cursor_cell) + Vector2(4, -34)
+	var view := get_viewport().get_visible_rect().size
+	if pos.x > view.x - 100.0:
+		pos.x -= 130.0
+	damage_preview.position = pos.max(Vector2(4, 4))
 
 
 # --- rendering ---------------------------------------------------------------
@@ -302,6 +424,8 @@ func _set_cursor_cell(cell: Vector2i) -> void:
 		if move_range.has(cell) and move_range.can_stop_at(cell):
 			planned_path = move_range.path_to(cell)
 		_update_path_line()
+	elif state == State.TARGETING:
+		_update_damage_preview()
 	EventBus.cursor_moved.emit(cell)
 
 
@@ -312,10 +436,17 @@ func _refresh_panel() -> void:
 
 
 func _screen_pos_for_cell(cell: Vector2i) -> Vector2:
+	# Anchor to the camera's target (unsmoothed) position so UI placed during
+	# a camera glide lands where the view settles, not where it happens to be.
 	var world := _cell_center(cell) + Vector2(TILE, -TILE) / 2.0
 	var view_size := get_viewport().get_visible_rect().size
-	return (world - camera.get_screen_center_position()) * camera.zoom \
-		+ view_size / 2.0 + Vector2(6, 0)
+	var center := Vector2(
+		clampf(camera.position.x, view_size.x / (2.0 * camera.zoom.x),
+			camera.limit_right - view_size.x / (2.0 * camera.zoom.x)),
+		clampf(camera.position.y, view_size.y / (2.0 * camera.zoom.y),
+			camera.limit_bottom - view_size.y / (2.0 * camera.zoom.y))
+	)
+	return (world - center) * camera.zoom + view_size / 2.0 + Vector2(6, 0)
 
 
 func _start_cursor_pulse() -> void:
@@ -329,18 +460,51 @@ func _start_cursor_pulse() -> void:
 # --- automated verification --------------------------------------------------
 
 
-## `Godot --path . -- --screenshot=/abs/path.png [--select=x,y]` boots the
-## scene, optionally selects the unit at (x,y) and previews its farthest move
-## (range overlay + path arrow), saves one frame, and quits.
+## `Godot --path . -- --screenshot=/abs/path.png [--select=x,y | --demo=MODE]`
+## boots the scene, optionally drives a demo, saves one frame, and quits.
+## --select previews a unit's movement; --demo=attack stops at the targeting
+## preview; --demo=resolve fires and captures the post-combat state.
 func _check_screenshot_mode() -> void:
 	var shot_path := ""
+	var select_cell := Vector2i(-1, -1)
+	var demo := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			shot_path = arg.get_slice("=", 1)
 		elif arg.begins_with("--select="):
 			var parts := arg.get_slice("=", 1).split(",")
 			if parts.size() == 2:
-				_screenshot_demo_select(Vector2i(int(parts[0]), int(parts[1])))
+				select_cell = Vector2i(int(parts[0]), int(parts[1]))
+		elif arg.begins_with("--demo="):
+			demo = arg.get_slice("=", 1)
+	if demo != "":
+		_run_attack_demo(demo, shot_path)
+		return
+	if select_cell.x >= 0:
+		_screenshot_demo_select(select_cell)
+	if shot_path != "":
+		_save_screenshot_and_quit(shot_path)
+
+
+## Drives the real selection -> menu -> Fire -> target flow on the frontline
+## tanks, through the same handlers a player's input reaches.
+func _run_attack_demo(mode: String, shot_path: String) -> void:
+	await get_tree().process_frame
+	game.rng.seed = 2026  # deterministic demo
+	_confirm_at(Vector2i(8, 8))  # select the red tank
+	_confirm_at(Vector2i(8, 8))  # fire in place
+	while state != State.MENU:
+		await get_tree().process_frame
+	action_menu.choose(&"fire")
+	while state != State.TARGETING:
+		await get_tree().process_frame
+	if mode == "attack":
+		if shot_path != "":
+			_save_screenshot_and_quit(shot_path)
+		return
+	_confirm_at(cursor_cell)  # fire at the blue tank
+	while state != State.IDLE:
+		await get_tree().process_frame
 	if shot_path != "":
 		_save_screenshot_and_quit(shot_path)
 

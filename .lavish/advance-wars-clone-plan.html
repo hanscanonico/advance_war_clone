@@ -166,11 +166,11 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M2 done</span></h3>
-          <p class="text-sm">As of 2026-07-17: Godot 4.7.1 project, 50 GUT tests passing. The 9-unit
-          ground roster is in as Resources, and the battle scene supports the full AW selection flow —
-          Dijkstra movement range with per-class terrain costs, path arrow, animated moves, and
-          Wait/Cancel with true undo. Next up: <strong>M3 — combat</strong>.</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M3 done</span></h3>
+          <p class="text-sm">As of 2026-07-17: Godot 4.7.1 project, 72 GUT tests passing. Movement and
+          combat are complete — AW2 damage chart as a Resource, seeded-luck CombatResolver with
+          counter-attacks, indirect fire rings, Fire targeting with red overlay and Atk/Counter damage
+          preview, HP badges and death. Next up: <strong>M4 — turns, capture, economy, victory</strong>.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -460,7 +460,7 @@ stateDiagram-v2
       <li class="step step-primary" data-content="✓">Setup</li>
       <li class="step step-primary" data-content="✓">Map</li>
       <li class="step step-primary" data-content="✓">Movement</li>
-      <li class="step step-primary">Combat</li>
+      <li class="step step-primary" data-content="✓">Combat</li>
       <li class="step step-primary">Game loop</li>
       <li class="step">AI</li>
       <li class="step">Depth</li>
@@ -495,7 +495,7 @@ stateDiagram-v2
             <td>…select units, see their exact legal range, walk them around, change your mind (B-cancel).</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M3 · Combat</td>
+            <td class="font-bold whitespace-nowrap">M3 · Combat <span class="badge badge-success badge-sm">Done</span></td>
             <td>DamageChart resource (AW2 ground matrix), <code>AttackCommand</code> + CombatResolver
             (formula above, seeded luck), direct move-and-fire + indirect min/max rings, damage preview
             popup, hit/counter resolution, HP updates, unit death + removal. Unit tests on the resolver.</td>

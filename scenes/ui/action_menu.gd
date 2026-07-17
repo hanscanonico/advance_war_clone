@@ -26,7 +26,7 @@ func open(actions: Array[Dictionary], screen_pos: Vector2) -> void:
 		button.focus_mode = Control.FOCUS_NONE
 		button.add_theme_font_size_override("font_size", 10)
 		var id: StringName = entry.id
-		button.pressed.connect(func() -> void: _choose(id))
+		button.pressed.connect(func() -> void: choose(id))
 		rows.add_child(button)
 		_ids.append(id)
 		_labels.append(entry.label)
@@ -51,15 +51,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		_index = wrapi(_index + 1, 0, _ids.size())
 		_update_labels()
 	elif event.is_action_pressed(&"confirm"):
-		_choose(_ids[_index])
+		choose(_ids[_index])
 	elif event.is_action_pressed(&"cancel"):
-		_choose(&"cancel")
+		choose(&"cancel")
 	else:
 		return
 	get_viewport().set_input_as_handled()
 
 
-func _choose(id: StringName) -> void:
+## Public so scripted drivers (screenshot demos) exercise the same path as
+## the buttons and keyboard.
+func choose(id: StringName) -> void:
 	action_chosen.emit(id)
 
 

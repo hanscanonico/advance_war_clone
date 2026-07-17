@@ -5,13 +5,21 @@ extends RefCounted
 
 var map: MapData
 var units: Array[Unit] = []
+var damage_chart: DamageChart
+## Match RNG (combat luck). Set `rng.seed` explicitly for deterministic
+## tests and replays; the battle scene randomizes it.
+var rng := RandomNumberGenerator.new()
 
 
 ## Builds the starting state from a parsed map. Returns null (with a pushed
-## error) if any starting unit is invalid.
-static func create(p_map: MapData, unit_db: UnitDB) -> GameState:
+## error) if any starting unit is invalid. The damage chart is optional for
+## states that never resolve combat (e.g. movement-only tests).
+static func create(
+	p_map: MapData, unit_db: UnitDB, p_damage_chart: DamageChart = null
+) -> GameState:
 	var state := GameState.new()
 	state.map = p_map
+	state.damage_chart = p_damage_chart
 	for entry: Dictionary in p_map.starting_units:
 		var type: UnitType = unit_db.by_symbol(entry.symbol)
 		if type == null:

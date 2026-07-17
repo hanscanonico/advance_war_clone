@@ -13,6 +13,9 @@ script = ExtResource("1")
 [node name="MoveOverlay" type="TileMapLayer" parent="."]
 modulate = Color(0.35, 0.55, 1, 0.75)
 
+[node name="AttackOverlay" type="TileMapLayer" parent="."]
+modulate = Color(1, 0.35, 0.3, 0.8)
+
 [node name="PathLine" type="Line2D" parent="."]
 width = 3.0
 default_color = Color(1, 0.92, 0.3, 0.95)
@@ -96,3 +99,31 @@ script = ExtResource("4")
 [node name="MenuRows" type="VBoxContainer" parent="UI/ActionMenu"]
 unique_name_in_owner = true
 layout_mode = 2
+
+[node name="DamagePreview" type="PanelContainer" parent="UI"]
+unique_name_in_owner = true
+visible = false
+offset_right = 96.0
+offset_bottom = 40.0
+
+[node name="PreviewMargin" type="MarginContainer" parent="UI/DamagePreview"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="PreviewRows" type="VBoxContainer" parent="UI/DamagePreview/PreviewMargin"]
+layout_mode = 2
+
+[node name="AtkLabel" type="Label" parent="UI/DamagePreview/PreviewMargin/PreviewRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Atk 50%"
+
+[node name="CounterLabel" type="Label" parent="UI/DamagePreview/PreviewMargin/PreviewRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Counter 45%"
