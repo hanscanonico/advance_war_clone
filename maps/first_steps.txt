@@ -38,3 +38,6 @@ SSSSSSSSSSSSSSSSSSSS
 2 t 14 11
 2 r 13 9
 2 g 15 12
+# frontline contact for the combat sandbox
+1 t 8 8
+2 t 9 8

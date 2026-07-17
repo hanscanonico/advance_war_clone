@@ -8,5 +8,5 @@ bin/
 .DS_Store
 
 # Local verification artifacts
-screenshot.png
-screenshot.png.import
+screenshot*.png
+screenshot*.png.import

@@ -27,3 +27,19 @@ func refresh() -> void:
 	modulate = ACTED_TINT if unit.acted else Color.WHITE
 	hp_label.visible = unit.displayed_hp() < 10
 	hp_label.text = str(unit.displayed_hp())
+
+
+## Quick white flash when taking a hit. Awaitable.
+func flash_hit() -> void:
+	var tween := create_tween()
+	tween.tween_property(self, "self_modulate", Color(4.0, 4.0, 4.0), 0.08)
+	tween.tween_property(self, "self_modulate", Color.WHITE, 0.12)
+	await tween.finished
+
+
+## Fade out and free. Awaitable; the caller must drop its reference first.
+func die() -> void:
+	var tween := create_tween()
+	tween.tween_property(self, "modulate:a", 0.0, 0.25)
+	await tween.finished
+	queue_free()
