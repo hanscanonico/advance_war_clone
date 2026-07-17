@@ -115,7 +115,7 @@ func test_loads_first_steps_map() -> void:
 	assert_eq(map.terrain_at(Vector2i(17, 11)).id, &"hq")
 	assert_eq(map.owner_at(Vector2i(17, 11)), 2)
 	assert_eq(map.terrain_at(Vector2i(16, 8)).id, &"city")
-	assert_eq(map.owner_at(Vector2i(16, 8)), 2)
+	assert_eq(map.owner_at(Vector2i(16, 8)), MapData.NEUTRAL, "cities start neutral")
 	# borders are sea
 	assert_eq(map.terrain_at(Vector2i(0, 0)).id, &"sea")
 	assert_eq(map.terrain_at(Vector2i(19, 14)).id, &"sea")

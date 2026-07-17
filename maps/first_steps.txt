@@ -18,13 +18,12 @@ S..F..=.MM.....=...S
 S.C...=.......F....S
 SSSSSSSSSSSSSSSSSSSS
 [owners]
-# team x y — Red (1) top-left, Blue (2) bottom-right
+# team x y — Red (1) top-left, Blue (2) bottom-right.
+# Only HQ + base start owned; all cities are neutral and contested.
 1 2 2
 1 3 2
-1 3 4
 2 17 11
 2 16 11
-2 16 8
 [units]
 # team symbol x y — i infantry, m mech, r recon, t tank, T md tank,
 #                   a anti-air, g artillery, R rockets, p apc
