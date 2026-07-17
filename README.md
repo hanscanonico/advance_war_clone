@@ -49,4 +49,3 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 All art is generated placeholder programmer art (`make tiles`), pending the free
 asset pack pass planned in the art decision. Third-party asset licenses must be
 tracked in `assets/LICENSES.md`. No Nintendo assets or names may ever be used.
-# advance_war_clone

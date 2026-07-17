@@ -1,0 +1,27 @@
+# First Steps — 20x15 starter map.
+# Symbols: . plains  F woods  M mountain  = road  ~ river
+#          C city  B base  Q HQ  S sea
+[terrain]
+SSSSSSSSSSSSSSSSSSSS
+S..................S
+S.QB=====..F..MM..CS
+S.......=..F.......S
+S..C....=......C...S
+S...FF..======.....S
+S..MM........=..F..S
+S..MM.~~~~...=.....S
+S......C.....=..C..S
+S.....======.=.....S
+S...C.=......===...S
+S.....=..F.....=BQ.S
+S..F..=.MM.....=...S
+S.C...=.......F....S
+SSSSSSSSSSSSSSSSSSSS
+[owners]
+# team x y — Red (1) top-left, Blue (2) bottom-right
+1 2 2
+1 3 2
+1 3 4
+2 17 11
+2 16 11
+2 16 8

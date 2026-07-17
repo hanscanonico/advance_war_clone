@@ -1,0 +1,11 @@
+# Godot
+.godot/
+
+# Vendored engine binary (see README for setup)
+bin/
+
+# macOS
+.DS_Store
+
+# Local verification artifacts
+screenshot.png

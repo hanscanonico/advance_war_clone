@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TerrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/terrain_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"mountain"
+display_name = "Mountain"
+symbol = "M"
+defense_stars = 4
+move_costs = {
+&"boot": 1,
+&"foot": 2
+}
+is_property = false
+atlas_col = 3
+team_tinted = false
