@@ -29,12 +29,8 @@ func validate(state: GameState) -> String:
 
 
 func apply(state: GameState) -> void:
-	var origin: Vector2i = path[0]
+	state.advance_unit(unit, path)
 	var dest: Vector2i = path[path.size() - 1]
-	if dest != origin:
-		state.notify_unit_left(origin)
-	unit.cell = dest
-	unit.acted = true
 	var points: int = state.capture_progress.get(dest, GameState.CAPTURE_POINTS)
 	points -= unit.displayed_hp()
 	if points > 0:

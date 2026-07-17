@@ -40,9 +40,5 @@ func validate(state: GameState) -> String:
 
 func apply(state: GameState) -> void:
 	var target := state.unit_at(target_cell)
-	var dest: Vector2i = path[path.size() - 1]
-	if dest != path[0]:
-		state.notify_unit_left(path[0])
-	unit.cell = dest
-	unit.acted = true
+	state.advance_unit(unit, path)
 	result = CombatResolver.resolve(state, unit, target)

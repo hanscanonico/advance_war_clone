@@ -56,6 +56,7 @@ var _build_cell := Vector2i.ZERO
 var _sprites: Dictionary = {}  # Unit -> UnitSprite
 var _zoom := 2.0
 var _min_zoom := 1.0
+var _banner_tween: Tween
 
 
 func _ready() -> void:
@@ -326,18 +327,22 @@ func _on_turn_started() -> void:
 
 func _enter_victory() -> void:
 	state = State.VICTORY
+	if _banner_tween != null and _banner_tween.is_valid():
+		_banner_tween.kill()
 	banner_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
 	turn_banner.show()
 	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 
 
 func _show_banner(text: String) -> void:
+	if _banner_tween != null and _banner_tween.is_valid():
+		_banner_tween.kill()
 	banner_label.text = text
 	turn_banner.show()
 	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	var tween := create_tween()
-	tween.tween_interval(1.2)
-	tween.tween_callback(turn_banner.hide)
+	_banner_tween = create_tween()
+	_banner_tween.tween_interval(1.2)
+	_banner_tween.tween_callback(turn_banner.hide)
 
 
 func _refresh_hud() -> void:
