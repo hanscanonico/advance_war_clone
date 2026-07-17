@@ -19,26 +19,32 @@ Then:
 ```sh
 make run          # play
 make test         # run the GUT unit test suite (headless)
-make tiles        # regenerate the placeholder tile atlas (headless)
+make tiles        # regenerate the placeholder art — tiles, unit sprites, overlay (headless)
 make import       # (re)import assets headless
 make screenshot   # boot the game, save screenshot.png, quit
 ```
 
 Any Godot 4.7+ works too — open the project folder in the editor.
 
-## Controls (M1)
+## Controls (M2)
 
 - Arrow keys / mouse hover: move the grid cursor
 - Mouse wheel or `+` / `-`: zoom
-- The corner panel shows the hovered tile's terrain, defense stars, and move costs
+- Confirm (`Enter` / `Space` / `Z`) or left-click on a unit: select it and highlight its
+  movement range; move the cursor within range to preview the path, then confirm a destination
+  to move there
+- Cancel (`Esc` / `X` / `Backspace`): deselect, or undo an uncommitted move
+- After a move, the Wait/Cancel menu commits the move (Wait) or reverts it (Cancel)
+- The corner panel shows the hovered tile's terrain, defense stars, move costs, and the unit
+  standing there, if any
 
 ## Architecture
 
 - `core/` — pure simulation code. **Nothing here may reference a Node or a scene.**
   All rules are unit-testable and the future AI simulates through the same code.
-- `data/` — game data as `Resource` files (terrain now; units and the damage chart at M2/M3).
-- `maps/` — plain-text maps: an ASCII terrain grid plus a property-ownership section.
-  `MapData` (core) is authoritative; the TileMapLayer is just paint.
+- `data/` — game data as `Resource` files (terrain and units now; the damage chart at M3).
+- `maps/` — plain-text maps: an ASCII terrain grid, a property-ownership section, and a
+  starting-units section. `MapData` (core) is authoritative; the TileMapLayer is just paint.
 - `scenes/` — presentation: battle scene, cursor, UI panels.
 - `tools/` — headless scripts (placeholder art generator).
 - `tests/` — GUT tests, targeting `core/` only.
