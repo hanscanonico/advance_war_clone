@@ -1,3 +1,4 @@
+class_name ActionMenu
 extends PanelContainer
 ## Minimal AW-style action menu (M2: Wait / Cancel; Fire etc. arrive in M3).
 ## The battle scene opens it with a list of actions; it emits the chosen id.

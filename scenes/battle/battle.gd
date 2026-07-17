@@ -29,7 +29,7 @@ const DIR_ACTIONS: Array = [
 @onready var cursor: Sprite2D = $Cursor
 @onready var camera: Camera2D = $Camera2D
 @onready var terrain_panel: PanelContainer = %TerrainPanel
-@onready var action_menu: PanelContainer = %ActionMenu
+@onready var action_menu: ActionMenu = %ActionMenu
 
 var db: TerrainDB
 var unit_db: UnitDB
