@@ -1,0 +1,67 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/battle.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/ui/terrain_panel.gd" id="2"]
+[ext_resource type="Texture2D" path="res://assets/ui/cursor.png" id="3"]
+
+[node name="Battle" type="Node2D"]
+script = ExtResource("1")
+
+[node name="TerrainLayer" type="TileMapLayer" parent="."]
+
+[node name="Cursor" type="Sprite2D" parent="."]
+z_index = 10
+texture = ExtResource("3")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)
+position_smoothing_enabled = true
+position_smoothing_speed = 12.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="TerrainPanel" type="PanelContainer" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -76.0
+offset_right = 168.0
+offset_bottom = -8.0
+grow_vertical = 0
+script = ExtResource("2")
+
+[node name="Margin" type="MarginContainer" parent="UI/TerrainPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Rows" type="VBoxContainer" parent="UI/TerrainPanel/Margin"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Plains"
+
+[node name="DefLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "DEF 1"
+
+[node name="MoveLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Foot 1  Boot 1  Tires 2  Treads 1"
+
+[node name="OwnerLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Neutral"
