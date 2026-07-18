@@ -734,8 +734,7 @@ func _start_cursor_pulse() -> void:
 
 ## `Godot --path . -- --screenshot=/abs/path.png [--select=x,y | --demo=MODE]`
 ## boots the scene, optionally drives a demo, saves one frame, and quits.
-## --select previews a unit's movement; --demo=attack stops at the targeting
-## preview; --demo=resolve fires and captures the post-combat state.
+## --select previews a unit's movement; see _run_attack_demo for the demo modes.
 func _check_screenshot_mode() -> void:
 	var shot_path := ""
 	var select_cell := Vector2i(-1, -1)
@@ -762,8 +761,10 @@ func _check_screenshot_mode() -> void:
 
 
 ## Drives real flows through the same handlers a player's input reaches:
-## attack/resolve use the frontline tanks, capture takes the city at (3,4)
-## with the infantry at (4,3), endturn hands the turn to Blue.
+## attack stops at the targeting preview and resolve fires, both with the
+## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
+## build buys at the red base; endturn hands the turn to Blue; aiturn does the
+## same and then waits out Blue's whole AI turn, back to Red's next turn.
 func _run_attack_demo(mode: String, shot_path: String) -> void:
 	await get_tree().process_frame
 	game.rng.seed = 2026  # deterministic demo

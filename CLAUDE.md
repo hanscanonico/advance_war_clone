@@ -6,7 +6,7 @@ Guidance for AI agents (and humans) working in this repository.
 
 An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with **GDScript**.
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster,
-property capture and income, and eventually a computer opponent.
+property capture and income, and a computer opponent.
 
 - **Status:** the design of record is `.lavish/advance-wars-clone-plan.html` — milestones M0–M7
   and which of them are done, mechanics reference, damage formula. Read it before making
@@ -48,10 +48,10 @@ res://
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
 │  └─ ui/       # menus, panels, damage preview
-├─ ai/          # ai_controller.gd, scoring
+├─ ai/          # ai_controller.gd — plans Commands  (NO Node references)
 ├─ maps/        # map scenes / map resources
 ├─ assets/      # sprites, audio, fonts  (+ LICENSES.md)
-└─ tests/       # GUT tests — target core/ only
+└─ tests/       # GUT tests — target core/ and ai/ only
 ```
 
 ## GDScript conventions
@@ -74,11 +74,12 @@ Follow the official Godot GDScript style guide. Key points:
 
 ## Testing
 
-- Tests use **GUT** (Godot Unit Test) and live in `tests/`, mirroring `core/`.
-- **Test `core/` exclusively** — the sim is where the rules live and where bugs hurt.
-  Movement range, path math, the combat resolver, capture points, and turn/economy logic all
-  get unit tests. Presentation is verified by playing the scene, not by unit tests.
-- Every bugfix in `core/` should come with a failing test that the fix makes pass.
+- Tests use **GUT** (Godot Unit Test) and live in `tests/`, mirroring `core/` and `ai/`.
+- **Test the pure-simulation layers exclusively** — `core/`, plus `ai/`, which is Node-free for
+  exactly this reason. That's where the rules live and where bugs hurt. Movement range, path
+  math, the combat resolver, capture points, turn/economy logic, and AI planning all get unit
+  tests. Presentation is verified by playing the scene, not by unit tests.
+- Every bugfix in `core/` or `ai/` should come with a failing test that the fix makes pass.
 - Keep tests deterministic: seed the RNG explicitly.
 
 Run the suite with `make test` — it runs GUT headless against `tests/unit` via `.gutconfig.json`.
@@ -94,8 +95,8 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
 ## Working in this repo
 
 - **Match the plan's milestones.** Ship something playable each milestone; don't pull scope
-  forward. The game is complete and fun at M4 (hot-seat); AI (M5) and depth/polish (M6–M7)
-  come after. Scope creep is the named top risk.
+  forward — the plan artifact tracks which milestones are done and what each one owes.
+  Scope creep is the named top risk.
 - **Balance numbers live in `data/`.** Don't hardcode stats you could put in a `.tres`.
 - **Don't hand-edit** `.import` files or the binary/UID bits of `.tscn`/`.tres` unless you know
   exactly what you're doing — let Godot regenerate them. Do read `.tscn`/`.tres` to understand a
