@@ -285,21 +285,11 @@ flowchart TD
       <div class="card card-border bg-base-100">
         <div class="card-body">
           <h3 class="card-title text-base">Project layout</h3>
-          <div class="mockup-code text-sm">
-<pre data-prefix=" "><code>res://</code></pre>
-<pre data-prefix=" "><code>├─ core/        # sim: game_state.gd, commands/, rules/</code></pre>
-<pre data-prefix=" "><code>├─ data/        # .tres: units/, terrain/, damage_chart</code></pre>
-<pre data-prefix=" "><code>├─ scenes/</code></pre>
-<pre data-prefix=" "><code>│  ├─ battle/   # battle.tscn, cursor, unit_sprite</code></pre>
-<pre data-prefix=" "><code>│  └─ ui/       # menus, panels, damage preview</code></pre>
-<pre data-prefix=" "><code>├─ ai/          # ai_controller.gd, scoring</code></pre>
-<pre data-prefix=" "><code>├─ maps/        # map scenes / map resources</code></pre>
-<pre data-prefix=" "><code>├─ assets/      # sprites, audio, fonts</code></pre>
-<pre data-prefix=" "><code>└─ tests/       # GUT tests for core/ only</code></pre>
-          </div>
+          <p class="text-sm text-base-content/70">The canonical directory tree lives in
+          <code>CLAUDE.md</code> (&ldquo;Project layout&rdquo;) and is kept current there — this plan
+          does not duplicate it.</p>
           <p class="text-sm text-base-content/70">Rule of thumb: nothing in <code>core/</code> may
-          reference a Node, a scene, or anything in <code>scenes/</code>. Tests target
-          <code>core/</code> exclusively.</p>
+          reference a Node, a scene, or anything in <code>scenes/</code>.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
