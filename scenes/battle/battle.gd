@@ -4,6 +4,9 @@ extends Node2D
 ## this scene only issues commands and animates the results.
 
 const TILE := 16
+## Terrain atlas cells are 4x the world grid so the PixVoxel property buildings
+## keep their detail; TerrainLayer is scaled down to compensate.
+const TERRAIN_PX := 64
 const MAP_PATH := "res://maps/first_steps.txt"
 const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
 const ATLAS_PATH := "res://assets/tiles/terrain_atlas.png"
@@ -119,6 +122,10 @@ func _ready() -> void:
 		game.fog_enabled = fog
 		game.rng.randomize()
 	terrain_layer.tile_set = _build_tile_set()
+	# The terrain atlas is drawn at 4x the world grid (see TERRAIN_PX), so the
+	# layer is scaled back down to keep one cell = TILE. Overlays and the cursor
+	# stay at 1x and are unaffected.
+	terrain_layer.scale = Vector2.ONE * (float(TILE) / float(TERRAIN_PX))
 	move_overlay.tile_set = _build_overlay_tile_set()
 	attack_overlay.tile_set = move_overlay.tile_set
 	fog_layer.tile_set = move_overlay.tile_set
@@ -923,10 +930,10 @@ func _update_damage_preview() -> void:
 ## terrain, team-colored rows for properties. No hand-maintained .tres TileSet.
 func _build_tile_set() -> TileSet:
 	var tile_set := TileSet.new()
-	tile_set.tile_size = Vector2i(TILE, TILE)
+	tile_set.tile_size = Vector2i(TERRAIN_PX, TERRAIN_PX)
 	var atlas := TileSetAtlasSource.new()
 	atlas.texture = load(ATLAS_PATH)
-	atlas.texture_region_size = Vector2i(TILE, TILE)
+	atlas.texture_region_size = Vector2i(TERRAIN_PX, TERRAIN_PX)
 	for terrain in db.all():
 		atlas.create_tile(Vector2i(terrain.atlas_col, 0))
 		if terrain.team_tinted:

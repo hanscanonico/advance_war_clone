@@ -20,7 +20,8 @@ Then:
 make run             # boot the game — the main menu (map, fog, 1P / 2P / Continue)
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
 make test            # run the GUT unit test suite (headless)
-make tiles           # regenerate the placeholder art — tiles, unit sprites, overlay (headless)
+make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
+make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
 make import          # (re)import assets headless
 make screenshot      # boot the battle scene, save screenshot.png, quit
@@ -113,13 +114,27 @@ vision.
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
-- `tools/` — headless scripts (the placeholder art and sound generators).
+- `tools/` — the art and sound build scripts: the headless ground-tile and sound generators, plus
+  the PixVoxel atlas builder (see Assets below).
 - `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 
 ## Assets
 
-All art is generated placeholder programmer art (`make tiles`) and all sound is generated
-placeholder chiptune (`make sfx`), pending the free asset pack pass planned in the art decision.
+Units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
+Sprites](https://opengameart.org/content/pixvoxel-revised-isometric-wargame-sprites); the ground
+tiles are still generated programmer art. All sound is generated placeholder chiptune (`make sfx`).
 There is no music yet — it needs licensed tracks. Third-party asset licenses must be tracked in
 `assets/LICENSES.md`. No Nintendo assets or names may ever be used.
+
+`make tiles` rebuilds the art in four ordered steps: `sprites-check` verifies the build inputs,
+`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it, and `import`
+reimports the result — Godot caches image imports by size, so skipping the last step after a
+rebuild that changes atlas dimensions renders a blank map. The check runs first because `ground`
+is destructive: it replaces the committed building art with bare lots that only `sprites` can
+finish painting, so a failure has to happen while the tree is still clean.
+
+The only external requirement is ImageMagick 7 (`brew install imagemagick`). The 36 CC0 source
+sprites are vendored under `assets/sprites/pixvoxel_src`, so a fresh clone rebuilds with no
+download. To build from a full extracted pack instead, override the default:
+`make tiles PIXVOXEL=/path/to/Revised_PixVoxel_Wargame/standing_frames`.
