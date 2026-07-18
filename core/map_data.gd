@@ -88,16 +88,6 @@ func size() -> Vector2i:
 	return Vector2i(width, height)
 
 
-## Cells owned by the given team, e.g. to find a start position for the cursor.
-func cells_owned_by(team: int) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for cell: Vector2i in _owners:
-		if _owners[cell] == team:
-			cells.append(cell)
-	cells.sort()
-	return cells
-
-
 func _append_terrain_row(line: String, db: TerrainDB) -> bool:
 	if width == 0:
 		width = line.length()

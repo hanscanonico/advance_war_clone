@@ -40,12 +40,6 @@ func test_owners() -> void:
 	assert_eq(map.owner_at(Vector2i(1, 2)), MapData.NEUTRAL)
 
 
-func test_cells_owned_by() -> void:
-	var map := MapData.parse(SAMPLE, db)
-	assert_eq(map.cells_owned_by(1), [Vector2i(2, 1)] as Array[Vector2i])
-	assert_eq(map.cells_owned_by(2), [] as Array[Vector2i])
-
-
 func test_out_of_bounds() -> void:
 	var map := MapData.parse(SAMPLE, db)
 	assert_false(map.in_bounds(Vector2i(-1, 0)))

@@ -74,12 +74,11 @@ func _ready() -> void:
 	_spawn_unit_sprites()
 	action_menu.action_chosen.connect(_on_menu_action)
 	_setup_camera()
-	var homes := game.properties_of(game.current_team)
-	_set_cursor_cell(homes[0] if not homes.is_empty() else Vector2i.ZERO)
+	_set_cursor_cell(Vector2i.ZERO)
+	_start_cursor_pulse()
+	_on_turn_started()  # day 1 gets the same banner/cursor/event as every turn
 	camera.position = cursor.position
 	camera.reset_smoothing()
-	_start_cursor_pulse()
-	_refresh_hud()
 	_check_screenshot_mode()
 
 
@@ -260,7 +259,7 @@ func _handle_build_action(action: StringName) -> void:
 	command.apply(game)
 	var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
 	units_root.add_child(sprite)
-	sprite.setup(command.built_unit)
+	sprite.setup(command.built_unit, game.current_team)
 	_sprites[command.built_unit] = sprite
 	EventBus.unit_built.emit(command.built_unit)
 	state = State.IDLE
@@ -313,7 +312,7 @@ func _open_map_menu() -> void:
 
 func _on_turn_started() -> void:
 	for unit in game.units:
-		_sprites[unit].refresh()
+		_sprites[unit].set_active_team(game.current_team)
 	_refresh_hud()
 	_refresh_panel()
 	_show_banner("Day %d - %s" % [
@@ -344,6 +343,13 @@ func _show_banner(text: String) -> void:
 	_banner_tween = create_tween()
 	_banner_tween.tween_interval(1.2)
 	_banner_tween.tween_callback(turn_banner.hide)
+
+
+## Dismisses the banner now, cancelling any pending auto-hide.
+func _hide_banner() -> void:
+	if _banner_tween != null and _banner_tween.is_valid():
+		_banner_tween.kill()
+	turn_banner.hide()
 
 
 func _refresh_hud() -> void:
@@ -520,7 +526,7 @@ func _spawn_unit_sprites() -> void:
 	for unit in game.units:
 		var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
 		units_root.add_child(sprite)
-		sprite.setup(unit)
+		sprite.setup(unit, game.current_team)
 		_sprites[unit] = sprite
 
 
@@ -630,6 +636,9 @@ func _check_screenshot_mode() -> void:
 				select_cell = Vector2i(int(parts[0]), int(parts[1]))
 		elif arg.begins_with("--demo="):
 			demo = arg.get_slice("=", 1)
+	if shot_path == "" and select_cell.x < 0 and demo == "":
+		return
+	_hide_banner()  # the day-1 banner would cover every captured frame
 	if demo != "":
 		_run_attack_demo(demo, shot_path)
 		return
