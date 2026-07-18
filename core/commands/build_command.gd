@@ -37,9 +37,6 @@ func validate(state: GameState) -> String:
 
 func apply(state: GameState) -> void:
 	state.funds[team] -= unit_type.cost
-	built_unit = Unit.new()
-	built_unit.type = unit_type
-	built_unit.team = team
-	built_unit.cell = cell
+	built_unit = Unit.create(unit_type, team, cell)
 	built_unit.acted = true
 	state.units.append(built_unit)

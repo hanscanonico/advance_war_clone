@@ -1,8 +1,8 @@
 class_name TurnRules
 extends RefCounted
-## Start-of-turn bookkeeping for the current team: income, paid repairs on
-## friendly properties, and readying units. Used by GameState.create for the
-## first turn and by EndTurnCommand for every turn after.
+## Start-of-turn bookkeeping for the current team: income, resupply, paid
+## repairs on friendly properties, and readying units. Used by
+## GameState.create for the first turn and by EndTurnCommand after.
 
 const REPAIR_HP := 20  # internal HP (= 2 displayed) per turn on a property
 
@@ -12,6 +12,10 @@ static func begin_turn(state: GameState) -> void:
 	state.funds[team] += state.properties_of(team).size() * GameState.INCOME_PER_PROPERTY
 	for unit in state.units_of(team):
 		unit.acted = false
+		if unit.carrier != null:
+			continue  # passengers sit tight until dropped
+		if state.owner_at(unit.cell) == unit.team or _adjacent_to_supplier(state, unit):
+			unit.resupply()
 		_repair(state, unit)
 
 
@@ -28,3 +32,13 @@ static func _repair(state: GameState, unit: Unit) -> void:
 		return
 	state.funds[unit.team] -= cost
 	unit.hp += heal
+
+
+static func _adjacent_to_supplier(state: GameState, unit: Unit) -> bool:
+	for other in state.units_of(unit.team):
+		if other == unit or other.carrier != null or not other.type.can_resupply:
+			continue
+		var dist := absi(other.cell.x - unit.cell.x) + absi(other.cell.y - unit.cell.y)
+		if dist == 1:
+			return true
+	return false

@@ -47,6 +47,8 @@ static func reachable(state: GameState, unit: Unit) -> MoveRange:
 	result.origin = unit.cell
 	result.costs[unit.cell] = 0
 	result.stoppable[unit.cell] = true
+	# An empty tank keeps a unit where it stands: fuel caps the move budget.
+	var budget := mini(unit.type.move_points, unit.fuel)
 	var frontier: Array[Vector2i] = [unit.cell]
 	while not frontier.is_empty():
 		# Maps are small; a linear min-scan beats a heap in simplicity.
@@ -68,7 +70,7 @@ static func reachable(state: GameState, unit: Unit) -> MoveRange:
 			if occupant != null and occupant.team != unit.team:
 				continue
 			var next_cost: int = result.costs[current] + step
-			if next_cost > unit.type.move_points:
+			if next_cost > budget:
 				continue
 			if result.costs.has(next) and result.costs[next] <= next_cost:
 				continue

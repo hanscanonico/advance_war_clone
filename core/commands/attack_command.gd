@@ -22,6 +22,8 @@ func validate(state: GameState) -> String:
 		return move_error
 	if unit.type.max_range <= 0:
 		return "unit is unarmed"
+	if not unit.has_ammo():
+		return "out of ammo"
 	if unit.type.min_range > 1 and path.size() > 1:
 		return "indirect units cannot move and fire"
 	var target := state.unit_at(target_cell)
