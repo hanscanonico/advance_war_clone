@@ -14,4 +14,6 @@ vision = 1
 can_capture = false
 min_range = 1
 max_range = 1
+max_fuel = 50
+max_ammo = 8
 atlas_col = 4

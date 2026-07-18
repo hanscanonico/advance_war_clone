@@ -53,18 +53,14 @@ static func create(
 			push_error("GameState: %s cannot stand on %s at %s"
 				% [type.id, p_map.terrain_at(cell).id, cell])
 			return null
-		var unit := Unit.new()
-		unit.type = type
-		unit.team = entry.team
-		unit.cell = cell
-		state.units.append(unit)
+		state.units.append(Unit.create(type, entry.team, cell))
 	TurnRules.begin_turn(state)  # day-1 income for the first player
 	return state
 
 
 func unit_at(cell: Vector2i) -> Unit:
 	for unit in units:
-		if unit.cell == cell:
+		if unit.carrier == null and unit.cell == cell:
 			return unit
 	return null
 
@@ -77,7 +73,19 @@ func units_of(team: int) -> Array[Unit]:
 	return result
 
 
+## Units riding inside the given transport.
+func cargo_of(transport: Unit) -> Array[Unit]:
+	var result: Array[Unit] = []
+	for unit in units:
+		if unit.carrier == transport:
+			result.append(unit)
+	return result
+
+
 func remove_unit(unit: Unit) -> void:
+	# Cargo goes down with its transport.
+	for passenger in cargo_of(unit):
+		remove_unit(passenger)
 	units.erase(unit)
 	# A dying unit abandons any capture in progress.
 	capture_progress.erase(unit.cell)
@@ -102,14 +110,21 @@ func properties_of(team: int) -> Array[Vector2i]:
 
 
 ## Commits a unit's move along `path`: an abandoned capture on the vacated cell
-## resets to the full point count, and the unit is exhausted. Sole move-commit
-## entry point, shared by Move/Attack/Capture apply.
+## resets to the full point count, fuel is spent per terrain cost, cargo rides
+## along, and the unit is exhausted. Sole move-commit entry point, shared by
+## every movement-type command's apply.
 func advance_unit(unit: Unit, path: Array[Vector2i]) -> void:
 	var dest: Vector2i = path[path.size() - 1]
 	if dest != path[0]:
 		capture_progress.erase(path[0])
+	var fuel_spent := 0
+	for i in range(1, path.size()):
+		fuel_spent += map.terrain_at(path[i]).move_cost(unit.type.move_class)
+	unit.fuel = maxi(0, unit.fuel - fuel_spent)
 	unit.cell = dest
 	unit.acted = true
+	for passenger in cargo_of(unit):
+		passenger.cell = dest
 
 
 func next_team() -> int:

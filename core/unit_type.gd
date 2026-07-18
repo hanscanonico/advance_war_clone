@@ -18,5 +18,13 @@ extends Resource
 ## cannot move and fire, never counters, and is never countered.
 @export var min_range: int = 0
 @export var max_range: int = 0
+## Fuel tank; movement spends fuel equal to the terrain cost of each step.
+@export var max_fuel: int = 99
+## Primary ammo; 0 means the weapon needs no ammo (or the unit is unarmed).
+@export var max_ammo: int = 0
+## How many foot/boot passengers this unit can carry (APC = 1).
+@export var transport_capacity: int = 0
+## Supply units (APC) refill adjacent friendlies at turn start and on demand.
+@export var can_resupply: bool = false
 ## Column of this unit in the generated units atlas texture.
 @export var atlas_col: int = 0

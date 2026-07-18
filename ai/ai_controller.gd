@@ -53,7 +53,7 @@ func plan_next_command(state: GameState) -> Command:
 	var best: Command = null
 	var best_score := -INF
 	for unit in state.units_of(state.current_team):
-		if unit.acted:
+		if unit.acted or unit.carrier != null:
 			continue
 		var plan := _best_unit_plan(state, unit)
 		if plan.score > best_score:
@@ -92,7 +92,7 @@ func _consider_attacks(
 				dests.append(cell)
 	for dest in dests:
 		for enemy in state.units:
-			if enemy.team == unit.team:
+			if enemy.team == unit.team or enemy.carrier != null:
 				continue
 			var dist := absi(enemy.cell.x - dest.x) + absi(enemy.cell.y - dest.y)
 			if dist < unit.type.min_range or dist > unit.type.max_range:
@@ -210,7 +210,7 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 			return goal
 	var enemy_cells: Array[Vector2i] = []
 	for other in state.units:
-		if other.team != unit.team:
+		if other.team != unit.team and other.carrier == null:
 			enemy_cells.append(other.cell)
 	if not enemy_cells.is_empty():
 		goal.cell = _nearest(unit.cell, enemy_cells)

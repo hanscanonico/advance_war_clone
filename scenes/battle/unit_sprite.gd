@@ -30,9 +30,11 @@ func set_active_team(team: int) -> void:
 	refresh()
 
 
-## Re-syncs position, acted tint, and HP badge from the sim state.
+## Re-syncs position, visibility, acted tint, and HP badge from the sim
+## state. Carried units are hidden until dropped.
 func refresh() -> void:
 	position = Vector2(unit.cell * TILE) + Vector2(TILE, TILE) / 2.0
+	visible = unit.carrier == null
 	modulate = ACTED_TINT if unit.acted and unit.team == active_team else Color.WHITE
 	hp_label.visible = unit.displayed_hp() < 10
 	hp_label.text = str(unit.displayed_hp())

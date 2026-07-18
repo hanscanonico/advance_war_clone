@@ -29,10 +29,11 @@ property capture and income, and a computer opponent.
    `.tres` `Resource` files under `data/`, not constants in code. Balancing = editing data;
    adding a unit = adding a file. The damage chart is one resource holding the attacker × defender
    base-damage matrix.
-3. **Command pattern for all actions.** `Move`, `Attack`, `Capture`, `Build`, `EndTurn` are
-   command objects that are *validated* then *applied* to the sim, which emits typed events the
-   scene layer animates. This gives us undo of uncommitted moves, an AI that issues the same
-   commands as the player, and a serializable log for save/replay.
+3. **Command pattern for all actions.** Every player or AI action is a command object under
+   `core/commands/` (`Move`, `Attack`, `Capture`, `Build`, `EndTurn`, …) that is *validated* then
+   *applied* to the sim, which emits typed events the scene layer animates. This gives us undo of
+   uncommitted moves, an AI that issues the same commands as the player, and a serializable log
+   for save/replay.
 4. **Determinism.** RNG (combat luck) is **seeded**. Same seed + same commands ⇒ same result.
    Never call global `randf()`/`randi()` in `core/`; thread a seeded RNG through the sim.
 

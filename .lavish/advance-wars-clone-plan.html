@@ -166,12 +166,12 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M5 done</span></h3>
-          <p class="text-sm">As of 2026-07-18: single-player works — the Blue army is played by a
-          utility-scoring AI (attack value vs counter risk, capture priorities with the HQ on top,
-          advance/retreat fallbacks, simple production) that issues the exact same commands as the
-          player, with animated turns you can watch. <code>--hotseat</code> restores two-player.
-          109 GUT tests passing. Next up: <strong>M6 — depth</strong> (transports, fuel &amp; ammo).</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M6 done</span></h3>
+          <p class="text-sm">As of 2026-07-18: the depth pass is in — APC transport (Load/Drop/Supply),
+          fuel spent per terrain step and ammo per shot with turn-start resupply on properties and
+          beside APCs, unit merging (Join), and a second map (Crossfire, <code>--map=crossfire</code>).
+          Air units stayed deferred as planned. 132 GUT tests passing.
+          Next up: <strong>M7 — polish</strong> (fog of war, sound, save/load, menus).</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -306,8 +306,9 @@ flowchart TD
           <h3 class="card-title text-base">Key algorithms</h3>
           <ul class="list-disc list-inside text-sm space-y-2">
             <li><strong>Movement range</strong> — Dijkstra flood-fill from the unit's tile, edge
-            costs from the terrain × movement-class table, budget = unit's move points. Occupied
-            enemy tiles block; friendly tiles pass-through but can't be final destinations.</li>
+            costs from the terrain × movement-class table, budget = min(move points, remaining
+            fuel) since M6. Occupied enemy tiles block; friendly tiles pass-through and are final
+            destinations only for Load and Join.</li>
             <li><strong>Path arrow</strong> — walk the Dijkstra parent tree; if the player traces a
             custom path with the cursor, keep it while it stays legal and within budget (AW behavior).</li>
             <li><strong>Attack range</strong> — direct units: tiles adjacent to any reachable tile
@@ -337,12 +338,18 @@ stateDiagram-v2
   UnitSelected --> MovePreview : "choose reachable tile"
   UnitSelected --> Idle : "cancel"
   MovePreview --> ActionMenu : "confirm destination"
+  MovePreview --> LoadJoinMenu : "confirm onto reachable<br/>friendly-occupied tile"
   MovePreview --> UnitSelected : "cancel"
   ActionMenu --> TargetSelect : "Fire"
+  ActionMenu --> DropTargeting : "Drop"
   ActionMenu --> Executing : "Wait / Capture / Supply"
   ActionMenu --> MovePreview : "cancel (undo move)"
+  LoadJoinMenu --> Executing : "Load / Join"
+  LoadJoinMenu --> MovePreview : "cancel (undo move)"
   TargetSelect --> Executing : "confirm target (damage preview shown)"
   TargetSelect --> ActionMenu : "cancel"
+  DropTargeting --> Executing : "confirm drop cell"
+  DropTargeting --> ActionMenu : "cancel"
   BuildMenu --> Executing : "buy unit"
   BuildMenu --> Idle : "cancel"
   TurnMenu --> TurnTransition : "End Turn"
@@ -464,7 +471,7 @@ stateDiagram-v2
       <li class="step step-primary" data-content="✓">Combat</li>
       <li class="step step-primary" data-content="✓">Game loop</li>
       <li class="step step-primary" data-content="✓">AI</li>
-      <li class="step">Depth</li>
+      <li class="step step-primary" data-content="✓">Depth</li>
       <li class="step">Polish</li>
     </ul>
 
@@ -519,7 +526,7 @@ stateDiagram-v2
             <td>…play 1-player and lose to the computer at least sometimes.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M6 · Depth pass</td>
+            <td class="font-bold whitespace-nowrap">M6 · Depth pass <span class="badge badge-success badge-sm">Done</span></td>
             <td>APC load/drop, fuel &amp; ammo with resupply (properties + APC), Join, more maps,
             optionally first air units (T-Copter, B-Copter, Anti-Air matters). Damage chart already
             supports new rows — mostly data + a few commands.</td>

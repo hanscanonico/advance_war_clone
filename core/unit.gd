@@ -9,7 +9,34 @@ var cell: Vector2i
 var hp: int = 100
 ## True once the unit has used its action this turn.
 var acted: bool = false
+## Remaining fuel; movement spends it point-for-point with terrain cost.
+var fuel: int = 99
+## Remaining primary ammo; only meaningful when type.max_ammo > 0.
+var ammo: int = 0
+## The transport carrying this unit, or null when on the board. Carried units
+## are invisible to cell lookups and can neither act nor be targeted.
+var carrier: Unit = null
+
+
+static func create(p_type: UnitType, p_team: int, p_cell: Vector2i) -> Unit:
+	var unit := Unit.new()
+	unit.type = p_type
+	unit.team = p_team
+	unit.cell = p_cell
+	unit.fuel = p_type.max_fuel
+	unit.ammo = p_type.max_ammo
+	return unit
 
 
 func displayed_hp() -> int:
 	return ceili(hp / 10.0)
+
+
+## True when the unit can still fire (max_ammo 0 = the weapon needs none).
+func has_ammo() -> bool:
+	return type.max_ammo == 0 or ammo > 0
+
+
+func resupply() -> void:
+	fuel = type.max_fuel
+	ammo = type.max_ammo

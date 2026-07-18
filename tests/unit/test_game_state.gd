@@ -66,6 +66,18 @@ func test_first_steps_map_builds_a_state() -> void:
 	var map := MapData.load_from_file("res://maps/first_steps.txt", terrain_db)
 	var state := GameState.create(map, unit_db)
 	assert_not_null(state)
-	assert_eq(state.units.size(), 12)
-	assert_eq(state.units_of(1).size(), 6)
-	assert_eq(state.units_of(2).size(), 6)
+	assert_eq(state.units.size(), 14)
+	assert_eq(state.units_of(1).size(), 7)
+	assert_eq(state.units_of(2).size(), 7)
+
+
+func test_crossfire_map_builds_a_state() -> void:
+	var map := MapData.load_from_file("res://maps/crossfire.txt", terrain_db)
+	assert_not_null(map)
+	assert_eq(map.size(), Vector2i(20, 15))
+	var state := GameState.create(map, unit_db)
+	assert_not_null(state)
+	assert_eq(state.units_of(1).size(), 4)
+	assert_eq(state.units_of(2).size(), 4)
+	assert_eq(map.owner_at(Vector2i(2, 1)), 1)
+	assert_eq(map.terrain_at(Vector2i(17, 13)).id, &"hq")

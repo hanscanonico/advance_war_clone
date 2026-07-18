@@ -36,6 +36,8 @@ static func forecast(
 	state: GameState, attacker: Unit, attacker_cell: Vector2i, defender: Unit
 ) -> Forecast:
 	var result := Forecast.new()
+	if not attacker.has_ammo():
+		return result
 	var damage := _damage_pct(
 		state, attacker.type, attacker.displayed_hp(),
 		defender.type, defender.displayed_hp(), defender.cell
@@ -64,6 +66,8 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 	if base < 0:
 		push_error("CombatResolver: %s cannot attack %s" % [attacker.type.id, defender.type.id])
 		return result
+	if attacker.type.max_ammo > 0:
+		attacker.ammo = maxi(0, attacker.ammo - 1)
 	result.attack_damage = base + state.rng.randi_range(0, LUCK_MAX)
 	defender.hp = maxi(0, defender.hp - result.attack_damage)
 	if defender.hp == 0:
@@ -78,6 +82,8 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 	)
 	if counter_base < 0:
 		return result
+	if defender.type.max_ammo > 0:
+		defender.ammo = maxi(0, defender.ammo - 1)
 	result.countered = true
 	result.counter_damage = counter_base + state.rng.randi_range(0, LUCK_MAX)
 	attacker.hp = maxi(0, attacker.hp - result.counter_damage)
@@ -92,6 +98,8 @@ static func _defender_can_counter(
 ) -> bool:
 	if defender.type.max_range != 1:
 		return false  # unarmed and indirect units never counter
+	if not defender.has_ammo():
+		return false
 	var dist := absi(attacker_cell.x - defender.cell.x) + absi(attacker_cell.y - defender.cell.y)
 	if dist != 1:
 		return false  # an indirect attacker fires from beyond counter reach
