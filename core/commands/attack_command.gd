@@ -40,6 +40,5 @@ func validate(state: GameState) -> String:
 
 func apply(state: GameState) -> void:
 	var target := state.unit_at(target_cell)
-	unit.cell = path[path.size() - 1]
-	unit.acted = true
+	state.advance_unit(unit, path)
 	result = CombatResolver.resolve(state, unit, target)

@@ -166,11 +166,11 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M3 done</span></h3>
-          <p class="text-sm">As of 2026-07-17: Godot 4.7.1 project, 72 GUT tests passing. Movement and
-          combat are complete — AW2 damage chart as a Resource, seeded-luck CombatResolver with
-          counter-attacks, indirect fire rings, Fire targeting with red overlay and Atk/Counter damage
-          preview, HP badges and death. Next up: <strong>M4 — turns, capture, economy, victory</strong>.</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">MVP reached — M0–M4 done</span></h3>
+          <p class="text-sm">As of 2026-07-17: the MVP is playable — full hot-seat matches with turns,
+          day counter, income, capture (20-point AW rules), unit production at bases, paid repairs,
+          and HQ-capture/rout victory, on top of the finished movement and combat systems.
+          96 GUT tests passing. Next up: <strong>M5 — the AI opponent</strong>.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -461,7 +461,7 @@ stateDiagram-v2
       <li class="step step-primary" data-content="✓">Map</li>
       <li class="step step-primary" data-content="✓">Movement</li>
       <li class="step step-primary" data-content="✓">Combat</li>
-      <li class="step step-primary">Game loop</li>
+      <li class="step step-primary" data-content="✓">Game loop</li>
       <li class="step">AI</li>
       <li class="step">Depth</li>
       <li class="step">Polish</li>
@@ -502,11 +502,13 @@ stateDiagram-v2
             <td>…fight battles with faithful AW numbers and see the damage preview before committing.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M4 · Full game loop <span class="badge badge-primary badge-sm">MVP</span></td>
-            <td>TurnManager (players, day counter), income, <code>CaptureCommand</code> with capture
+            <td class="font-bold whitespace-nowrap">M4 · Full game loop <span class="badge badge-primary badge-sm">MVP</span> <span class="badge badge-success badge-sm">Done</span></td>
+            <td><code>TurnRules</code> start-of-turn effects (income, paid repairs, readying) driven by
+            <code>EndTurnCommand</code> and a day counter, <code>CaptureCommand</code> with capture
             points, <code>BuildCommand</code> + base build menu, funds UI, repair on properties,
-            HQ-capture and rout victory, win/lose screen, hot-seat 2-player, "End Turn" flow.</td>
-            <td>…play a complete match against a friend on one machine, start to victory screen.</td>
+            HQ-capture and rout victory, hot-seat 2-player, "End Turn" flow. Shipped with a minimal
+            victory banner rather than a full win/lose screen — deferred to M7 polish.</td>
+            <td>…play a complete match against a friend on one machine, start to victory.</td>
           </tr>
           <tr>
             <td class="font-bold whitespace-nowrap">M5 · AI opponent</td>

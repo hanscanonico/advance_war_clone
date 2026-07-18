@@ -8,8 +8,8 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster,
 property capture and income, and eventually a computer opponent.
 
-- **Status:** greenfield. The design of record is `.lavish/advance-wars-clone-plan.html`
-  (milestones M0–M7, mechanics reference, damage formula). Read it before making
+- **Status:** the design of record is `.lavish/advance-wars-clone-plan.html` — milestones M0–M7
+  and which of them are done, mechanics reference, damage formula. Read it before making
   architectural decisions.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
@@ -81,20 +81,13 @@ Follow the official Godot GDScript style guide. Key points:
 - Every bugfix in `core/` should come with a failing test that the fix makes pass.
 - Keep tests deterministic: seed the RNG explicitly.
 
-Run tests headless:
-
-```sh
-godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
-```
-
-(or `-gconfig=.gutconfig.json` once configured).
+Run the suite with `make test` — it runs GUT headless against `tests/unit` via `.gutconfig.json`.
+See README.md for engine setup and the other `make` targets.
 
 ## Running the game
 
-```sh
-godot --path .            # open in the editor
-godot --path . scenes/battle/battle.tscn   # run a specific scene
-```
+Play with `make run`; `make screenshot` boots the game, saves `screenshot.png`, and quits.
+See README.md for engine setup and the other `make` targets.
 
 Prefer the running game (or a GUT test) over reasoning alone when verifying a change.
 

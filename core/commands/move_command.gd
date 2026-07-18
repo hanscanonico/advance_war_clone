@@ -13,6 +13,10 @@ func _init(p_unit: Unit, p_path: Array[Vector2i]) -> void:
 
 
 func validate(state: GameState) -> String:
+	if state.winner != 0:
+		return "the match is over"
+	if unit.team != state.current_team:
+		return "not this team's turn"
 	if unit.acted:
 		return "unit has already acted"
 	if path.is_empty() or path[0] != unit.cell:
@@ -40,6 +44,5 @@ func validate(state: GameState) -> String:
 	return ""
 
 
-func apply(_state: GameState) -> void:
-	unit.cell = path[path.size() - 1]
-	unit.acted = true
+func apply(state: GameState) -> void:
+	state.advance_unit(unit, path)

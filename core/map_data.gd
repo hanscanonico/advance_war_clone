@@ -78,18 +78,14 @@ func owner_at(cell: Vector2i) -> int:
 	return _owners.get(cell, NEUTRAL)
 
 
+## Copy of the starting ownership for GameState; runtime capture never
+## mutates the map itself.
+func initial_owners() -> Dictionary:
+	return _owners.duplicate()
+
+
 func size() -> Vector2i:
 	return Vector2i(width, height)
-
-
-## Cells owned by the given team, e.g. to find a start position for the cursor.
-func cells_owned_by(team: int) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for cell: Vector2i in _owners:
-		if _owners[cell] == team:
-			cells.append(cell)
-	cells.sort()
-	return cells
 
 
 func _append_terrain_row(line: String, db: TerrainDB) -> bool:
