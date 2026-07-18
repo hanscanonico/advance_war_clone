@@ -3,6 +3,9 @@ GODOT := bin/Godot.app/Contents/MacOS/Godot
 run:
 	$(GODOT) --path .
 
+hotseat:
+	$(GODOT) --path . -- --hotseat
+
 test:
 	$(GODOT) --headless --path . -s res://addons/gut/gut_cmdln.gd
 
@@ -15,4 +18,4 @@ import:
 screenshot:
 	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
-.PHONY: run test tiles import screenshot
+.PHONY: run hotseat test tiles import screenshot

@@ -11,8 +11,11 @@ const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
 const ATLAS_SOURCE_ID := 0
 const MAX_ZOOM := 5.0
 const MOVE_STEP_SECONDS := 0.06
+const BANNER_SECONDS := 1.2
 const AI_COMMAND_DELAY := 0.2
 const AI_MAX_COMMANDS_PER_TURN := 300
+## The AI opens its turn just after the turn banner has cleared.
+const AI_TURN_START_DELAY := BANNER_SECONDS + 0.1
 
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
@@ -352,9 +355,10 @@ func _on_turn_started() -> void:
 ## ends its turn. The command cap is a safety net so a planner bug can never
 ## hang the match.
 func _run_ai_turn() -> void:
-	await get_tree().create_timer(1.3).timeout  # let the turn banner pass
+	await get_tree().create_timer(AI_TURN_START_DELAY).timeout
 	for i in AI_MAX_COMMANDS_PER_TURN:
 		if game.winner != 0:
+			_leave_ai_turn()
 			return
 		var command := ai.plan_next_command(game)
 		var error := command.validate(game)
@@ -362,6 +366,7 @@ func _run_ai_turn() -> void:
 			push_error("AI command rejected (%s); ending the AI turn" % error)
 			command = EndTurnCommand.new()
 			if command.validate(game) != "":
+				_leave_ai_turn()
 				return
 		var ended := command is EndTurnCommand
 		await _execute_ai_command(command)
@@ -375,6 +380,17 @@ func _run_ai_turn() -> void:
 	var end_turn := EndTurnCommand.new()
 	if end_turn.validate(game) == "":
 		await _execute_ai_command(end_turn)
+	else:
+		_leave_ai_turn()
+
+
+## Every bail-out from the AI loop lands here, so a planner bug can never leave
+## the scene stuck in AI_TURN with all input blocked and no banner.
+func _leave_ai_turn() -> void:
+	if game.winner != 0:
+		_enter_victory()
+	else:
+		state = State.IDLE
 
 
 ## Applies one AI command with the same animations the player flow uses.
@@ -438,7 +454,7 @@ func _set_banner(text: String) -> void:
 func _show_banner(text: String) -> void:
 	_set_banner(text)
 	_banner_tween = create_tween()
-	_banner_tween.tween_interval(1.2)
+	_banner_tween.tween_interval(BANNER_SECONDS)
 	_banner_tween.tween_callback(turn_banner.hide)
 
 

@@ -78,6 +78,25 @@ func test_waits_when_isolated() -> void:
 	assert_eq(command.validate(state), "", "waiting in place is still a legal action")
 
 
+func test_indirect_unit_backs_off_into_firing_range() -> void:
+	# Artillery (range 2-3) pinned next to a tank can neither fire nor counter,
+	# so it must reposition instead of waiting there forever.
+	var state := _state("[terrain]\n......\n[units]\n1 g 1 0\n2 t 0 0")
+	var command := ai.plan_next_command(state)
+	assert_true(command is MoveCommand, "expected a reposition, got %s" % command)
+	var path: Array[Vector2i] = (command as MoveCommand).path
+	assert_eq(path[path.size() - 1], Vector2i(3, 0), "stand off at max range")
+	assert_eq(command.validate(state), "")
+
+
+func test_indirect_unit_closes_in_when_out_of_range() -> void:
+	var state := _state("[terrain]\n..........\n[units]\n1 g 0 0\n2 t 9 0")
+	var command := ai.plan_next_command(state)
+	assert_true(command is MoveCommand)
+	var path: Array[Vector2i] = (command as MoveCommand).path
+	assert_eq(path[path.size() - 1], Vector2i(5, 0), "spend the full 5 closing in")
+
+
 func test_builds_infantry_when_short_on_capture_units() -> void:
 	var state := _state("[terrain]\nB.\n[owners]\n1 0 0\n[units]\n1 i 1 0")
 	state.units[0].acted = true

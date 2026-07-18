@@ -31,6 +31,13 @@ class UnitPlan:
 	var score := -INF
 
 
+## Where a unit should head when it has nothing better to do. `stand_off` marks
+## goals we want to shoot rather than reach, so indirect units stop at range.
+class AdvanceGoal:
+	var cell: Vector2i
+	var stand_off := false
+
+
 var unit_db: UnitDB
 
 
@@ -144,48 +151,71 @@ func _consider_captures(
 			plan.command = CaptureCommand.new(unit, reachable.path_to(cell))
 
 
-## Fallback when no attack or capture is worthwhile: close in on a goal.
-## Damaged units head for a friendly property (repairs), capture units for
-## the nearest non-owned property, everyone else toward the nearest enemy.
-## Waits in place when nothing is reachable, so the unit still acts.
+## Fallback when no attack or capture is worthwhile: take the best position
+## relative to a goal. Waits in place when nothing better is reachable, so the
+## unit still acts.
 func _advance_command(
 	state: GameState, unit: Unit, reachable: MovementResolver.MoveRange
 ) -> Command:
 	var goal := _advance_goal(state, unit)
 	var best_cell := unit.cell
-	var best_dist := absi(goal.x - unit.cell.x) + absi(goal.y - unit.cell.y)
+	var best_rank := _position_rank(unit, unit.cell, goal)
 	var best_cost := 0
 	for cell in reachable.cells():
 		if not reachable.can_stop_at(cell):
 			continue
-		var dist := absi(goal.x - cell.x) + absi(goal.y - cell.y)
+		var rank := _position_rank(unit, cell, goal)
 		var cost: int = reachable.costs[cell]
-		if dist < best_dist or (dist == best_dist and cost < best_cost):
-			best_dist = dist
+		if rank < best_rank or (rank == best_rank and cost < best_cost):
+			best_rank = rank
 			best_cost = cost
 			best_cell = cell
 	return MoveCommand.new(unit, reachable.path_to(best_cell))
 
 
-func _advance_goal(state: GameState, unit: Unit) -> Vector2i:
+## How good a destination is, lower being better. Direct units just close in on
+## the goal. Indirect units want it inside their firing ring instead, ideally at
+## maximum standoff, so they never strand themselves inside their minimum range
+## where they can neither fire nor counter.
+static func _position_rank(unit: Unit, cell: Vector2i, goal: AdvanceGoal) -> int:
+	var dist := absi(goal.cell.x - cell.x) + absi(goal.cell.y - cell.y)
+	if not goal.stand_off:
+		return dist
+	var out_of_ring: int = unit.type.max_range - unit.type.min_range + 1
+	if dist > unit.type.max_range:
+		return out_of_ring + dist - unit.type.max_range
+	if dist < unit.type.min_range:
+		return out_of_ring + unit.type.min_range - dist
+	return unit.type.max_range - dist
+
+
+## Damaged units head for a friendly property (repairs), capture units for the
+## nearest non-owned property, everyone else toward the nearest enemy — which
+## indirect units approach only as far as their firing ring.
+func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
+	var goal := AdvanceGoal.new()
+	goal.cell = unit.cell
 	if unit.hp <= RETREAT_HP:
 		var owned := state.properties_of(unit.team)
 		if not owned.is_empty():
-			return _nearest(unit.cell, owned)
+			goal.cell = _nearest(unit.cell, owned)
+			return goal
 	if unit.type.can_capture:
 		var capturable: Array[Vector2i] = []
 		for cell in state.map.property_cells():
 			if state.owner_at(cell) != unit.team:
 				capturable.append(cell)
 		if not capturable.is_empty():
-			return _nearest(unit.cell, capturable)
+			goal.cell = _nearest(unit.cell, capturable)
+			return goal
 	var enemy_cells: Array[Vector2i] = []
 	for other in state.units:
 		if other.team != unit.team:
 			enemy_cells.append(other.cell)
 	if not enemy_cells.is_empty():
-		return _nearest(unit.cell, enemy_cells)
-	return unit.cell
+		goal.cell = _nearest(unit.cell, enemy_cells)
+		goal.stand_off = unit.type.min_range > 1
+	return goal
 
 
 static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
@@ -221,12 +251,12 @@ func _pick_build(state: GameState) -> UnitType:
 	for unit in state.units_of(state.current_team):
 		if unit.type.can_capture:
 			capture_units += 1
-	if capture_units < CAPTURE_UNIT_TARGET and funds >= infantry.cost:
+	if infantry != null and capture_units < CAPTURE_UNIT_TARGET and funds >= infantry.cost:
 		return infantry
 	for id in BUILD_PRIORITY:
 		var unit_type := unit_db.by_id(id)
 		if unit_type != null and funds >= unit_type.cost:
 			return unit_type
-	if funds >= infantry.cost:
+	if infantry != null and funds >= infantry.cost:
 		return infantry
 	return null

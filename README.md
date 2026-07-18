@@ -17,7 +17,8 @@ mkdir -p bin && curl -sL -o /tmp/godot.zip \
 Then:
 
 ```sh
-make run          # play
+make run          # play against the computer (Blue is the AI)
+make hotseat      # play two-player hot-seat instead (no AI)
 make test         # run the GUT unit test suite (headless)
 make tiles        # regenerate the placeholder art — tiles, unit sprites, overlay (headless)
 make import       # (re)import assets headless
