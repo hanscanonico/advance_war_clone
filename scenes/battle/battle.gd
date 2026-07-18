@@ -79,9 +79,13 @@ func _ready() -> void:
 		if arg.begins_with("--map="):
 			map_path = "res://maps/%s.txt" % arg.get_slice("=", 1)
 	map = MapData.load_from_file(map_path, db)
+	if map == null and map_path != MAP_PATH:
+		push_error("failed to load %s; falling back to %s" % [map_path, MAP_PATH])
+		map_path = MAP_PATH
+		map = MapData.load_from_file(map_path, db)
 	assert(map != null, "failed to load %s" % map_path)
 	game = GameState.create(map, unit_db, load(DAMAGE_CHART_PATH))
-	assert(game != null, "failed to build game state from %s" % MAP_PATH)
+	assert(game != null, "failed to build game state from %s" % map_path)
 	game.rng.randomize()
 	ai = AIController.new(unit_db)
 	if "--hotseat" in OS.get_cmdline_user_args():
@@ -177,18 +181,16 @@ func _cancel() -> void:
 
 ## Menu entries offered when confirming onto a reachable friendly-occupied
 ## cell: boarding a transport with room, or merging into a damaged twin.
+## The commands themselves decide what is legal, so the menu never drifts
+## from core/'s rules.
 func _special_dest_actions(cell: Vector2i) -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
-	var occupant := game.unit_at(cell)
-	if occupant == null or occupant == selected or occupant.team != selected.team:
+	var path := move_range.path_to(cell)
+	if path.is_empty():
 		return actions
-	if occupant.type.transport_capacity > 0 \
-			and game.cargo_of(occupant).size() < occupant.type.transport_capacity \
-			and selected.type.move_class in LoadCommand.TRANSPORTABLE:
+	if LoadCommand.new(selected, path).validate(game) == "":
 		actions.append({"id": &"load", "label": "Load"})
-	if occupant.type == selected.type and not occupant.acted \
-			and occupant.displayed_hp() < 10 \
-			and game.cargo_of(selected).is_empty() and game.cargo_of(occupant).is_empty():
+	if JoinCommand.new(selected, path).validate(game) == "":
 		actions.append({"id": &"join", "label": "Join"})
 	return actions
 
@@ -589,16 +591,17 @@ func _undo_move_preview() -> void:
 
 
 ## Enemy cells the unit could fire at from `dest`. Indirect units lose their
-## shot if they moved this turn.
+## shot if they moved this turn, a dry unit has no shot at all, and carried
+## enemies are not on the board to be shot at.
 func _attackable_cells(unit: Unit, dest: Vector2i, moved: bool) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	var type := unit.type
-	if type.max_range <= 0:
+	if type.max_range <= 0 or not unit.has_ammo():
 		return cells
 	if type.min_range > 1 and moved:
 		return cells
 	for other in game.units:
-		if other.team == unit.team:
+		if other.team == unit.team or other.carrier != null:
 			continue
 		var dist := absi(other.cell.x - dest.x) + absi(other.cell.y - dest.y)
 		if dist < type.min_range or dist > type.max_range:
@@ -716,16 +719,33 @@ func _animate_combat(
 		await attacker_sprite.die()
 	else:
 		attacker_sprite.refresh()
+	_reap_dead_sprites()
+
+
+## Frees the sprite of every unit that has left the sim without an animation
+## of its own — cargo goes down with its transport, so a single death can take
+## units the combat result never names. Keeps `_sprites` in step with
+## `game.units`.
+func _reap_dead_sprites() -> void:
+	for unit: Unit in _sprites.keys():
+		if unit in game.units:
+			continue
+		var sprite: UnitSprite = _sprites[unit]
+		_sprites.erase(unit)
+		sprite.queue_free()
 
 
 func _update_damage_preview() -> void:
 	var target := game.unit_at(cursor_cell)
 	var valid := state == State.TARGETING and target != null and cursor_cell in _attack_targets
-	damage_preview.visible = valid
 	if not valid:
+		damage_preview.visible = false
 		return
 	var dest: Vector2i = planned_path[planned_path.size() - 1]
 	var forecast := CombatResolver.forecast(game, selected, dest, target)
+	damage_preview.visible = forecast.can_attack
+	if not forecast.can_attack:
+		return
 	atk_label.text = "Atk %d%%" % forecast.attack_damage
 	counter_label.text = (
 		"Counter %d%%" % forecast.counter_damage if forecast.counter_damage >= 0

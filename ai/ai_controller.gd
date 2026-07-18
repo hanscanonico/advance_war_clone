@@ -210,7 +210,7 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 			return goal
 	var enemy_cells: Array[Vector2i] = []
 	for other in state.units:
-		if other.team != unit.team:
+		if other.team != unit.team and other.carrier == null:
 			enemy_cells.append(other.cell)
 	if not enemy_cells.is_empty():
 		goal.cell = _nearest(unit.cell, enemy_cells)

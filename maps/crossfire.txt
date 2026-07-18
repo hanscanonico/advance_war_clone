@@ -1,25 +1,28 @@
-# Crossfire — 20x15. A central lake splits the front; the long southern road
-# rewards transports, the mountain passes reward infantry.
+# Crossfire — 20x15, 180-degree rotationally symmetric: every cell mirrors
+# (x, y) -> (19 - x, 14 - y), so neither side gets a terrain or income edge.
+# A central lake splits the front; the long ring road rewards transports and
+# the mountains beside the lake are the passes that reward infantry.
 # Symbols: . plains  F woods  M mountain  = road  ~ river
 #          C city  B base  Q HQ  S sea
 [terrain]
 SSSSSSSSSSSSSSSSSSSS
-S.Q....C....F......S
-S.B=======....MM...S
-S....F...=..C..MM..S
-S..C.....=.........S
-S...MM...=====.....S
-S....MM.SSSS.=..C..S
-S.......SSSS.=.....S
-S..C....SSSS.==....S
-S.....=======.=....S
-S.....=....F..=....S
-S..F..=.MM....====.S
-S.C...=....C....=B.S
-S......F........=Q.S
+S.Q....C........F..S
+S.B===========.....S
+S.....=..FF..=.MM..S
+S..CF.=...C..=.M.C.S
+S...MM=.F....=.....S
+S...M.=.SSSS.=..F..S
+S.....=MSSSSM=.....S
+S..F..=.SSSS.=.M...S
+S.....=....F.=MM...S
+S.C.M.=..C...=.FC..S
+S..MM.=..FF..=.....S
+S.....===========B.S
+S..F........C....Q.S
 SSSSSSSSSSSSSSSSSSSS
 [owners]
-# team x y — only HQ + base start owned; every city is contested
+# team x y — only HQ + base start owned; every city is contested.
+# Four cities sit closer to each base (foot distances 3/6/8/10 per side).
 1 2 1
 1 2 2
 2 17 12
@@ -27,11 +30,12 @@ SSSSSSSSSSSSSSSSSSSS
 [units]
 # team symbol x y — i infantry, m mech, r recon, t tank, T md tank,
 #                   a anti-air, g artillery, R rockets, p apc
+# Mirrored starts; no unit begins on a property.
 1 i 4 3
 1 p 3 2
-1 t 5 2
-1 m 3 4
-2 i 15 12
-2 p 15 11
-2 t 14 11
-2 m 14 12
+1 t 4 2
+1 m 3 3
+2 i 15 11
+2 p 16 12
+2 t 15 12
+2 m 16 11
