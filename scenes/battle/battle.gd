@@ -371,7 +371,7 @@ func _run_ai_turn() -> void:
 		var ended := command is EndTurnCommand
 		await _execute_ai_command(command)
 		if game.winner != 0:
-			_enter_victory()
+			_leave_ai_turn()
 			return
 		if ended:
 			return
