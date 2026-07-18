@@ -503,10 +503,12 @@ stateDiagram-v2
           </tr>
           <tr>
             <td class="font-bold whitespace-nowrap">M4 · Full game loop <span class="badge badge-primary badge-sm">MVP</span> <span class="badge badge-success badge-sm">Done</span></td>
-            <td>TurnManager (players, day counter), income, <code>CaptureCommand</code> with capture
+            <td><code>TurnRules</code> start-of-turn effects (income, paid repairs, readying) driven by
+            <code>EndTurnCommand</code> and a day counter, <code>CaptureCommand</code> with capture
             points, <code>BuildCommand</code> + base build menu, funds UI, repair on properties,
-            HQ-capture and rout victory, win/lose screen, hot-seat 2-player, "End Turn" flow.</td>
-            <td>…play a complete match against a friend on one machine, start to victory screen.</td>
+            HQ-capture and rout victory, hot-seat 2-player, "End Turn" flow. Shipped with a minimal
+            victory banner rather than a full win/lose screen — deferred to M7 polish.</td>
+            <td>…play a complete match against a friend on one machine, start to victory.</td>
           </tr>
           <tr>
             <td class="font-bold whitespace-nowrap">M5 · AI opponent</td>

@@ -8,8 +8,8 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster,
 property capture and income, and eventually a computer opponent.
 
-- **Status:** greenfield. The design of record is `.lavish/advance-wars-clone-plan.html`
-  (milestones M0–M7, mechanics reference, damage formula). Read it before making
+- **Status:** the design of record is `.lavish/advance-wars-clone-plan.html` — milestones M0–M7
+  and which of them are done, mechanics reference, damage formula. Read it before making
   architectural decisions.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
