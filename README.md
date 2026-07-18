@@ -14,12 +14,18 @@ mkdir -p bin && curl -sL -o /tmp/godot.zip \
   && unzip -q /tmp/godot.zip -d bin/
 ```
 
+`make lint` and `make format` additionally need [gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit)
+(`pipx install "gdtoolkit==4.*"`). Everything else runs off the vendored engine alone.
+
 Then:
 
 ```sh
 make run             # boot the game — the main menu (map, fog, 1P / 2P / Continue)
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
 make test            # run the GUT unit test suite (headless)
+make check           # parse + type check every .gd file (fast; no scene tree)
+make lint            # gdlint — style and smells (config: gdlintrc)
+make format          # gdformat — reformat in place; format-check only reports
 make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
 make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)

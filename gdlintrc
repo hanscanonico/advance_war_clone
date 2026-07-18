@@ -1,0 +1,22 @@
+# gdlint configuration. Run via `make lint`.
+# Only the rules that deviate from gdtoolkit's defaults are listed here;
+# dump the full default set with `gdlint --dump-default-config`.
+
+# Declaration-ordering inside a class. Disabled deliberately: it fires 27 times
+# across the presentation layer (@onready vars declared beside the plain vars
+# they relate to, `enum State` sitting next to the consts it indexes), and
+# satisfying it means reshuffling declarations for no correctness benefit.
+disable:
+- class-definitions-order
+
+# Command `validate()` methods are guard-clause validators — one early return
+# per rejection reason, each with its own error string (attack_command has 9).
+# That shape is required by the command pattern in CLAUDE.md; collapsing it into
+# nested conditionals would be strictly worse. 12 leaves room without inviting
+# sprawl.
+max-returns: 12
+
+# Ratchet, not a target: scenes/battle/battle.gd is 1255 lines and should be
+# split. This is set just above it so the file cannot grow further without
+# tripping the lint, and should be lowered as it shrinks.
+max-file-lines: 1300

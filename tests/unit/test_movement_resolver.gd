@@ -18,7 +18,8 @@ func _state(map_text: String) -> GameState:
 
 
 func test_infantry_open_field_diamond() -> void:
-	var state := _state("[terrain]\n.......\n.......\n.......\n.......\n.......\n.......\n.......\n[units]\n1 i 3 3")
+	var open_field := ".......\n".repeat(7)
+	var state := _state("[terrain]\n%s[units]\n1 i 3 3" % open_field)
 	var result := MovementResolver.reachable(state, state.units[0])
 	# move 3 on cost-1 terrain = manhattan diamond: 2*3*(3+1) + 1 cells
 	assert_eq(result.costs.size(), 25)

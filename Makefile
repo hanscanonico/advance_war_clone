@@ -14,6 +14,30 @@ hotseat:
 test:
 	$(GODOT) --headless --path . -s res://addons/gut/gut_cmdln.gd
 
+# Every .gd file that is actually ours: skips the engine cache, vendored addons,
+# the engine binary, and .claude/worktrees, which holds whole nested checkouts of
+# this same repo and would otherwise be linted as if it were project source.
+SOURCES := $(shell find . -name '*.gd' \
+	-not -path './.godot/*' -not -path './addons/*' -not -path './bin/*' \
+	-not -path './.claude/*')
+
+# Parse + type check without booting the scene tree — the quick "does this
+# compile?" pass. Rules live in tools/check_scripts.sh.
+check:
+	tools/check_scripts.sh
+
+# Style and smells. Rule overrides live in gdlintrc.
+lint:
+	gdlint $(SOURCES)
+
+# Reformat in place; `make format-check` only reports. Both need gdtoolkit:
+#   pipx install "gdtoolkit==4.*"
+format:
+	gdformat $(SOURCES)
+
+format-check:
+	gdformat --check $(SOURCES)
+
 # generate_tiles.gd draws only the ground; it leaves city/base/hq as bare lots
 # and no longer writes units_atlas.png, so the PixVoxel step must follow it.
 # `sprites-check` runs first because `ground` is destructive: it replaces the
@@ -49,4 +73,5 @@ screenshot:
 menu-screenshot:
 	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
-.PHONY: run hotseat test tiles sprites-check ground sprites sfx import screenshot menu-screenshot
+.PHONY: run hotseat test check lint format format-check tiles sprites-check \
+	ground sprites sfx import screenshot menu-screenshot

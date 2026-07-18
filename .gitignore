@@ -10,3 +10,7 @@ bin/
 # Local verification artifacts
 screenshot*.png
 screenshot*.png.import
+
+# Agent scratch space. .claude/worktrees holds nested checkouts of this repo,
+# which git would otherwise offer to commit as embedded repositories.
+.claude/
