@@ -24,6 +24,8 @@ make import       # (re)import assets headless
 make screenshot   # boot the game, save screenshot.png, quit
 ```
 
+Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
+
 Any Godot 4.7+ works too — open the project folder in the editor.
 
 ## Controls (M4)
