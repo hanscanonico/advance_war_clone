@@ -11,6 +11,8 @@ const SPRITE_PX := 64
 const SPRITE_SCALE := float(TILE) / float(SPRITE_PX)
 const UNITS_ATLAS_PATH := "res://assets/tiles/units_atlas.png"
 const ACTED_TINT := Color(0.55, 0.55, 0.55)
+## HpLabel's offset in unit_sprite.tscn, in world-grid units.
+const HP_LABEL_OFFSET := Vector2(1, 0)
 
 var unit: Unit
 ## Team whose turn it is. Only that team's units grey out when exhausted;
@@ -34,7 +36,7 @@ func setup(p_unit: Unit, p_active_team: int) -> void:
 	# rather than letting it shrink with the art. Its offset is authored in the
 	# same units and needs the same treatment, or the badge creeps toward centre.
 	hp_label.scale = Vector2.ONE / SPRITE_SCALE
-	hp_label.position /= SPRITE_SCALE
+	hp_label.position = HP_LABEL_OFFSET / SPRITE_SCALE
 	refresh()
 
 

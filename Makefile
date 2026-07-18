@@ -14,7 +14,13 @@ test:
 
 # generate_tiles.gd draws only the ground; it leaves city/base/hq as bare lots
 # and no longer writes units_atlas.png, so the PixVoxel step must follow it.
-tiles: ground sprites
+# `import` runs last because Godot caches image imports by size: without it a
+# rebuild that changes the atlas dimensions renders a blank map.
+# .NOTPARALLEL keeps that order under `make -j` — the two atlas steps write the
+# same file, so running them concurrently produces a torn terrain_atlas.png.
+.NOTPARALLEL:
+
+tiles: ground sprites import
 
 ground:
 	$(GODOT) --headless --path . -s res://tools/generate_tiles.gd

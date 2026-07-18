@@ -50,6 +50,9 @@ UNITS=(Infantry Infantry_T Supply_T Tank Tank_P Artillery_S Artillery Artillery_
 # Columns 5, 6, 7 of the terrain atlas: city, base, hq.
 BUILDINGS=(City Factory Castle)
 BLDG_COLS=(5 6 7)
+# COLS in tools/generate_tiles.gd; rows are the team rows above.
+TERRAIN_COLS=9
+TERRAIN_ROWS=${#ROW_PALETTE[@]}
 
 # Paved lot under a building, matching _ground(o, PAVE) in tools/generate_tiles.gd:
 # PAVE with a 1px (4px at this scale) PAVE.darkened(0.12) edge so the grid reads.
@@ -72,17 +75,34 @@ render_cell() {
 }
 
 echo "building units_atlas.png (${#UNITS[@]} cols x ${#ROW_PALETTE[@]} rows @ ${CELL}px)"
+# The cell lists are accumulated in loop order rather than globbed: a glob sorts
+# lexicographically, so a tenth unit would place u_0_10.png before u_0_2.png and
+# silently hand every column from 2 up the wrong sprite.
+unit_rows=()
 for row in "${!ROW_PALETTE[@]}"; do
+	unit_cells=()
 	for col in "${!UNITS[@]}"; do
 		render_cell "$SRC/${ROW_PALETTE[$row]}_${UNITS[$col]}_${FRAME}.png" \
 			"$UNIT_CROP" "${ROW_TWEAK[$row]}" "$WORK/u_${row}_${col}.png"
+		unit_cells+=("$WORK/u_${row}_${col}.png")
 	done
-	magick "$WORK"/u_${row}_*.png +append "$WORK/urow_$row.png"
+	magick "${unit_cells[@]}" +append "$WORK/urow_$row.png"
+	unit_rows+=("$WORK/urow_$row.png")
 done
-magick "$WORK"/urow_*.png -append "${NO_TIME[@]}" "$TILES/units_atlas.png"
+magick "${unit_rows[@]}" -append "${NO_TIME[@]}" "$TILES/units_atlas.png"
 
 echo "painting city/base/hq into terrain_atlas.png"
 [ -f "$TILES/terrain_atlas.png" ] || { echo "error: run 'make tiles' first" >&2; exit 1; }
+# The composites below are placed at fixed CELL offsets, and ImageMagick clips
+# anything landing off-canvas without an error, so a stale or differently-sized
+# atlas would yield missing or half-drawn buildings.
+TERRAIN_SIZE="$((TERRAIN_COLS * CELL))x$((TERRAIN_ROWS * CELL))"
+ACTUAL_SIZE="$(magick identify -format '%wx%h' "$TILES/terrain_atlas.png")"
+[ "$ACTUAL_SIZE" = "$TERRAIN_SIZE" ] || {
+	echo "error: terrain_atlas.png is $ACTUAL_SIZE, expected $TERRAIN_SIZE" >&2
+	echo "       re-run 'make ground' (check SCALE/COLS in tools/generate_tiles.gd)" >&2
+	exit 1
+}
 # -type TrueColor is load-bearing: the lot is pure grey, so ImageMagick would
 # otherwise write it in grayscale colorspace and desaturate the building
 # composited onto it, leaving every team's property the same colour.
