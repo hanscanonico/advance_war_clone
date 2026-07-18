@@ -27,9 +27,13 @@ make screenshot   # boot the game, save screenshot.png, quit
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
+Two maps ship: `first_steps` (the default) and `crossfire`. Pick one on the command line with
+`bin/Godot.app/Contents/MacOS/Godot --path . -- --map=crossfire`; an in-game map select arrives
+with M7.
+
 Any Godot 4.7+ works too — open the project folder in the editor.
 
-## Controls (M5)
+## Controls (M6)
 
 You play Red; Blue is the computer. Blue's turn plays itself — input is blocked while the AI
 moves, attacks, captures, and builds, and the cursor follows each of its actions so you can
@@ -42,20 +46,31 @@ jumps to that team's first property.
 - Mouse wheel or `+` / `-`: zoom
 - Confirm (`Enter` / `Space` / `Z`) or left-click on one of *your* units: select it and highlight
   its movement range; move the cursor within range to preview the path, then confirm a destination
-  to move there
+  to move there. Remaining fuel caps that range, so a dry unit is stranded where it stands
 - Cancel (`Esc` / `X` / `Backspace`): deselect, or undo an uncommitted move
 - After a move, the action menu opens: **Fire** (offered only when an enemy is in weapon range
-  from the destination), **Capture** (offered when a capture-capable unit ends on a property you
-  don't own), **Wait** (commit the move), or **Cancel** (revert it)
+  from the destination and the unit still has ammo), **Capture** (offered when a capture-capable
+  unit ends on a property you don't own), **Drop** and **Supply** (see transports below),
+  **Wait** (commit the move), or **Cancel** (revert it)
 - Choosing Fire enters targeting: attackable enemies get a red overlay and a panel previews the
   attack and counter damage; confirm on a target to resolve combat, or cancel back to the menu
+- Confirming onto a reachable cell held by one of *your* units offers **Load** (board a transport
+  with room) or **Join** (merge into a damaged unit of the same type, adding up HP, fuel, and
+  ammo). Cancel snaps the mover back, as with any uncommitted move
+- A loaded APC offers **Drop**, which enters a cell picker: the legal unload cells get the blue
+  overlay, and confirming on one puts the passenger out there, exhausted for the turn. **Supply**
+  refills every friendly unit standing next to the APC
+- Moving spends fuel equal to the terrain cost of each step; attacking spends one ammo, and so
+  does each counter-attack, so a dry unit can neither fire nor counter. At the start of your turn
+  every unit standing on one of your properties or next to one of your APCs is refilled
 - Confirm on one of your empty bases: the build menu lists units cheapest first; rows you can't
   afford are greyed out. A bought unit spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
   team (the day counter advances when the rotation wraps back to Red)
 - The HUD shows the current day, team, and funds; the corner panel shows the hovered tile's
   terrain, defense stars, move costs, owner (with `capture: N left` while a capture is in
-  progress), and the unit standing there, if any
+  progress), and the unit standing there, if any — with its fuel, its ammo when the unit needs
+  any, and `[+Infantry]` when it is carrying a passenger
 - Taking the enemy HQ or destroying every enemy unit ends the match with a victory banner and
   no further input
 

@@ -306,8 +306,9 @@ flowchart TD
           <h3 class="card-title text-base">Key algorithms</h3>
           <ul class="list-disc list-inside text-sm space-y-2">
             <li><strong>Movement range</strong> — Dijkstra flood-fill from the unit's tile, edge
-            costs from the terrain × movement-class table, budget = unit's move points. Occupied
-            enemy tiles block; friendly tiles pass-through but can't be final destinations.</li>
+            costs from the terrain × movement-class table, budget = min(move points, remaining
+            fuel) since M6. Occupied enemy tiles block; friendly tiles pass-through and are final
+            destinations only for Load and Join.</li>
             <li><strong>Path arrow</strong> — walk the Dijkstra parent tree; if the player traces a
             custom path with the cursor, keep it while it stays legal and within budget (AW behavior).</li>
             <li><strong>Attack range</strong> — direct units: tiles adjacent to any reachable tile

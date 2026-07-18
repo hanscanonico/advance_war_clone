@@ -933,7 +933,10 @@ func _check_screenshot_mode() -> void:
 ## attack stops at the targeting preview and resolve fires, both with the
 ## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
 ## build buys at the red base; endturn hands the turn to Blue; aiturn does the
-## same and then waits out Blue's whole AI turn, back to Red's next turn.
+## same and then waits out Blue's whole AI turn, back to Red's next turn;
+## transport runs load -> drive -> drop, and load, cargo, and drop stop that
+## same chain at the Load menu, the loaded APC's panel, and the drop-target
+## picker; supply holds the APC next to its infantry so Supply is offered.
 func _run_demo(mode: String, shot_path: String) -> void:
 	await get_tree().process_frame
 	game.rng.seed = 2026  # deterministic demo
@@ -976,14 +979,23 @@ func _run_demo(mode: String, shot_path: String) -> void:
 				await get_tree().process_frame
 			action_menu.choose(&"end_turn")
 			await get_tree().process_frame
-		"transport":
+		"load", "cargo", "drop", "transport":
 			_confirm_at(Vector2i(4, 3))  # select the red infantry
 			_confirm_at(Vector2i(3, 3))  # onto the APC -> Load menu
 			while state != State.MENU:
 				await get_tree().process_frame
+			if mode == "load":
+				if shot_path != "":
+					_save_screenshot_and_quit(shot_path)
+				return
 			action_menu.choose(&"load")
 			while state != State.IDLE:
 				await get_tree().process_frame
+			if mode == "cargo":
+				_set_cursor_cell(Vector2i(3, 3))  # panel shows the APC's [+Infantry]
+				if shot_path != "":
+					_save_screenshot_and_quit(shot_path)
+				return
 			_confirm_at(Vector2i(3, 3))  # select the loaded APC
 			_confirm_at(Vector2i(3, 5))  # drive it south
 			while state != State.MENU:
@@ -991,10 +1003,19 @@ func _run_demo(mode: String, shot_path: String) -> void:
 			action_menu.choose(&"drop")
 			while state != State.DROP_TARGETING:
 				await get_tree().process_frame
+			if mode == "drop":
+				if shot_path != "":
+					_save_screenshot_and_quit(shot_path)
+				return
 			_confirm_at(cursor_cell)  # drop at the first offered cell
 			while state != State.IDLE:
 				await get_tree().process_frame
 			_set_cursor_cell(Vector2i(3, 5))  # show the APC in the panel
+		"supply":
+			_confirm_at(Vector2i(3, 3))  # select the red APC
+			_confirm_at(Vector2i(3, 3))  # stay put -> menu offers Supply
+			while state != State.MENU:
+				await get_tree().process_frame
 		"aiturn":
 			# hand the turn to the Blue AI and wait until it plays back to Red
 			_confirm_at(Vector2i(10, 5))
