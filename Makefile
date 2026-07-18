@@ -1,7 +1,9 @@
 GODOT := bin/Godot.app/Contents/MacOS/Godot
 BATTLE := scenes/battle/battle.tscn
-# Extracted Revised_PixVoxel_Wargame_1.7z — see assets/LICENSES.md for the source.
-PIXVOXEL ?= $(HOME)/Downloads/Revised_PixVoxel_Wargame/standing_frames
+# The 36 source sprites the atlases are built from are vendored (CC0), so a
+# fresh clone rebuilds with no setup. Override to build from a full extracted
+# Revised_PixVoxel_Wargame_1.7z — see assets/LICENSES.md for the source.
+PIXVOXEL ?= assets/sprites/pixvoxel_src
 
 run:
 	$(GODOT) --path .
@@ -14,13 +16,19 @@ test:
 
 # generate_tiles.gd draws only the ground; it leaves city/base/hq as bare lots
 # and no longer writes units_atlas.png, so the PixVoxel step must follow it.
+# `sprites-check` runs first because `ground` is destructive: it replaces the
+# committed building art with bare lots that only `sprites` can finish painting,
+# so a missing ImageMagick or source sprite has to fail while the tree is clean.
 # `import` runs last because Godot caches image imports by size: without it a
 # rebuild that changes the atlas dimensions renders a blank map.
 # .NOTPARALLEL keeps that order under `make -j` — the two atlas steps write the
 # same file, so running them concurrently produces a torn terrain_atlas.png.
 .NOTPARALLEL:
 
-tiles: ground sprites import
+tiles: sprites-check ground sprites import
+
+sprites-check:
+	tools/build_pixvoxel_atlases.sh --check "$(PIXVOXEL)"
 
 ground:
 	$(GODOT) --headless --path . -s res://tools/generate_tiles.gd
@@ -41,4 +49,4 @@ screenshot:
 menu-screenshot:
 	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
-.PHONY: run hotseat test tiles ground sprites sfx import screenshot menu-screenshot
+.PHONY: run hotseat test tiles sprites-check ground sprites sfx import screenshot menu-screenshot

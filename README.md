@@ -21,6 +21,7 @@ make run             # boot the game — the main menu (map, fog, 1P / 2P / Cont
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
 make test            # run the GUT unit test suite (headless)
 make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
+make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
 make import          # (re)import assets headless
 make screenshot      # boot the battle scene, save screenshot.png, quit
@@ -125,8 +126,14 @@ tiles are still generated programmer art. All sound is generated placeholder chi
 There is no music yet — it needs licensed tracks. Third-party asset licenses must be tracked in
 `assets/LICENSES.md`. No Nintendo assets or names may ever be used.
 
-`make tiles` rebuilds the art in three ordered steps: `ground` draws the terrain headless, then
-`sprites` composites the PixVoxel art over it, then `import` reimports the result — Godot caches
-image imports by size, so skipping the last step after a rebuild that changes atlas dimensions
-renders a blank map. `sprites` needs ImageMagick 7 and the extracted pack — point it at one with
+`make tiles` rebuilds the art in four ordered steps: `sprites-check` verifies the build inputs,
+`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it, and `import`
+reimports the result — Godot caches image imports by size, so skipping the last step after a
+rebuild that changes atlas dimensions renders a blank map. The check runs first because `ground`
+is destructive: it replaces the committed building art with bare lots that only `sprites` can
+finish painting, so a failure has to happen while the tree is still clean.
+
+The only external requirement is ImageMagick 7 (`brew install imagemagick`). The 36 CC0 source
+sprites are vendored under `assets/sprites/pixvoxel_src`, so a fresh clone rebuilds with no
+download. To build from a full extracted pack instead, override the default:
 `make tiles PIXVOXEL=/path/to/Revised_PixVoxel_Wargame/standing_frames`.

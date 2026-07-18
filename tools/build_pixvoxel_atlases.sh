@@ -6,19 +6,32 @@
 #   source: https://opengameart.org/content/pixvoxel-revised-isometric-wargame-sprites
 #   pack:   Revised_PixVoxel_Wargame_1.7z  ->  Revised_PixVoxel_Wargame/standing_frames/
 #
-# Usage:  tools/build_pixvoxel_atlases.sh <path-to-standing_frames>
+# Usage:  tools/build_pixvoxel_atlases.sh [--check] <path-to-standing_frames>
 #
 # Writes assets/tiles/units_atlas.png outright, and repaints the city/base/hq
 # columns of assets/tiles/terrain_atlas.png (which tools/generate_tiles.gd
-# leaves as bare paved lots). Run it after `make tiles`; see the `sprites`
+# leaves as bare paved lots). Run it after the `ground` step; see the `sprites`
 # target in the Makefile. Both steps are idempotent — the building columns are
 # rebuilt from a freshly drawn base rather than composited onto themselves.
+#
+# --check validates every precondition and exits without writing anything, so
+# `make tiles` can prove this step will succeed before the destructive `ground`
+# step strips the committed building art out of the working tree.
+#
+# The 36 sprites it reads are vendored under assets/sprites/pixvoxel_src, so the
+# default path in the Makefile works on a fresh clone.
 #
 # Requires ImageMagick 7 (`brew install imagemagick`).
 
 set -euo pipefail
 
-SRC="${1:?usage: build_pixvoxel_atlases.sh <path to Revised_PixVoxel_Wargame/standing_frames>}"
+CHECK_ONLY=0
+if [ "${1:-}" = "--check" ]; then
+	CHECK_ONLY=1
+	shift
+fi
+
+SRC="${1:?usage: build_pixvoxel_atlases.sh [--check] <path to standing_frames>}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TILES="$ROOT/assets/tiles"
 WORK="$(mktemp -d)"
@@ -59,8 +72,45 @@ TERRAIN_ROWS=${#ROW_PALETTE[@]}
 PAVE="#cfcfcf"
 PAVE_EDGE="#b6b6b6"
 
+# Everything this script depends on is checked here, before the first write: a
+# failure past that point leaves a half-rebuilt pair of atlases, and in the
+# `make tiles` flow the committed building art is already gone.
 command -v magick >/dev/null || { echo "error: ImageMagick 7 (magick) not found" >&2; exit 1; }
 [ -d "$SRC" ] || { echo "error: no such directory: $SRC" >&2; exit 1; }
+
+missing=()
+for row in "${!ROW_PALETTE[@]}"; do
+	for name in "${UNITS[@]}" "${BUILDINGS[@]}"; do
+		sprite="$SRC/${ROW_PALETTE[$row]}_${name}_${FRAME}.png"
+		[ -f "$sprite" ] || missing+=("$sprite")
+	done
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+	echo "error: ${#missing[@]} source sprite(s) missing under $SRC:" >&2
+	printf '       %s\n' "${missing[@]}" >&2
+	exit 1
+fi
+
+# The building columns are painted into an atlas that tools/generate_tiles.gd
+# draws, at fixed CELL offsets that ImageMagick would silently clip off-canvas
+# if it were a stale or differently-sized one.
+[ -f "$TILES/terrain_atlas.png" ] || {
+	echo "error: missing $TILES/terrain_atlas.png — run 'make ground' first" >&2
+	exit 1
+}
+TERRAIN_SIZE="$((TERRAIN_COLS * CELL))x$((TERRAIN_ROWS * CELL))"
+ACTUAL_SIZE="$(magick identify -format '%wx%h' "$TILES/terrain_atlas.png")"
+[ "$ACTUAL_SIZE" = "$TERRAIN_SIZE" ] || {
+	echo "error: terrain_atlas.png is $ACTUAL_SIZE, expected $TERRAIN_SIZE" >&2
+	echo "       re-run 'make ground' (check SCALE/COLS in tools/generate_tiles.gd)" >&2
+	exit 1
+}
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+	echo "preflight ok: ${#UNITS[@]} units + ${#BUILDINGS[@]} buildings" \
+		"x ${#ROW_PALETTE[@]} palettes in $SRC"
+	exit 0
+fi
 
 # Scale a source sprite into one transparent CELL x CELL atlas cell. Nearest
 # neighbour only: these sit next to 16px art and must stay hard-edged.
@@ -92,17 +142,6 @@ done
 magick "${unit_rows[@]}" -append "${NO_TIME[@]}" "$TILES/units_atlas.png"
 
 echo "painting city/base/hq into terrain_atlas.png"
-[ -f "$TILES/terrain_atlas.png" ] || { echo "error: run 'make tiles' first" >&2; exit 1; }
-# The composites below are placed at fixed CELL offsets, and ImageMagick clips
-# anything landing off-canvas without an error, so a stale or differently-sized
-# atlas would yield missing or half-drawn buildings.
-TERRAIN_SIZE="$((TERRAIN_COLS * CELL))x$((TERRAIN_ROWS * CELL))"
-ACTUAL_SIZE="$(magick identify -format '%wx%h' "$TILES/terrain_atlas.png")"
-[ "$ACTUAL_SIZE" = "$TERRAIN_SIZE" ] || {
-	echo "error: terrain_atlas.png is $ACTUAL_SIZE, expected $TERRAIN_SIZE" >&2
-	echo "       re-run 'make ground' (check SCALE/COLS in tools/generate_tiles.gd)" >&2
-	exit 1
-}
 # -type TrueColor is load-bearing: the lot is pure grey, so ImageMagick would
 # otherwise write it in grayscale colorspace and desaturate the building
 # composited onto it, leaving every team's property the same colour.
