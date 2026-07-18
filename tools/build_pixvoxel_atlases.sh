@@ -27,6 +27,12 @@ trap 'rm -rf "$WORK"' EXIT
 CELL=64          # atlas cell: 4x the 16px world grid, so art is texel-exact at 1x zoom
 FRAME="Large_face0_0"  # one standing frame, one facing, for every sprite
 
+# PNG writes embed a tIME chunk and date:create/date:modify text chunks, which
+# make an unchanged rebuild differ byte-for-byte and show up as a dirty working
+# tree. Strip them so the atlases are reproducible: same pack in, same bytes
+# out. -strip touches metadata only, not the pixels or the colour type.
+NO_TIME=(-strip -define png:exclude-chunk=time)
+
 # Team rows: 0 neutral, 1 red, 2 blue — matching GameState.TEAMS / MapData.NEUTRAL.
 # PixVoxel colour1 is white and gets desaturated to grey, so a neutral property
 # never reads as a team. colour0 (dark) is unusable here: its red trim looks red-team.
@@ -73,7 +79,7 @@ for row in "${!ROW_PALETTE[@]}"; do
 	done
 	magick "$WORK"/u_${row}_*.png +append "$WORK/urow_$row.png"
 done
-magick "$WORK"/urow_*.png -append "$TILES/units_atlas.png"
+magick "$WORK"/urow_*.png -append "${NO_TIME[@]}" "$TILES/units_atlas.png"
 
 echo "painting city/base/hq into terrain_atlas.png"
 [ -f "$TILES/terrain_atlas.png" ] || { echo "error: run 'make tiles' first" >&2; exit 1; }
@@ -95,7 +101,7 @@ for row in "${!ROW_PALETTE[@]}"; do
 			-composite "$WORK/terrain.png"
 	done
 done
-cp "$WORK/terrain.png" "$TILES/terrain_atlas.png"
+magick "$WORK/terrain.png" "${NO_TIME[@]}" "$TILES/terrain_atlas.png"
 
 magick identify "$TILES/units_atlas.png" "$TILES/terrain_atlas.png"
 echo "done"
