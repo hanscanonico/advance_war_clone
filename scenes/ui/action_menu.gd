@@ -69,6 +69,9 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Public so scripted drivers (screenshot demos) exercise the same path as
 ## the buttons and keyboard.
 func choose(id: StringName) -> void:
+	var i := _ids.find(id)
+	if i >= 0 and _disabled[i]:
+		return
 	action_chosen.emit(id)
 
 

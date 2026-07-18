@@ -74,8 +74,8 @@ func _ready() -> void:
 	_spawn_unit_sprites()
 	action_menu.action_chosen.connect(_on_menu_action)
 	_setup_camera()
-	var red_cells := map.cells_owned_by(1)
-	_set_cursor_cell(red_cells[0] if not red_cells.is_empty() else Vector2i.ZERO)
+	var homes := game.properties_of(game.current_team)
+	_set_cursor_cell(homes[0] if not homes.is_empty() else Vector2i.ZERO)
 	camera.position = cursor.position
 	camera.reset_smoothing()
 	_start_cursor_pulse()
@@ -327,19 +327,20 @@ func _on_turn_started() -> void:
 
 func _enter_victory() -> void:
 	state = State.VICTORY
-	if _banner_tween != null and _banner_tween.is_valid():
-		_banner_tween.kill()
-	banner_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
-	turn_banner.show()
-	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_set_banner("%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner)))
 
 
-func _show_banner(text: String) -> void:
+## Shows the banner immediately and cancels any pending auto-hide.
+func _set_banner(text: String) -> void:
 	if _banner_tween != null and _banner_tween.is_valid():
 		_banner_tween.kill()
 	banner_label.text = text
 	turn_banner.show()
 	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+
+
+func _show_banner(text: String) -> void:
+	_set_banner(text)
 	_banner_tween = create_tween()
 	_banner_tween.tween_interval(1.2)
 	_banner_tween.tween_callback(turn_banner.hide)

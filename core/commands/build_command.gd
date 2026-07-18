@@ -21,6 +21,8 @@ func validate(state: GameState) -> String:
 		return "the match is over"
 	if team != state.current_team:
 		return "not this team's turn"
+	if unit_type == null:
+		return "unknown unit type"
 	var terrain := state.map.terrain_at(cell)
 	if terrain == null or terrain.id != &"base":
 		return "can only build at a base"

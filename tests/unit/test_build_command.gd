@@ -32,6 +32,12 @@ func test_build_spawns_exhausted_unit_and_charges() -> void:
 	assert_eq(command.built_unit, unit)
 
 
+func test_unknown_unit_type_rejected() -> void:
+	var state := _state("[terrain]\nB.\n[owners]\n1 0 0")
+	var command := BuildCommand.new(1, unit_db.by_id(&"no_such_unit"), Vector2i(0, 0))
+	assert_eq(command.validate(state), "unknown unit type")
+
+
 func test_insufficient_funds_rejected() -> void:
 	var state := _state("[terrain]\nB.\n[owners]\n1 0 0")
 	var command := BuildCommand.new(1, unit_db.by_id(&"md_tank"), Vector2i(0, 0))

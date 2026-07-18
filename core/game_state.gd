@@ -101,20 +101,15 @@ func properties_of(team: int) -> Array[Vector2i]:
 	return cells
 
 
-## Commits a unit's move along `path`: notifies the vacated cell (resetting any
-## abandoned capture) and exhausts the unit. Shared by Move/Attack/Capture apply.
+## Commits a unit's move along `path`: an abandoned capture on the vacated cell
+## resets to the full point count, and the unit is exhausted. Sole move-commit
+## entry point, shared by Move/Attack/Capture apply.
 func advance_unit(unit: Unit, path: Array[Vector2i]) -> void:
 	var dest: Vector2i = path[path.size() - 1]
 	if dest != path[0]:
-		notify_unit_left(path[0])
+		capture_progress.erase(path[0])
 	unit.cell = dest
 	unit.acted = true
-
-
-## Called by movement-type commands when a unit vacates a cell: an abandoned
-## capture resets to the full point count.
-func notify_unit_left(cell: Vector2i) -> void:
-	capture_progress.erase(cell)
 
 
 func next_team() -> int:
