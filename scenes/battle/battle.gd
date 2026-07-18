@@ -11,10 +11,12 @@ const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
 const ATLAS_SOURCE_ID := 0
 const MAX_ZOOM := 5.0
 const MOVE_STEP_SECONDS := 0.06
+const AI_COMMAND_DELAY := 0.2
+const AI_MAX_COMMANDS_PER_TURN := 300
 
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
-enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, VICTORY }
+enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, VICTORY, AI_TURN }
 
 const DIR_ACTIONS: Array = [
 	[&"cursor_up", Vector2i.UP],
@@ -43,6 +45,9 @@ var db: TerrainDB
 var unit_db: UnitDB
 var map: MapData
 var game: GameState
+var ai: AIController
+## Teams played by the computer. Blue by default; `--hotseat` clears it.
+var ai_teams: Array[int] = [2]
 var cursor_cell := Vector2i.ZERO
 
 var state := State.IDLE
@@ -67,6 +72,9 @@ func _ready() -> void:
 	game = GameState.create(map, unit_db, load(DAMAGE_CHART_PATH))
 	assert(game != null, "failed to build game state from %s" % MAP_PATH)
 	game.rng.randomize()
+	ai = AIController.new(unit_db)
+	if "--hotseat" in OS.get_cmdline_user_args():
+		ai_teams = []
 	terrain_layer.tile_set = _build_tile_set()
 	move_overlay.tile_set = _build_overlay_tile_set()
 	attack_overlay.tile_set = move_overlay.tile_set
@@ -83,8 +91,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if state == State.ANIMATING or state == State.MENU or state == State.VICTORY:
-		return  # the menu handles its own input; animations and victory block it
+	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN]:
+		return  # the menu handles its own input; the rest block input entirely
 	if event.is_action_pressed(&"zoom_in"):
 		_set_zoom(_zoom + 1.0)
 	elif event.is_action_pressed(&"zoom_out"):
@@ -167,14 +175,18 @@ func _animate_move() -> void:
 	state = State.ANIMATING
 	move_overlay.clear()
 	path_line.clear_points()
-	if planned_path.size() < 2:
-		_on_move_animation_done()
+	await _animate_path(_sprites[selected], planned_path)
+	_on_move_animation_done()
+
+
+## Tweens a sprite along a path without touching the sim. Awaitable.
+func _animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
+	if path.size() < 2:
 		return
-	var sprite: UnitSprite = _sprites[selected]
 	var tween := create_tween()
-	for i in range(1, planned_path.size()):
-		tween.tween_property(sprite, "position", _cell_center(planned_path[i]), MOVE_STEP_SECONDS)
-	tween.finished.connect(_on_move_animation_done)
+	for i in range(1, path.size()):
+		tween.tween_property(sprite, "position", _cell_center(path[i]), MOVE_STEP_SECONDS)
+	await tween.finished
 
 
 func _on_move_animation_done() -> void:
@@ -257,14 +269,18 @@ func _handle_build_action(action: StringName) -> void:
 		state = State.IDLE
 		return
 	command.apply(game)
-	var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
-	units_root.add_child(sprite)
-	sprite.setup(command.built_unit, game.current_team)
-	_sprites[command.built_unit] = sprite
+	_spawn_sprite_for(command.built_unit)
 	EventBus.unit_built.emit(command.built_unit)
 	state = State.IDLE
 	_refresh_panel()
 	_refresh_hud()
+
+
+func _spawn_sprite_for(unit: Unit) -> void:
+	var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
+	units_root.add_child(sprite)
+	sprite.setup(unit, game.current_team)
+	_sprites[unit] = sprite
 
 
 func _handle_map_action(action: StringName) -> void:
@@ -322,6 +338,87 @@ func _on_turn_started() -> void:
 	if not homes.is_empty():
 		_set_cursor_cell(homes[0])
 	EventBus.turn_started.emit(game.current_team, game.day)
+	if game.winner == 0 and game.current_team in ai_teams:
+		state = State.AI_TURN
+		_run_ai_turn()
+	else:
+		state = State.IDLE
+
+
+# --- AI turns ----------------------------------------------------------------
+
+
+## Plays the whole AI turn: plan one command, animate it, repeat until the AI
+## ends its turn. The command cap is a safety net so a planner bug can never
+## hang the match.
+func _run_ai_turn() -> void:
+	await get_tree().create_timer(1.3).timeout  # let the turn banner pass
+	for i in AI_MAX_COMMANDS_PER_TURN:
+		if game.winner != 0:
+			return
+		var command := ai.plan_next_command(game)
+		var error := command.validate(game)
+		if error != "":
+			push_error("AI command rejected (%s); ending the AI turn" % error)
+			command = EndTurnCommand.new()
+			if command.validate(game) != "":
+				return
+		var ended := command is EndTurnCommand
+		await _execute_ai_command(command)
+		if game.winner != 0:
+			_enter_victory()
+			return
+		if ended:
+			return
+		await get_tree().create_timer(AI_COMMAND_DELAY).timeout
+	push_error("AI hit the per-turn command cap; forcing end of turn")
+	var end_turn := EndTurnCommand.new()
+	if end_turn.validate(game) == "":
+		await _execute_ai_command(end_turn)
+
+
+## Applies one AI command with the same animations the player flow uses.
+## Note: Attack/Capture are checked before Move because each is its own
+## Command subclass; the cursor follows so the player can watch.
+func _execute_ai_command(command: Command) -> void:
+	if command is AttackCommand:
+		var attack := command as AttackCommand
+		var target := game.unit_at(attack.target_cell)
+		_set_cursor_cell(attack.path[attack.path.size() - 1])
+		await _animate_path(_sprites[attack.unit], attack.path)
+		_set_cursor_cell(attack.target_cell)
+		command.apply(game)
+		EventBus.unit_moved.emit(attack.unit)
+		await _animate_combat(attack.result, attack.unit, target)
+	elif command is CaptureCommand:
+		var capture := command as CaptureCommand
+		var dest: Vector2i = capture.path[capture.path.size() - 1]
+		_set_cursor_cell(dest)
+		await _animate_path(_sprites[capture.unit], capture.path)
+		command.apply(game)
+		EventBus.unit_moved.emit(capture.unit)
+		if game.owner_at(dest) == capture.unit.team:
+			EventBus.property_captured.emit(dest, capture.unit.team)
+			_repaint_property(dest)
+		_sprites[capture.unit].refresh()
+	elif command is MoveCommand:
+		var move := command as MoveCommand
+		_set_cursor_cell(move.path[move.path.size() - 1])
+		await _animate_path(_sprites[move.unit], move.path)
+		command.apply(game)
+		EventBus.unit_moved.emit(move.unit)
+		_sprites[move.unit].refresh()
+	elif command is BuildCommand:
+		var build := command as BuildCommand
+		_set_cursor_cell(build.cell)
+		command.apply(game)
+		_spawn_sprite_for(build.built_unit)
+		EventBus.unit_built.emit(build.built_unit)
+	elif command is EndTurnCommand:
+		command.apply(game)
+		_on_turn_started()
+	_refresh_panel()
+	_refresh_hud()
 
 
 func _enter_victory() -> void:
@@ -693,6 +790,14 @@ func _run_attack_demo(mode: String, shot_path: String) -> void:
 				await get_tree().process_frame
 			action_menu.choose(&"end_turn")
 			await get_tree().process_frame
+		"aiturn":
+			# hand the turn to the Blue AI and wait until it plays back to Red
+			_confirm_at(Vector2i(10, 5))
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"end_turn")
+			while game.winner == 0 and not (game.current_team == 1 and state == State.IDLE):
+				await get_tree().process_frame
 	if shot_path != "":
 		_save_screenshot_and_quit(shot_path)
 
