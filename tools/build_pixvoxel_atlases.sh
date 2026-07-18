@@ -14,9 +14,11 @@
 # target in the Makefile. Both steps are idempotent — the building columns are
 # rebuilt from a freshly drawn base rather than composited onto themselves.
 #
-# --check validates every precondition and exits without writing anything, so
-# `make tiles` can prove this step will succeed before the destructive `ground`
-# step strips the committed building art out of the working tree.
+# --check validates this step's own inputs (ImageMagick and the source sprites)
+# and exits without writing anything, so `make tiles` can prove the step will
+# succeed before the destructive `ground` step strips the committed building art
+# out of the working tree. It deliberately does not inspect terrain_atlas.png,
+# which `ground` is about to rewrite.
 #
 # The 36 sprites it reads are vendored under assets/sprites/pixvoxel_src, so the
 # default path in the Makefile works on a fresh clone.
@@ -72,9 +74,10 @@ TERRAIN_ROWS=${#ROW_PALETTE[@]}
 PAVE="#cfcfcf"
 PAVE_EDGE="#b6b6b6"
 
-# Everything this script depends on is checked here, before the first write: a
-# failure past that point leaves a half-rebuilt pair of atlases, and in the
-# `make tiles` flow the committed building art is already gone.
+# Inputs no other build step can produce. These are what `--check` exists to
+# assert: in the `make tiles` flow the `ground` step that follows replaces the
+# committed building art with bare lots, so a missing one has to fail here,
+# while the working tree is still clean.
 command -v magick >/dev/null || { echo "error: ImageMagick 7 (magick) not found" >&2; exit 1; }
 [ -d "$SRC" ] || { echo "error: no such directory: $SRC" >&2; exit 1; }
 
@@ -91,9 +94,17 @@ if [ "${#missing[@]}" -gt 0 ]; then
 	exit 1
 fi
 
-# The building columns are painted into an atlas that tools/generate_tiles.gd
-# draws, at fixed CELL offsets that ImageMagick would silently clip off-canvas
-# if it were a stale or differently-sized one.
+if [ "$CHECK_ONLY" -eq 1 ]; then
+	echo "preflight ok: ${#UNITS[@]} units + ${#BUILDINGS[@]} buildings" \
+		"x ${#ROW_PALETTE[@]} palettes in $SRC"
+	exit 0
+fi
+
+# terrain_atlas.png is the `ground` step's output, not an input to this one, so
+# it is checked past the `--check` exit above — that runs before `ground`. The
+# building columns are painted at fixed CELL offsets that ImageMagick would
+# silently clip off-canvas on a stale or differently-sized atlas. Still ahead of
+# the first write below, so a failure never leaves a half-rebuilt pair.
 [ -f "$TILES/terrain_atlas.png" ] || {
 	echo "error: missing $TILES/terrain_atlas.png — run 'make ground' first" >&2
 	exit 1
@@ -105,12 +116,6 @@ ACTUAL_SIZE="$(magick identify -format '%wx%h' "$TILES/terrain_atlas.png")"
 	echo "       re-run 'make ground' (check SCALE/COLS in tools/generate_tiles.gd)" >&2
 	exit 1
 }
-
-if [ "$CHECK_ONLY" -eq 1 ]; then
-	echo "preflight ok: ${#UNITS[@]} units + ${#BUILDINGS[@]} buildings" \
-		"x ${#ROW_PALETTE[@]} palettes in $SRC"
-	exit 0
-fi
 
 # Scale a source sprite into one transparent CELL x CELL atlas cell. Nearest
 # neighbour only: these sit next to 16px art and must stay hard-edged.
