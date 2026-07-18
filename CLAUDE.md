@@ -86,10 +86,8 @@ See README.md for engine setup and the other `make` targets.
 
 ## Running the game
 
-```sh
-godot --path .            # open in the editor
-godot --path . scenes/battle/battle.tscn   # run a specific scene
-```
+Play with `make run`; `make screenshot` boots the game, saves `screenshot.png`, and quits.
+See README.md for engine setup and the other `make` targets.
 
 Prefer the running game (or a GUT test) over reasoning alone when verifying a change.
 
