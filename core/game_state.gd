@@ -26,6 +26,10 @@ var property_owners: Dictionary = {}
 var capture_progress: Dictionary = {}
 ## 0 while the match runs; the winning team once decided.
 var winner: int = 0
+## Fog of war (a match option; see Vision for the rules).
+var fog_enabled := false
+## res:// path of the map this match runs on; kept for save files.
+var map_path := ""
 
 
 ## Builds the starting state from a parsed map. Returns null (with a pushed

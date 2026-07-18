@@ -48,7 +48,10 @@ res://
 ├─ data/        # .tres resources: units/, terrain/, damage_chart
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
+│  ├─ menu/     # main_menu.tscn — map select, match options
+│  ├─ common/   # helpers shared by both scenes
 │  └─ ui/       # menus, panels, damage preview
+├─ autoload/    # singletons: EventBus, MatchConfig, Sfx
 ├─ ai/          # ai_controller.gd — plans Commands  (NO Node references)
 ├─ maps/        # map scenes / map resources
 ├─ assets/      # sprites, audio, fonts  (+ LICENSES.md)
@@ -88,8 +91,8 @@ See README.md for engine setup and the other `make` targets.
 
 ## Running the game
 
-Play with `make run`; `make screenshot` boots the game, saves `screenshot.png`, and quits.
-See README.md for engine setup and the other `make` targets.
+Play with `make run` (boots the main menu); `make screenshot` boots the battle scene directly,
+saves `screenshot.png`, and quits. See README.md for engine setup and the other `make` targets.
 
 Prefer the running game (or a GUT test) over reasoning alone when verifying a change.
 
@@ -104,8 +107,10 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
   scene, and prefer editing resource *data* over scene graph plumbing.
 - **`project.godot`, autoloads, and the input map** are edited through the editor when practical;
   if editing by hand, keep changes minimal and reviewable.
-- Keep the vision/fog boundary clean: route "what can this player see?" through one Vision API
-  that returns "everything" until fog is implemented (M7), so the retrofit is contained.
+- Keep the vision/fog boundary clean: `core/rules/vision.gd` is the single authority for "what can
+  this player see?" — ask it, never re-derive visibility. Fog is enforced in the presentation layer
+  (the sim stays permissive, the UI refuses to target or inspect what the viewer cannot see), and
+  the AI deliberately sees everything.
 
 ## Commits
 

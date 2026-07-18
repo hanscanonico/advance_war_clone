@@ -166,12 +166,13 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M6 done</span></h3>
-          <p class="text-sm">As of 2026-07-18: the depth pass is in — APC transport (Load/Drop/Supply),
-          fuel spent per terrain step and ammo per shot with turn-start resupply on properties and
-          beside APCs, unit merging (Join), and a second map (Crossfire, <code>--map=crossfire</code>).
-          Air units stayed deferred as planned. 132 GUT tests passing.
-          Next up: <strong>M7 — polish</strong> (fog of war, sound, save/load, menus).</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">PLAN COMPLETE — M0–M7 done</span></h3>
+          <p class="text-sm">As of 2026-07-18, all eight milestones are delivered: the game boots to a
+          main menu with map select and a fog-of-war toggle, plays 1P (vs the Blue AI) or hot-seat,
+          supports fog with true vision rules, saves and resumes matches, and has generated sound
+          effects, screen shake, and a real victory screen with Rematch. 143 GUT tests passing.
+          What remains is the stretch list below: CO powers, naval/air units, a map editor,
+          campaign scripting, and online play.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -284,21 +285,11 @@ flowchart TD
       <div class="card card-border bg-base-100">
         <div class="card-body">
           <h3 class="card-title text-base">Project layout</h3>
-          <div class="mockup-code text-sm">
-<pre data-prefix=" "><code>res://</code></pre>
-<pre data-prefix=" "><code>├─ core/        # sim: game_state.gd, commands/, rules/</code></pre>
-<pre data-prefix=" "><code>├─ data/        # .tres: units/, terrain/, damage_chart</code></pre>
-<pre data-prefix=" "><code>├─ scenes/</code></pre>
-<pre data-prefix=" "><code>│  ├─ battle/   # battle.tscn, cursor, unit_sprite</code></pre>
-<pre data-prefix=" "><code>│  └─ ui/       # menus, panels, damage preview</code></pre>
-<pre data-prefix=" "><code>├─ ai/          # ai_controller.gd, scoring</code></pre>
-<pre data-prefix=" "><code>├─ maps/        # map scenes / map resources</code></pre>
-<pre data-prefix=" "><code>├─ assets/      # sprites, audio, fonts</code></pre>
-<pre data-prefix=" "><code>└─ tests/       # GUT tests for core/ only</code></pre>
-          </div>
+          <p class="text-sm text-base-content/70">The canonical directory tree lives in
+          <code>CLAUDE.md</code> (&ldquo;Project layout&rdquo;) and is kept current there — this plan
+          does not duplicate it.</p>
           <p class="text-sm text-base-content/70">Rule of thumb: nothing in <code>core/</code> may
-          reference a Node, a scene, or anything in <code>scenes/</code>. Tests target
-          <code>core/</code> exclusively.</p>
+          reference a Node, a scene, or anything in <code>scenes/</code>.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -472,7 +463,7 @@ stateDiagram-v2
       <li class="step step-primary" data-content="✓">Game loop</li>
       <li class="step step-primary" data-content="✓">AI</li>
       <li class="step step-primary" data-content="✓">Depth</li>
-      <li class="step">Polish</li>
+      <li class="step step-primary" data-content="✓">Polish</li>
     </ul>
 
     <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
@@ -533,10 +524,11 @@ stateDiagram-v2
             <td>…run transport openings and supply lines like real AW strategy.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M7 · Polish &amp; atmosphere</td>
+            <td class="font-bold whitespace-nowrap">M7 · Polish &amp; atmosphere <span class="badge badge-success badge-sm">Done</span></td>
             <td>Fog of war (vision ranges, woods hiding, indirect-fire rules), sound effects + music,
             battle animations or screen-shake feedback, save/load (serialize GameState), main menu +
-            map select, settings.</td>
+            map select, settings. <em>Shipped without music and without a settings screen — both
+            deferred (music needs licensed tracks; settings is a stretch item).</em></td>
             <td>…hand the game to someone who has never seen the repo.</td>
           </tr>
           <tr>
@@ -577,10 +569,11 @@ stateDiagram-v2
       </div>
       <div role="alert" class="alert alert-warning alert-vertical sm:alert-horizontal">
         <div>
-          <h3 class="font-bold">Fog of war retrofit</h3>
-          <p class="text-sm">Fog touches rendering, AI, and rules. Mitigation: from M2 on, all
-          "what can this player see" queries go through one <code>Vision</code> API that simply returns
-          "everything" until M7 implements it.</p>
+          <h3 class="font-bold">Fog of war retrofit <span class="badge badge-success badge-sm">Landed in M7</span></h3>
+          <p class="text-sm">Fog touches rendering, AI, and rules. The mitigation held: every
+          "what can this player see" query goes through one <code>Vision</code> API
+          (<code>core/rules/vision.gd</code>), so M7 only had to fill it in and let the presentation
+          layer honour it. The sim itself stays permissive and the AI deliberately sees everything.</p>
         </div>
       </div>
     </div>

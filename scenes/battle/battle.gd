@@ -5,6 +5,7 @@ extends Node2D
 
 const TILE := 16
 const MAP_PATH := "res://maps/first_steps.txt"
+const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
 const ATLAS_PATH := "res://assets/tiles/terrain_atlas.png"
 const OVERLAY_PATH := "res://assets/tiles/overlay.png"
 const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
@@ -20,7 +21,7 @@ const AI_TURN_START_DELAY := BANNER_SECONDS + 0.1
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
 enum State {
-	IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, DROP_TARGETING, VICTORY, AI_TURN,
+	IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, DROP_TARGETING, VICTORY, AI_TURN, HANDOFF,
 }
 
 const DIR_ACTIONS: Array = [
@@ -33,6 +34,7 @@ const DIR_ACTIONS: Array = [
 @onready var terrain_layer: TileMapLayer = $TerrainLayer
 @onready var move_overlay: TileMapLayer = $MoveOverlay
 @onready var attack_overlay: TileMapLayer = $AttackOverlay
+@onready var fog_layer: TileMapLayer = $FogLayer
 @onready var path_line: Line2D = $PathLine
 @onready var units_root: Node2D = $Units
 @onready var cursor: Sprite2D = $Cursor
@@ -45,6 +47,14 @@ const DIR_ACTIONS: Array = [
 @onready var turn_label: Label = %TurnLabel
 @onready var turn_banner: PanelContainer = %TurnBanner
 @onready var banner_label: Label = %BannerLabel
+@onready var victory_screen: PanelContainer = %VictoryScreen
+@onready var victory_label: Label = %VictoryLabel
+@onready var victory_sub_label: Label = %VictorySubLabel
+@onready var rematch_button: Button = %RematchButton
+@onready var menu_button: Button = %MenuButton
+@onready var handoff_screen: Panel = %HandoffScreen
+@onready var handoff_label: Label = %HandoffLabel
+@onready var handoff_button: Button = %HandoffButton
 
 var db: TerrainDB
 var unit_db: UnitDB
@@ -66,6 +76,8 @@ var _menu_context: StringName = &"unit"
 var _build_cell := Vector2i.ZERO
 
 var _sprites: Dictionary = {}  # Unit -> UnitSprite
+## Cells the viewing team can see; refreshed by _refresh_fog after commits.
+var _visible_cells: Dictionary = {}
 var _zoom := 2.0
 var _min_zoom := 1.0
 var _banner_tween: Tween
@@ -74,28 +86,48 @@ var _banner_tween: Tween
 func _ready() -> void:
 	db = TerrainDB.load_default()
 	unit_db = UnitDB.load_default()
-	var map_path := MAP_PATH
+	ai = AIController.new(unit_db)
+	var chart: DamageChart = load(DAMAGE_CHART_PATH)
+	# Match setup comes from the main menu; command-line flags override it.
+	var map_path := MatchConfig.map_path
+	ai_teams = MatchConfig.ai_teams.duplicate()
+	var fog := MatchConfig.fog_enabled
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
 			map_path = "res://maps/%s.txt" % arg.get_slice("=", 1)
-	map = MapData.load_from_file(map_path, db)
-	if map == null and map_path != MAP_PATH:
-		push_error("failed to load %s; falling back to %s" % [map_path, MAP_PATH])
-		map_path = MAP_PATH
-		map = MapData.load_from_file(map_path, db)
-	assert(map != null, "failed to load %s" % map_path)
-	game = GameState.create(map, unit_db, load(DAMAGE_CHART_PATH))
-	assert(game != null, "failed to build game state from %s" % map_path)
-	game.rng.randomize()
-	ai = AIController.new(unit_db)
 	if "--hotseat" in OS.get_cmdline_user_args():
 		ai_teams = []
+	if "--fog" in OS.get_cmdline_user_args():
+		fog = true
+	if MatchConfig.load_save and SaveGame.has_save():
+		MatchConfig.load_save = false
+		var loaded := SaveGame.load_game(db, unit_db, chart)
+		if loaded != null:
+			game = loaded.state
+			ai_teams = loaded.ai_teams
+			map = game.map
+	if game == null:
+		map = MapData.load_from_file(map_path, db)
+		if map == null and map_path != MAP_PATH:
+			push_error("failed to load %s; falling back to %s" % [map_path, MAP_PATH])
+			map_path = MAP_PATH
+			map = MapData.load_from_file(map_path, db)
+		assert(map != null, "failed to load %s" % map_path)
+		game = GameState.create(map, unit_db, chart)
+		assert(game != null, "failed to build game state from %s" % map_path)
+		game.map_path = map_path
+		game.fog_enabled = fog
+		game.rng.randomize()
 	terrain_layer.tile_set = _build_tile_set()
 	move_overlay.tile_set = _build_overlay_tile_set()
 	attack_overlay.tile_set = move_overlay.tile_set
+	fog_layer.tile_set = move_overlay.tile_set
 	_paint_map()
 	_spawn_unit_sprites()
 	action_menu.action_chosen.connect(_on_menu_action)
+	rematch_button.pressed.connect(_rematch)
+	menu_button.pressed.connect(_go_to_main_menu)
+	handoff_button.pressed.connect(_leave_handoff)
 	_setup_camera()
 	_set_cursor_cell(Vector2i.ZERO)
 	_start_cursor_pulse()
@@ -105,7 +137,29 @@ func _ready() -> void:
 	_check_screenshot_mode()
 
 
+func _go_to_main_menu() -> void:
+	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+
+
+## Replays the setup of the match actually running — including one resumed
+## from a save — rather than whatever the menu last wrote to MatchConfig.
+func _rematch() -> void:
+	MatchConfig.map_path = game.map_path
+	MatchConfig.fog_enabled = game.fog_enabled
+	MatchConfig.ai_teams = ai_teams.duplicate()
+	MatchConfig.load_save = false
+	get_tree().reload_current_scene()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if state == State.HANDOFF:
+		# Only "I'm ready" gets through while the device is being passed over.
+		var clicked := event is InputEventMouseButton \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+			and (event as InputEventMouseButton).pressed
+		if event.is_action_pressed(&"confirm") or clicked:
+			_leave_handoff()
+		return
 	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN]:
 		return  # the menu handles its own input; the rest block input entirely
 	if event.is_action_pressed(&"zoom_in"):
@@ -196,6 +250,7 @@ func _special_dest_actions(cell: Vector2i) -> Array[Dictionary]:
 
 
 func _select(unit: Unit) -> void:
+	Sfx.play(&"select")
 	selected = unit
 	move_range = MovementResolver.reachable(game, unit)
 	planned_path = [unit.cell]
@@ -214,6 +269,7 @@ func _clear_selection() -> void:
 	path_line.clear_points()
 	damage_preview.visible = false
 	state = State.IDLE
+	_refresh_fog()
 
 
 func _animate_move() -> void:
@@ -228,6 +284,7 @@ func _animate_move() -> void:
 func _animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 	if path.size() < 2:
 		return
+	Sfx.play(&"move", -6.0)
 	var tween := create_tween()
 	for i in range(1, path.size()):
 		tween.tween_property(sprite, "position", _cell_center(path[i]), MOVE_STEP_SECONDS)
@@ -370,6 +427,7 @@ func _handle_build_action(action: StringName) -> void:
 	_spawn_sprite_for(command.built_unit)
 	EventBus.unit_built.emit(command.built_unit)
 	state = State.IDLE
+	_refresh_fog()  # the new unit lifts fog around its base straight away
 	_refresh_panel()
 	_refresh_hud()
 
@@ -383,6 +441,10 @@ func _spawn_sprite_for(unit: Unit) -> void:
 
 func _handle_map_action(action: StringName) -> void:
 	state = State.IDLE
+	if action == &"save":
+		if SaveGame.save(game, ai_teams):
+			_show_banner("Saved")
+		return
 	if action != &"end_turn":
 		return
 	var command := EndTurnCommand.new()
@@ -420,6 +482,7 @@ func _open_map_menu() -> void:
 	state = State.MENU
 	action_menu.open([
 		{"id": &"end_turn", "label": "End Turn"},
+		{"id": &"save", "label": "Save"},
 		{"id": &"cancel", "label": "Cancel"},
 	], _screen_pos_for_cell(cursor_cell))
 
@@ -427,8 +490,19 @@ func _open_map_menu() -> void:
 func _on_turn_started() -> void:
 	for unit in game.units:
 		_sprites[unit].set_active_team(game.current_team)
+	if _needs_handoff():
+		_enter_handoff()
+		return
+	_begin_turn()
+
+
+## Everything the incoming team is allowed to see, run once the device has
+## actually changed hands (immediately, outside fogged hot-seat).
+func _begin_turn() -> void:
+	_refresh_fog()
 	_refresh_hud()
 	_refresh_panel()
+	Sfx.play(&"fanfare", -8.0)
 	_show_banner("Day %d - %s" % [
 		game.day, TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
 	])
@@ -441,6 +515,77 @@ func _on_turn_started() -> void:
 		_run_ai_turn()
 	else:
 		state = State.IDLE
+
+
+## Fogged hot-seat only: two humans sharing one screen must not see each
+## other's vision, so the incoming player confirms before anything is painted.
+## AI turns and fog-off matches never gate.
+func _needs_handoff() -> bool:
+	if not game.fog_enabled or game.winner != 0:
+		return false
+	if game.current_team in ai_teams:
+		return false
+	var humans := 0
+	for team in GameState.TEAMS:
+		if team not in ai_teams:
+			humans += 1
+	return humans > 1
+
+
+func _enter_handoff() -> void:
+	state = State.HANDOFF
+	_hide_banner()
+	_refresh_fog()  # blanks the outgoing team's vision before the panel goes up
+	handoff_label.text = "%s — press confirm when ready" % TerrainPanel.TEAM_NAMES.get(
+		game.current_team, str(game.current_team)
+	)
+	handoff_screen.show()
+	handoff_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	handoff_button.grab_focus()
+
+
+func _leave_handoff() -> void:
+	if state != State.HANDOFF:
+		return
+	handoff_screen.hide()
+	state = State.IDLE  # _begin_turn paints the incoming team's vision, not a blackout
+	_begin_turn()
+
+
+## The perspective fog is drawn from: the human whose turn it is, or the
+## first human team while the AI plays. The AI itself deliberately sees
+## everything — a simple, openly-cheating opponent instead of a guessing one.
+func _viewing_team() -> int:
+	if game.current_team not in ai_teams:
+		return game.current_team
+	for team in GameState.TEAMS:
+		if team not in ai_teams:
+			return team
+	return game.current_team
+
+
+## Recomputes visibility and repaints the fog layer + unit visibility.
+## Called after every committed action and turn change (not per cursor move).
+## With fog off nothing is ever hidden, so the whole pass is skipped; during a
+## hot-seat handoff nobody may look, so the board is blacked out entirely.
+func _refresh_fog() -> void:
+	fog_layer.clear()
+	if not game.fog_enabled:
+		_visible_cells = {}
+		return
+	var blacked_out := state == State.HANDOFF
+	_visible_cells = {} if blacked_out else Vision.visible_cells(game, _viewing_team())
+	for y in map.height:
+		for x in map.width:
+			var cell := Vector2i(x, y)
+			if not _visible_cells.has(cell):
+				fog_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
+	for unit in game.units:
+		var sprite: UnitSprite = _sprites[unit]
+		sprite.refresh()
+		if blacked_out or (unit.carrier == null and unit.team != _viewing_team() \
+				and not _visible_cells.has(unit.cell)):
+			sprite.visible = false
 
 
 # --- AI turns ----------------------------------------------------------------
@@ -528,13 +673,20 @@ func _execute_ai_command(command: Command) -> void:
 	elif command is EndTurnCommand:
 		command.apply(game)
 		_on_turn_started()
+	_refresh_fog()
 	_refresh_panel()
 	_refresh_hud()
 
 
 func _enter_victory() -> void:
 	state = State.VICTORY
-	_set_banner("%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner)))
+	_hide_banner()
+	Sfx.play(&"fanfare")
+	victory_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
+	victory_sub_label.text = "Day %d" % game.day
+	victory_screen.show()
+	victory_screen.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	rematch_button.grab_focus()
 
 
 ## Shows the banner immediately and cancels any pending auto-hide.
@@ -603,6 +755,8 @@ func _attackable_cells(unit: Unit, dest: Vector2i, moved: bool) -> Array[Vector2
 	for other in game.units:
 		if other.team == unit.team or other.carrier != null:
 			continue
+		if game.fog_enabled and not _visible_cells.has(other.cell):
+			continue  # the player cannot target what they cannot see
 		var dist := absi(other.cell.x - dest.x) + absi(other.cell.y - dest.y)
 		if dist < type.min_range or dist > type.max_range:
 			continue
@@ -706,13 +860,17 @@ func _animate_combat(
 	var defender_sprite: UnitSprite = _sprites[defender]
 	var attacker_sprite: UnitSprite = _sprites[attacker]
 	attacker_sprite.refresh()  # snap to the committed destination
+	Sfx.play(&"shot")
 	await defender_sprite.flash_hit()
+	_shake_camera()
 	if result.defender_died:
+		Sfx.play(&"explosion")
 		_sprites.erase(defender)
 		await defender_sprite.die()
 	else:
 		defender_sprite.refresh()
 	if result.countered:
+		Sfx.play(&"shot")
 		await attacker_sprite.flash_hit()
 	if result.attacker_died:
 		_sprites.erase(attacker)
@@ -867,6 +1025,9 @@ func _refresh_panel() -> void:
 		game.capture_progress.get(cursor_cell, -1)
 	)
 	var hovered := game.unit_at(cursor_cell)
+	if game.fog_enabled and hovered != null and hovered.team != _viewing_team() \
+			and not _visible_cells.has(cursor_cell):
+		hovered = null  # hidden enemies stay hidden in the panel too
 	var carrying := ""
 	if hovered != null:
 		var cargo := game.cargo_of(hovered)
@@ -888,6 +1049,18 @@ func _screen_pos_for_cell(cell: Vector2i) -> Vector2:
 			camera.limit_bottom - view_size.y / (2.0 * camera.zoom.y))
 	)
 	return (world - center) * camera.zoom + view_size / 2.0 + Vector2(6, 0)
+
+
+## Brief camera jitter on combat hits. Presentation-only randomness: this
+## must never touch game.rng, which is reserved for deterministic sim luck.
+func _shake_camera(strength: float = 3.0) -> void:
+	var tween := create_tween()
+	for i in 4:
+		var offset := Vector2(
+			randf_range(-strength, strength), randf_range(-strength, strength)
+		)
+		tween.tween_property(camera, "offset", offset, 0.04)
+	tween.tween_property(camera, "offset", Vector2.ZERO, 0.04)
 
 
 func _start_cursor_pulse() -> void:
@@ -919,6 +1092,7 @@ func _check_screenshot_mode() -> void:
 			demo = arg.get_slice("=", 1)
 	if shot_path == "" and select_cell.x < 0 and demo == "":
 		return
+	_leave_handoff()  # demos and captures drive the board, not the handoff panel
 	_hide_banner()  # the day-1 banner would cover every captured frame
 	if demo != "":
 		_run_demo(demo, shot_path)
@@ -936,7 +1110,9 @@ func _check_screenshot_mode() -> void:
 ## same and then waits out Blue's whole AI turn, back to Red's next turn;
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
-## picker; supply holds the APC next to its infantry so Supply is offered.
+## picker; supply holds the APC next to its infantry so Supply is offered;
+## mapmenu stops at the map menu (End Turn / Save); victory routs Blue through
+## a real attack so the victory screen comes up.
 func _run_demo(mode: String, shot_path: String) -> void:
 	await get_tree().process_frame
 	game.rng.seed = 2026  # deterministic demo
@@ -1016,6 +1192,30 @@ func _run_demo(mode: String, shot_path: String) -> void:
 			_confirm_at(Vector2i(3, 3))  # stay put -> menu offers Supply
 			while state != State.MENU:
 				await get_tree().process_frame
+		"mapmenu":
+			_confirm_at(Vector2i(10, 5))  # empty road tile -> End Turn / Save
+			while state != State.MENU:
+				await get_tree().process_frame
+		"victory":
+			# Leave Blue one nearly-dead unit, then win through the ordinary
+			# select -> Fire flow so the real victory handler runs.
+			for unit in game.units.duplicate():
+				if unit.team == 2 and unit.cell != Vector2i(9, 8):
+					game.remove_unit(unit)
+			_reap_dead_sprites()
+			var last_blue := game.unit_at(Vector2i(9, 8))
+			last_blue.hp = 1
+			_sprites[last_blue].refresh()
+			_confirm_at(Vector2i(8, 8))  # select the red tank
+			_confirm_at(Vector2i(8, 8))  # fire in place
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"fire")
+			while state != State.TARGETING:
+				await get_tree().process_frame
+			_confirm_at(cursor_cell)  # kill the last blue unit -> rout
+			while state != State.VICTORY:
+				await get_tree().process_frame
 		"aiturn":
 			# hand the turn to the Blue AI and wait until it plays back to Red
 			_confirm_at(Vector2i(10, 5))
@@ -1045,9 +1245,4 @@ func _screenshot_demo_select(cell: Vector2i) -> void:
 
 
 func _save_screenshot_and_quit(path: String) -> void:
-	for i in 8:
-		await get_tree().process_frame
-	var image := get_viewport().get_texture().get_image()
-	var err := image.save_png(path)
-	print("screenshot: saved to %s (err=%d)" % [path, err])
-	get_tree().quit()
+	await ScreenshotUtil.capture_and_quit(self, path)
