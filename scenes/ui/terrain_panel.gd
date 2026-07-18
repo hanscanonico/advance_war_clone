@@ -34,15 +34,22 @@ func show_terrain(terrain: TerrainType, owner_team: int, capture_left: int = -1)
 
 
 ## Shows the hovered unit's line, or hides it when unit is null.
-func show_unit(unit: Unit) -> void:
+## `carrying` names the cargo when the unit is a loaded transport.
+func show_unit(unit: Unit, carrying: String = "") -> void:
 	unit_label.visible = unit != null
 	if unit == null:
 		return
 	var team_name: String = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
-	var suffix := " (acted)" if unit.acted else ""
-	unit_label.text = "%s - HP %d - %s%s" % [
-		unit.type.display_name, unit.displayed_hp(), team_name, suffix,
-	]
+	var stats := "%s - HP %d" % [unit.type.display_name, unit.displayed_hp()]
+	stats += " - F %d" % unit.fuel
+	if unit.type.max_ammo > 0:
+		stats += " - A %d" % unit.ammo
+	stats += " - " + team_name
+	if unit.acted:
+		stats += " (acted)"
+	if carrying != "":
+		stats += " [+%s]" % carrying
+	unit_label.text = stats
 
 
 func set_side(on_right: bool) -> void:

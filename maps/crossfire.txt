@@ -1,0 +1,37 @@
+# Crossfire — 20x15. A central lake splits the front; the long southern road
+# rewards transports, the mountain passes reward infantry.
+# Symbols: . plains  F woods  M mountain  = road  ~ river
+#          C city  B base  Q HQ  S sea
+[terrain]
+SSSSSSSSSSSSSSSSSSSS
+S.Q....C....F......S
+S.B=======....MM...S
+S....F...=..C..MM..S
+S..C.....=.........S
+S...MM...=====.....S
+S....MM.SSSS.=..C..S
+S.......SSSS.=.....S
+S..C....SSSS.==....S
+S.....=======.=....S
+S.....=....F..=....S
+S..F..=.MM....====.S
+S.C...=....C....=B.S
+S......F........=Q.S
+SSSSSSSSSSSSSSSSSSSS
+[owners]
+# team x y — only HQ + base start owned; every city is contested
+1 2 1
+1 2 2
+2 17 12
+2 17 13
+[units]
+# team symbol x y — i infantry, m mech, r recon, t tank, T md tank,
+#                   a anti-air, g artillery, R rockets, p apc
+1 i 4 3
+1 p 3 2
+1 t 5 2
+1 m 3 4
+2 i 15 12
+2 p 15 11
+2 t 14 11
+2 m 14 12

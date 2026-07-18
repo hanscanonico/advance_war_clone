@@ -19,7 +19,9 @@ const AI_TURN_START_DELAY := BANNER_SECONDS + 0.1
 
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
-enum State { IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, VICTORY, AI_TURN }
+enum State {
+	IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, DROP_TARGETING, VICTORY, AI_TURN,
+}
 
 const DIR_ACTIONS: Array = [
 	[&"cursor_up", Vector2i.UP],
@@ -58,6 +60,8 @@ var selected: Unit
 var move_range: MovementResolver.MoveRange
 var planned_path: Array[Vector2i] = []
 var _attack_targets: Array[Vector2i] = []
+var _drop_targets: Array[Vector2i] = []
+var _pending_special_actions: Array[Dictionary] = []
 var _menu_context: StringName = &"unit"
 var _build_cell := Vector2i.ZERO
 
@@ -70,8 +74,12 @@ var _banner_tween: Tween
 func _ready() -> void:
 	db = TerrainDB.load_default()
 	unit_db = UnitDB.load_default()
-	map = MapData.load_from_file(MAP_PATH, db)
-	assert(map != null, "failed to load %s" % MAP_PATH)
+	var map_path := MAP_PATH
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--map="):
+			map_path = "res://maps/%s.txt" % arg.get_slice("=", 1)
+	map = MapData.load_from_file(map_path, db)
+	assert(map != null, "failed to load %s" % map_path)
 	game = GameState.create(map, unit_db, load(DAMAGE_CHART_PATH))
 	assert(game != null, "failed to build game state from %s" % MAP_PATH)
 	game.rng.randomize()
@@ -141,9 +149,19 @@ func _confirm_at(cell: Vector2i) -> void:
 			if move_range.has(cell) and move_range.can_stop_at(cell):
 				planned_path = move_range.path_to(cell)
 				_animate_move()
+			elif move_range.has(cell):
+				# Occupied but reachable: maybe a Load or Join destination.
+				var special := _special_dest_actions(cell)
+				if not special.is_empty():
+					_pending_special_actions = special
+					planned_path = move_range.path_to(cell)
+					_animate_move()
 		State.TARGETING:
 			if cell in _attack_targets:
 				_execute_attack(cell)
+		State.DROP_TARGETING:
+			if cell in _drop_targets:
+				_execute_drop(cell)
 
 
 func _cancel() -> void:
@@ -151,6 +169,28 @@ func _cancel() -> void:
 		_clear_selection()
 	elif state == State.TARGETING:
 		_exit_targeting_to_menu()
+	elif state == State.DROP_TARGETING:
+		move_overlay.clear()
+		_drop_targets = []
+		_on_move_animation_done()  # back to the unit menu
+
+
+## Menu entries offered when confirming onto a reachable friendly-occupied
+## cell: boarding a transport with room, or merging into a damaged twin.
+func _special_dest_actions(cell: Vector2i) -> Array[Dictionary]:
+	var actions: Array[Dictionary] = []
+	var occupant := game.unit_at(cell)
+	if occupant == null or occupant == selected or occupant.team != selected.team:
+		return actions
+	if occupant.type.transport_capacity > 0 \
+			and game.cargo_of(occupant).size() < occupant.type.transport_capacity \
+			and selected.type.move_class in LoadCommand.TRANSPORTABLE:
+		actions.append({"id": &"load", "label": "Load"})
+	if occupant.type == selected.type and not occupant.acted \
+			and occupant.displayed_hp() < 10 \
+			and game.cargo_of(selected).is_empty() and game.cargo_of(occupant).is_empty():
+		actions.append({"id": &"join", "label": "Join"})
+	return actions
 
 
 func _select(unit: Unit) -> void:
@@ -196,6 +236,13 @@ func _on_move_animation_done() -> void:
 	state = State.MENU
 	_menu_context = &"unit"
 	var dest: Vector2i = planned_path[planned_path.size() - 1]
+	if not _pending_special_actions.is_empty():
+		# Load/Join destination: only the special action (and Cancel) applies.
+		var special := _pending_special_actions
+		_pending_special_actions = []
+		special.append({"id": &"cancel", "label": "Cancel"})
+		action_menu.open(special, _screen_pos_for_cell(dest))
+		return
 	_attack_targets = _attackable_cells(selected, dest, planned_path.size() > 1)
 	var actions: Array[Dictionary] = []
 	if not _attack_targets.is_empty():
@@ -204,6 +251,11 @@ func _on_move_animation_done() -> void:
 	if selected.type.can_capture and dest_terrain.is_property \
 			and game.owner_at(dest) != selected.team:
 		actions.append({"id": &"capture", "label": "Capture"})
+	if not game.cargo_of(selected).is_empty() and not _drop_cells(dest).is_empty():
+		actions.append({"id": &"drop", "label": "Drop"})
+	if selected.type.can_resupply and not SupplyCommand.new(selected, planned_path) \
+			.adjacent_friendlies(game, dest).is_empty():
+		actions.append({"id": &"supply", "label": "Supply"})
 	actions.append({"id": &"wait", "label": "Wait"})
 	actions.append({"id": &"cancel", "label": "Cancel"})
 	action_menu.open(actions, _screen_pos_for_cell(dest))
@@ -224,6 +276,47 @@ func _handle_unit_action(action: StringName) -> void:
 	match action:
 		&"fire":
 			_enter_targeting()
+		&"drop":
+			_enter_drop_targeting()
+		&"load":
+			var command := LoadCommand.new(selected, planned_path)
+			var error := command.validate(game)
+			if error != "":
+				push_error("LoadCommand rejected: %s" % error)
+				_undo_move_preview()
+				return
+			command.apply(game)
+			EventBus.unit_moved.emit(selected)
+			_sprites[selected].refresh()  # hides the boarded sprite
+			_clear_selection()
+			_refresh_panel()
+		&"join":
+			var command := JoinCommand.new(selected, planned_path)
+			var error := command.validate(game)
+			if error != "":
+				push_error("JoinCommand rejected: %s" % error)
+				_undo_move_preview()
+				return
+			var dest: Vector2i = planned_path[planned_path.size() - 1]
+			var mover_sprite: UnitSprite = _sprites[selected]
+			_sprites.erase(selected)
+			command.apply(game)
+			mover_sprite.die()  # fade the merged-away sprite; fire and forget
+			_sprites[game.unit_at(dest)].refresh()
+			_clear_selection()
+			_refresh_panel()
+		&"supply":
+			var command := SupplyCommand.new(selected, planned_path)
+			var error := command.validate(game)
+			if error != "":
+				push_error("SupplyCommand rejected: %s" % error)
+				_undo_move_preview()
+				return
+			command.apply(game)
+			EventBus.unit_moved.emit(selected)
+			_sprites[selected].refresh()
+			_clear_selection()
+			_refresh_panel()
 		&"capture":
 			var command := CaptureCommand.new(selected, planned_path)
 			var error := command.validate(game)
@@ -530,6 +623,56 @@ func _exit_targeting_to_menu() -> void:
 	_on_move_animation_done()  # recomputes targets and reopens the menu
 
 
+# --- transport flow ----------------------------------------------------------
+
+
+## Adjacent cells where the selected transport (previewed at `dest`) could
+## unload its passenger. The vacated origin cell counts as free.
+func _drop_cells(dest: Vector2i) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var cargo := game.cargo_of(selected)
+	if cargo.is_empty():
+		return cells
+	for dir in MovementResolver.DIRECTIONS:
+		var cell := dest + dir
+		var terrain := map.terrain_at(cell)
+		if terrain == null or not terrain.is_passable(cargo[0].type.move_class):
+			continue
+		var occupant := game.unit_at(cell)
+		if occupant != null and occupant != selected:
+			continue
+		cells.append(cell)
+	return cells
+
+
+func _enter_drop_targeting() -> void:
+	state = State.DROP_TARGETING
+	_drop_targets = _drop_cells(planned_path[planned_path.size() - 1])
+	move_overlay.clear()
+	for cell in _drop_targets:
+		move_overlay.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
+	_set_cursor_cell(_drop_targets[0])
+
+
+func _execute_drop(drop_cell: Vector2i) -> void:
+	var command := DropCommand.new(selected, planned_path, drop_cell)
+	var error := command.validate(game)
+	if error != "":
+		# The UI only offers legal drops, so this is a bug guard.
+		push_error("DropCommand rejected: %s" % error)
+		_cancel()
+		return
+	var passenger: Unit = game.cargo_of(selected)[0]
+	var transport := selected
+	command.apply(game)
+	EventBus.unit_moved.emit(transport)
+	_sprites[transport].refresh()
+	_sprites[passenger].refresh()  # reappears, exhausted, at the drop cell
+	_drop_targets = []
+	_clear_selection()
+	_refresh_panel()
+
+
 func _execute_attack(target_cell: Vector2i) -> void:
 	var target := game.unit_at(target_cell)
 	var command := AttackCommand.new(selected, planned_path, target_cell)
@@ -703,7 +846,13 @@ func _refresh_panel() -> void:
 		map.terrain_at(cursor_cell), game.owner_at(cursor_cell),
 		game.capture_progress.get(cursor_cell, -1)
 	)
-	terrain_panel.show_unit(game.unit_at(cursor_cell))
+	var hovered := game.unit_at(cursor_cell)
+	var carrying := ""
+	if hovered != null:
+		var cargo := game.cargo_of(hovered)
+		if not cargo.is_empty():
+			carrying = cargo[0].type.display_name
+	terrain_panel.show_unit(hovered, carrying)
 	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
 
 
@@ -734,7 +883,7 @@ func _start_cursor_pulse() -> void:
 
 ## `Godot --path . -- --screenshot=/abs/path.png [--select=x,y | --demo=MODE]`
 ## boots the scene, optionally drives a demo, saves one frame, and quits.
-## --select previews a unit's movement; see _run_attack_demo for the demo modes.
+## --select previews a unit's movement; see _run_demo for the demo modes.
 func _check_screenshot_mode() -> void:
 	var shot_path := ""
 	var select_cell := Vector2i(-1, -1)
@@ -752,7 +901,7 @@ func _check_screenshot_mode() -> void:
 		return
 	_hide_banner()  # the day-1 banner would cover every captured frame
 	if demo != "":
-		_run_attack_demo(demo, shot_path)
+		_run_demo(demo, shot_path)
 		return
 	if select_cell.x >= 0:
 		_screenshot_demo_select(select_cell)
@@ -765,7 +914,7 @@ func _check_screenshot_mode() -> void:
 ## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
 ## build buys at the red base; endturn hands the turn to Blue; aiturn does the
 ## same and then waits out Blue's whole AI turn, back to Red's next turn.
-func _run_attack_demo(mode: String, shot_path: String) -> void:
+func _run_demo(mode: String, shot_path: String) -> void:
 	await get_tree().process_frame
 	game.rng.seed = 2026  # deterministic demo
 	match mode:
@@ -807,6 +956,25 @@ func _run_attack_demo(mode: String, shot_path: String) -> void:
 				await get_tree().process_frame
 			action_menu.choose(&"end_turn")
 			await get_tree().process_frame
+		"transport":
+			_confirm_at(Vector2i(4, 3))  # select the red infantry
+			_confirm_at(Vector2i(3, 3))  # onto the APC -> Load menu
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"load")
+			while state != State.IDLE:
+				await get_tree().process_frame
+			_confirm_at(Vector2i(3, 3))  # select the loaded APC
+			_confirm_at(Vector2i(3, 5))  # drive it south
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"drop")
+			while state != State.DROP_TARGETING:
+				await get_tree().process_frame
+			_confirm_at(cursor_cell)  # drop at the first offered cell
+			while state != State.IDLE:
+				await get_tree().process_frame
+			_set_cursor_cell(Vector2i(3, 5))  # show the APC in the panel
 		"aiturn":
 			# hand the turn to the Blue AI and wait until it plays back to Red
 			_confirm_at(Vector2i(10, 5))
