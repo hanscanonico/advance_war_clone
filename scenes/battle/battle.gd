@@ -21,7 +21,7 @@ const AI_TURN_START_DELAY := BANNER_SECONDS + 0.1
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
 enum State {
-	IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, DROP_TARGETING, VICTORY, AI_TURN,
+	IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, DROP_TARGETING, VICTORY, AI_TURN, HANDOFF,
 }
 
 const DIR_ACTIONS: Array = [
@@ -52,6 +52,9 @@ const DIR_ACTIONS: Array = [
 @onready var victory_sub_label: Label = %VictorySubLabel
 @onready var rematch_button: Button = %RematchButton
 @onready var menu_button: Button = %MenuButton
+@onready var handoff_screen: Panel = %HandoffScreen
+@onready var handoff_label: Label = %HandoffLabel
+@onready var handoff_button: Button = %HandoffButton
 
 var db: TerrainDB
 var unit_db: UnitDB
@@ -122,8 +125,9 @@ func _ready() -> void:
 	_paint_map()
 	_spawn_unit_sprites()
 	action_menu.action_chosen.connect(_on_menu_action)
-	rematch_button.pressed.connect(get_tree().reload_current_scene)
+	rematch_button.pressed.connect(_rematch)
 	menu_button.pressed.connect(_go_to_main_menu)
+	handoff_button.pressed.connect(_leave_handoff)
 	_setup_camera()
 	_set_cursor_cell(Vector2i.ZERO)
 	_start_cursor_pulse()
@@ -137,7 +141,25 @@ func _go_to_main_menu() -> void:
 	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 
 
+## Replays the setup of the match actually running — including one resumed
+## from a save — rather than whatever the menu last wrote to MatchConfig.
+func _rematch() -> void:
+	MatchConfig.map_path = game.map_path
+	MatchConfig.fog_enabled = game.fog_enabled
+	MatchConfig.ai_teams = ai_teams.duplicate()
+	MatchConfig.load_save = false
+	get_tree().reload_current_scene()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if state == State.HANDOFF:
+		# Only "I'm ready" gets through while the device is being passed over.
+		var clicked := event is InputEventMouseButton \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+			and (event as InputEventMouseButton).pressed
+		if event.is_action_pressed(&"confirm") or clicked:
+			_leave_handoff()
+		return
 	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN]:
 		return  # the menu handles its own input; the rest block input entirely
 	if event.is_action_pressed(&"zoom_in"):
@@ -405,6 +427,7 @@ func _handle_build_action(action: StringName) -> void:
 	_spawn_sprite_for(command.built_unit)
 	EventBus.unit_built.emit(command.built_unit)
 	state = State.IDLE
+	_refresh_fog()  # the new unit lifts fog around its base straight away
 	_refresh_panel()
 	_refresh_hud()
 
@@ -467,6 +490,15 @@ func _open_map_menu() -> void:
 func _on_turn_started() -> void:
 	for unit in game.units:
 		_sprites[unit].set_active_team(game.current_team)
+	if _needs_handoff():
+		_enter_handoff()
+		return
+	_begin_turn()
+
+
+## Everything the incoming team is allowed to see, run once the device has
+## actually changed hands (immediately, outside fogged hot-seat).
+func _begin_turn() -> void:
 	_refresh_fog()
 	_refresh_hud()
 	_refresh_panel()
@@ -485,6 +517,41 @@ func _on_turn_started() -> void:
 		state = State.IDLE
 
 
+## Fogged hot-seat only: two humans sharing one screen must not see each
+## other's vision, so the incoming player confirms before anything is painted.
+## AI turns and fog-off matches never gate.
+func _needs_handoff() -> bool:
+	if not game.fog_enabled or game.winner != 0:
+		return false
+	if game.current_team in ai_teams:
+		return false
+	var humans := 0
+	for team in GameState.TEAMS:
+		if team not in ai_teams:
+			humans += 1
+	return humans > 1
+
+
+func _enter_handoff() -> void:
+	state = State.HANDOFF
+	_hide_banner()
+	_refresh_fog()  # blanks the outgoing team's vision before the panel goes up
+	handoff_label.text = "%s — press confirm when ready" % TerrainPanel.TEAM_NAMES.get(
+		game.current_team, str(game.current_team)
+	)
+	handoff_screen.show()
+	handoff_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	handoff_button.grab_focus()
+
+
+func _leave_handoff() -> void:
+	if state != State.HANDOFF:
+		return
+	handoff_screen.hide()
+	state = State.IDLE  # _begin_turn paints the incoming team's vision, not a blackout
+	_begin_turn()
+
+
 ## The perspective fog is drawn from: the human whose turn it is, or the
 ## first human team while the AI plays. The AI itself deliberately sees
 ## everything — a simple, openly-cheating opponent instead of a guessing one.
@@ -499,20 +566,25 @@ func _viewing_team() -> int:
 
 ## Recomputes visibility and repaints the fog layer + unit visibility.
 ## Called after every committed action and turn change (not per cursor move).
+## With fog off nothing is ever hidden, so the whole pass is skipped; during a
+## hot-seat handoff nobody may look, so the board is blacked out entirely.
 func _refresh_fog() -> void:
 	fog_layer.clear()
-	_visible_cells = Vision.visible_cells(game, _viewing_team())
-	if game.fog_enabled:
-		for y in map.height:
-			for x in map.width:
-				var cell := Vector2i(x, y)
-				if not _visible_cells.has(cell):
-					fog_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
+	if not game.fog_enabled:
+		_visible_cells = {}
+		return
+	var blacked_out := state == State.HANDOFF
+	_visible_cells = {} if blacked_out else Vision.visible_cells(game, _viewing_team())
+	for y in map.height:
+		for x in map.width:
+			var cell := Vector2i(x, y)
+			if not _visible_cells.has(cell):
+				fog_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
 	for unit in game.units:
 		var sprite: UnitSprite = _sprites[unit]
 		sprite.refresh()
-		if unit.carrier == null and unit.team != _viewing_team() \
-				and not _visible_cells.has(unit.cell):
+		if blacked_out or (unit.carrier == null and unit.team != _viewing_team() \
+				and not _visible_cells.has(unit.cell)):
 			sprite.visible = false
 
 
@@ -1020,6 +1092,7 @@ func _check_screenshot_mode() -> void:
 			demo = arg.get_slice("=", 1)
 	if shot_path == "" and select_cell.x < 0 and demo == "":
 		return
+	_leave_handoff()  # demos and captures drive the board, not the handoff panel
 	_hide_banner()  # the day-1 banner would cover every captured frame
 	if demo != "":
 		_run_demo(demo, shot_path)

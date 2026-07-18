@@ -7,6 +7,15 @@ extends RefCounted
 const SAVE_PATH := "user://save.json"
 const VERSION := 1
 
+## Keys every save envelope must carry; optional ones (fog, winner,
+## capture_progress, carrier, ai_teams) fall back to defaults instead.
+const REQUIRED_KEYS: Array = [
+	"map_path", "day", "current_team", "funds", "rng_state", "owners", "units",
+]
+const REQUIRED_UNIT_KEYS: Array = ["type", "team", "x", "y", "hp", "fuel", "ammo", "acted"]
+const REQUIRED_OWNER_KEYS: Array = ["x", "y", "team"]
+const REQUIRED_PROGRESS_KEYS: Array = ["x", "y", "points"]
+
 
 class LoadedMatch:
 	var state: GameState
@@ -72,30 +81,47 @@ static func load_game(
 	if json.parse(text) != OK or not json.data is Dictionary:
 		push_error("SaveGame: %s is not a valid save" % path)
 		return null
-	var data: Variant = json.data
+	var data: Dictionary = json.data
 	if int(data.get("version", -1)) != VERSION:
 		push_error("SaveGame: unsupported save version")
 		return null
-	var map := MapData.load_from_file(String(data.map_path), terrain_db)
+	if not _has_keys(data, REQUIRED_KEYS, "save"):
+		return null
+	if not _valid_entries(data["owners"], REQUIRED_OWNER_KEYS, "owner"):
+		return null
+	var progress: Variant = data.get("capture_progress", [])
+	if not _valid_entries(progress, REQUIRED_PROGRESS_KEYS, "capture progress"):
+		return null
+	if not _valid_entries(data["units"], REQUIRED_UNIT_KEYS, "unit"):
+		return null
+	var funds: Variant = data["funds"]
+	if not (funds is Dictionary):
+		push_error("SaveGame: 'funds' is malformed")
+		return null
+	for team in GameState.TEAMS:
+		if not (funds as Dictionary).has(str(team)):
+			push_error("SaveGame: save has no funds for team %d" % team)
+			return null
+	var map := MapData.load_from_file(String(data["map_path"]), terrain_db)
 	if map == null:
 		return null
 	var state := GameState.new()
 	state.map = map
-	state.map_path = String(data.map_path)
+	state.map_path = String(data["map_path"])
 	state.damage_chart = damage_chart
 	state.fog_enabled = bool(data.get("fog", false))
-	state.day = int(data.day)
-	state.current_team = int(data.current_team)
+	state.day = int(data["day"])
+	state.current_team = int(data["current_team"])
 	state.winner = int(data.get("winner", 0))
 	for team in GameState.TEAMS:
-		state.funds[team] = int(data.funds[str(team)])
-	state.rng.state = int(String(data.rng_state))
-	for entry in data.owners:
+		state.funds[team] = int((funds as Dictionary)[str(team)])
+	state.rng.state = int(String(data["rng_state"]))
+	for entry in data["owners"]:
 		state.property_owners[Vector2i(int(entry.x), int(entry.y))] = int(entry.team)
-	for entry in data.get("capture_progress", []):
+	for entry in progress:
 		state.capture_progress[Vector2i(int(entry.x), int(entry.y))] = int(entry.points)
 	var carrier_indices: Array[int] = []
-	for entry in data.units:
+	for entry in data["units"]:
 		var type := unit_db.by_id(StringName(String(entry.type)))
 		if type == null:
 			push_error("SaveGame: unknown unit type '%s'" % entry.type)
@@ -113,6 +139,31 @@ static func load_game(
 			state.units[i].carrier = state.units[index]
 	var result := LoadedMatch.new()
 	result.state = state
-	for team in data.get("ai_teams", []):
-		result.ai_teams.append(int(team))
+	var teams: Variant = data.get("ai_teams", [])
+	if teams is Array:
+		for team in teams as Array:
+			result.ai_teams.append(int(team))
 	return result
+
+
+## True when `data` carries every key; pushes an error naming the first gap.
+static func _has_keys(data: Dictionary, keys: Array, what: String) -> bool:
+	for key in keys:
+		if not data.has(key):
+			push_error("SaveGame: %s is missing '%s'" % [what, key])
+			return false
+	return true
+
+
+## True when `value` is an array of dictionaries that all carry `keys`.
+static func _valid_entries(value: Variant, keys: Array, what: String) -> bool:
+	if not (value is Array):
+		push_error("SaveGame: '%s' list is malformed" % what)
+		return false
+	for entry: Variant in value as Array:
+		if not (entry is Dictionary):
+			push_error("SaveGame: %s entry is malformed" % what)
+			return false
+		if not _has_keys(entry as Dictionary, keys, "%s entry" % what):
+			return false
+	return true

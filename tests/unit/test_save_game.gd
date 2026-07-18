@@ -88,6 +88,38 @@ func test_corrupted_file_returns_null() -> void:
 	assert_push_error("not a valid save")
 
 
+func test_missing_required_key_returns_null() -> void:
+	var file := FileAccess.open(TEST_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": SaveGame.VERSION, "day": 2}))
+	file.close()
+	assert_null(SaveGame.load_game(terrain_db, unit_db, chart, TEST_PATH))
+	assert_push_error("is missing 'map_path'")
+
+
+func test_malformed_unit_entry_returns_null() -> void:
+	var state := _first_steps_state()
+	assert_true(SaveGame.save(state, [] as Array[int], TEST_PATH))
+	var text := FileAccess.get_file_as_string(TEST_PATH)
+	var file := FileAccess.open(TEST_PATH, FileAccess.WRITE)
+	file.store_string(text.replace("\"fuel\"", "\"petrol\""))
+	file.close()
+	assert_null(SaveGame.load_game(terrain_db, unit_db, chart, TEST_PATH))
+	assert_push_error("unit entry is missing 'fuel'")
+
+
+func test_missing_team_funds_returns_null() -> void:
+	var state := _first_steps_state()
+	assert_true(SaveGame.save(state, [] as Array[int], TEST_PATH))
+	var text := FileAccess.get_file_as_string(TEST_PATH)
+	var data: Dictionary = JSON.parse_string(text)
+	(data["funds"] as Dictionary).erase("2")
+	var file := FileAccess.open(TEST_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify(data))
+	file.close()
+	assert_null(SaveGame.load_game(terrain_db, unit_db, chart, TEST_PATH))
+	assert_push_error("no funds for team 2")
+
+
 func test_unknown_unit_type_returns_null() -> void:
 	var state := _first_steps_state()
 	assert_true(SaveGame.save(state, [] as Array[int], TEST_PATH))

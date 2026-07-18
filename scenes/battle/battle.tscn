@@ -221,3 +221,53 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Main Menu"
+
+[node name="HandoffScreen" type="Panel" parent="UI"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="HandoffBackdrop" type="ColorRect" parent="UI/HandoffScreen"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.03, 0.035, 0.06, 1)
+
+[node name="HandoffCenter" type="CenterContainer" parent="UI/HandoffScreen"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HandoffRows" type="VBoxContainer" parent="UI/HandoffScreen/HandoffCenter"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HandoffLabel" type="Label" parent="UI/HandoffScreen/HandoffCenter/HandoffRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+text = "Red Army — press confirm when ready"
+
+[node name="HandoffHint" type="Label" parent="UI/HandoffScreen/HandoffCenter/HandoffRows"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+text = "Pass the device over before continuing."
+
+[node name="HandoffButton" type="Button" parent="UI/HandoffScreen/HandoffCenter/HandoffRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Ready"
