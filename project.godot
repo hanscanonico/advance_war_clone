@@ -7,13 +7,15 @@ config_version=5
 [application]
 
 config/name="Grid Commander (working title)"
-run/main_scene="res://scenes/battle/battle.tscn"
+run/main_scene="res://scenes/menu/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/icon.png"
 
 [autoload]
 
 EventBus="*res://autoload/event_bus.gd"
+MatchConfig="*res://autoload/match_config.gd"
+Sfx="*res://autoload/sfx.gd"
 
 [display]
 

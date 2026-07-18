@@ -166,12 +166,13 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M6 done</span></h3>
-          <p class="text-sm">As of 2026-07-18: the depth pass is in — APC transport (Load/Drop/Supply),
-          fuel spent per terrain step and ammo per shot with turn-start resupply on properties and
-          beside APCs, unit merging (Join), and a second map (Crossfire, <code>--map=crossfire</code>).
-          Air units stayed deferred as planned. 132 GUT tests passing.
-          Next up: <strong>M7 — polish</strong> (fog of war, sound, save/load, menus).</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">PLAN COMPLETE — M0–M7 done</span></h3>
+          <p class="text-sm">As of 2026-07-18, all eight milestones are delivered: the game boots to a
+          main menu with map select and a fog-of-war toggle, plays 1P (vs the Blue AI) or hot-seat,
+          supports fog with true vision rules, saves and resumes matches, and has generated sound
+          effects, screen shake, and a real victory screen with Rematch. 143 GUT tests passing.
+          What remains is the stretch list below: CO powers, naval/air units, a map editor,
+          campaign scripting, and online play.</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -472,7 +473,7 @@ stateDiagram-v2
       <li class="step step-primary" data-content="✓">Game loop</li>
       <li class="step step-primary" data-content="✓">AI</li>
       <li class="step step-primary" data-content="✓">Depth</li>
-      <li class="step">Polish</li>
+      <li class="step step-primary" data-content="✓">Polish</li>
     </ul>
 
     <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
@@ -533,7 +534,7 @@ stateDiagram-v2
             <td>…run transport openings and supply lines like real AW strategy.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M7 · Polish &amp; atmosphere</td>
+            <td class="font-bold whitespace-nowrap">M7 · Polish &amp; atmosphere <span class="badge badge-success badge-sm">Done</span></td>
             <td>Fog of war (vision ranges, woods hiding, indirect-fire rules), sound effects + music,
             battle animations or screen-shake feedback, save/load (serialize GameState), main menu +
             map select, settings.</td>
