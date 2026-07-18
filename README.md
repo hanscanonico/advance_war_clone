@@ -17,7 +17,8 @@ mkdir -p bin && curl -sL -o /tmp/godot.zip \
 Then:
 
 ```sh
-make run          # play
+make run          # play against the computer (Blue is the AI)
+make hotseat      # play two-player hot-seat instead (no AI)
 make test         # run the GUT unit test suite (headless)
 make tiles        # regenerate the placeholder art — tiles, unit sprites, overlay (headless)
 make import       # (re)import assets headless
@@ -28,10 +29,14 @@ Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes
 
 Any Godot 4.7+ works too — open the project folder in the editor.
 
-## Controls (M4)
+## Controls (M5)
 
-Two players share the keyboard (hot-seat). Only the team whose day it is can act; a banner
-announces each turn and the cursor jumps to that team's first property.
+You play Red; Blue is the computer. Blue's turn plays itself — input is blocked while the AI
+moves, attacks, captures, and builds, and the cursor follows each of its actions so you can
+watch. `make hotseat` drops the AI and lets two players share the keyboard instead.
+
+Either way, only the team whose day it is can act; a banner announces each turn and the cursor
+jumps to that team's first property.
 
 - Arrow keys / mouse hover: move the grid cursor
 - Mouse wheel or `+` / `-`: zoom
@@ -57,14 +62,17 @@ announces each turn and the cursor jumps to that team's first property.
 ## Architecture
 
 - `core/` — pure simulation code. **Nothing here may reference a Node or a scene.**
-  All rules are unit-testable and the future AI simulates through the same code.
+  All rules are unit-testable and the AI simulates through the same code.
+- `ai/` — the computer opponent (`AIController`). Also pure simulation: it plans one `Command`
+  at a time, the exact same command objects player input produces, and the battle scene applies
+  and animates them.
 - `data/` — game data as `Resource` files (terrain, units, and the damage chart).
 - `maps/` — plain-text maps: an ASCII terrain grid, a *starting* property-ownership section, and
   a starting-units section. `MapData` (core) is authoritative for terrain and is never mutated by
   play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
 - `scenes/` — presentation: battle scene, cursor, UI panels.
 - `tools/` — headless scripts (placeholder art generator).
-- `tests/` — GUT tests, targeting `core/` only.
+- `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 
 ## Assets

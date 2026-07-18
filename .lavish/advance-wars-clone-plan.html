@@ -166,11 +166,12 @@
     <div class="grid gap-4 md:grid-cols-3">
       <div class="card card-border bg-base-100">
         <div class="card-body">
-          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">MVP reached — M0–M4 done</span></h3>
-          <p class="text-sm">As of 2026-07-17: the MVP is playable — full hot-seat matches with turns,
-          day counter, income, capture (20-point AW rules), unit production at bases, paid repairs,
-          and HQ-capture/rout victory, on top of the finished movement and combat systems.
-          96 GUT tests passing. Next up: <strong>M5 — the AI opponent</strong>.</p>
+          <h3 class="card-title text-base">Current state <span class="badge badge-success badge-sm">M0–M5 done</span></h3>
+          <p class="text-sm">As of 2026-07-18: single-player works — the Blue army is played by a
+          utility-scoring AI (attack value vs counter risk, capture priorities with the HQ on top,
+          advance/retreat fallbacks, simple production) that issues the exact same commands as the
+          player, with animated turns you can watch. <code>--hotseat</code> restores two-player.
+          109 GUT tests passing. Next up: <strong>M6 — depth</strong> (transports, fuel &amp; ammo).</p>
         </div>
       </div>
       <div class="card card-border bg-base-100">
@@ -462,7 +463,7 @@ stateDiagram-v2
       <li class="step step-primary" data-content="✓">Movement</li>
       <li class="step step-primary" data-content="✓">Combat</li>
       <li class="step step-primary" data-content="✓">Game loop</li>
-      <li class="step">AI</li>
+      <li class="step step-primary" data-content="✓">AI</li>
       <li class="step">Depth</li>
       <li class="step">Polish</li>
     </ul>
@@ -511,7 +512,7 @@ stateDiagram-v2
             <td>…play a complete match against a friend on one machine, start to victory.</td>
           </tr>
           <tr>
-            <td class="font-bold whitespace-nowrap">M5 · AI opponent</td>
+            <td class="font-bold whitespace-nowrap">M5 · AI opponent <span class="badge badge-success badge-sm">Done</span></td>
             <td>AI issues the same commands as the player. Per-unit utility scoring: expected damage
             dealt/taken (via dry-run resolver), capture value, threat map, retreat when weak; production
             AI with simple funds heuristics. Difficulty = noise on scores. Turn cap per move so it never hangs.</td>

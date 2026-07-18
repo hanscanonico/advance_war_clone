@@ -24,6 +24,8 @@ var height := 0
 var starting_units: Array[Dictionary] = []
 var _terrain: Array[TerrainType] = []  # row-major, width * height entries
 var _owners: Dictionary = {}  # Vector2i -> int (team); missing key = neutral
+var _property_cells: Array[Vector2i] = []  # cached by property_cells()
+var _property_cells_built := false
 
 
 static func load_from_file(path: String, db: TerrainDB) -> MapData:
@@ -82,6 +84,18 @@ func owner_at(cell: Vector2i) -> int:
 ## mutates the map itself.
 func initial_owners() -> Dictionary:
 	return _owners.duplicate()
+
+
+## Every capturable property cell on the map, row-major (computed once on
+## demand). Returns a copy, like initial_owners: the cache stays ours.
+func property_cells() -> Array[Vector2i]:
+	if not _property_cells_built:
+		for y in height:
+			for x in width:
+				if _terrain[y * width + x].is_property:
+					_property_cells.append(Vector2i(x, y))
+		_property_cells_built = true
+	return _property_cells.duplicate()
 
 
 func size() -> Vector2i:
