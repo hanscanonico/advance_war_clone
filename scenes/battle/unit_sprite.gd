@@ -25,12 +25,7 @@ var active_team: int = 0
 func setup(p_unit: Unit, p_active_team: int) -> void:
 	unit = p_unit
 	active_team = p_active_team
-	var atlas := AtlasTexture.new()
-	atlas.atlas = load(UNITS_ATLAS_PATH)
-	atlas.region = Rect2(
-		unit.type.atlas_col * SPRITE_PX, unit.team * SPRITE_PX, SPRITE_PX, SPRITE_PX
-	)
-	texture = atlas
+	texture = texture_for(p_unit.type, p_unit.team)
 	scale = Vector2.ONE * SPRITE_SCALE
 	# The badge is authored against the world grid, so undo the sprite's scale
 	# rather than letting it shrink with the art. Its offset is authored in the
@@ -38,6 +33,17 @@ func setup(p_unit: Unit, p_active_team: int) -> void:
 	hp_label.scale = Vector2.ONE / SPRITE_SCALE
 	hp_label.position = HP_LABEL_OFFSET / SPRITE_SCALE
 	refresh()
+
+
+## Atlas region for one unit kind in one team's colours, at the atlas's own
+## SPRITE_PX resolution. Static so menus can show the same artwork the board
+## does without instancing a sprite; callers that draw it outside the world
+## grid size it themselves.
+static func texture_for(type: UnitType, team: int) -> AtlasTexture:
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load(UNITS_ATLAS_PATH)
+	atlas.region = Rect2(type.atlas_col * SPRITE_PX, team * SPRITE_PX, SPRITE_PX, SPRITE_PX)
+	return atlas
 
 
 func set_active_team(team: int) -> void:

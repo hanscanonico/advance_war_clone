@@ -479,6 +479,7 @@ func _open_build_menu(cell: Vector2i) -> void:
 			"id": unit_type.id,
 			"label": "%s  %d" % [unit_type.display_name, unit_type.cost],
 			"disabled": game.funds[game.current_team] < unit_type.cost,
+			"icon": UnitSprite.texture_for(unit_type, game.current_team),
 		})
 	actions.append({"id": &"cancel", "label": "Cancel"})
 	action_menu.open(actions, _screen_pos_for_cell(cell))
@@ -1113,7 +1114,8 @@ func _check_screenshot_mode() -> void:
 ## Drives real flows through the same handlers a player's input reaches:
 ## attack stops at the targeting preview and resolve fires, both with the
 ## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
-## build buys at the red base; endturn hands the turn to Blue; aiturn does the
+## build buys at the red base and buildmenu stops at its open shop list;
+## endturn hands the turn to Blue; aiturn does the
 ## same and then waits out Blue's whole AI turn, back to Red's next turn;
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
@@ -1148,11 +1150,15 @@ func _run_demo(mode: String, shot_path: String) -> void:
 			while state != State.IDLE:
 				await get_tree().process_frame
 			_set_cursor_cell(Vector2i(3, 4))  # show capture progress in the panel
-		"build":
+		"build", "buildmenu":
 			_set_cursor_cell(Vector2i(3, 2))  # red base
 			_confirm_at(Vector2i(3, 2))  # open the build menu (funds 2000)
 			while state != State.MENU:
 				await get_tree().process_frame
+			if mode == "buildmenu":
+				if shot_path != "":
+					_save_screenshot_and_quit(shot_path)
+				return
 			action_menu.choose(&"infantry")
 			while state != State.IDLE:
 				await get_tree().process_frame
