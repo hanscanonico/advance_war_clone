@@ -1110,7 +1110,9 @@ func _check_screenshot_mode() -> void:
 ## same and then waits out Blue's whole AI turn, back to Red's next turn;
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
-## picker; supply holds the APC next to its infantry so Supply is offered.
+## picker; supply holds the APC next to its infantry so Supply is offered;
+## mapmenu stops at the map menu (End Turn / Save); victory routs Blue through
+## a real attack so the victory screen comes up.
 func _run_demo(mode: String, shot_path: String) -> void:
 	await get_tree().process_frame
 	game.rng.seed = 2026  # deterministic demo
@@ -1189,6 +1191,30 @@ func _run_demo(mode: String, shot_path: String) -> void:
 			_confirm_at(Vector2i(3, 3))  # select the red APC
 			_confirm_at(Vector2i(3, 3))  # stay put -> menu offers Supply
 			while state != State.MENU:
+				await get_tree().process_frame
+		"mapmenu":
+			_confirm_at(Vector2i(10, 5))  # empty road tile -> End Turn / Save
+			while state != State.MENU:
+				await get_tree().process_frame
+		"victory":
+			# Leave Blue one nearly-dead unit, then win through the ordinary
+			# select -> Fire flow so the real victory handler runs.
+			for unit in game.units.duplicate():
+				if unit.team == 2 and unit.cell != Vector2i(9, 8):
+					game.remove_unit(unit)
+			_reap_dead_sprites()
+			var last_blue := game.unit_at(Vector2i(9, 8))
+			last_blue.hp = 1
+			_sprites[last_blue].refresh()
+			_confirm_at(Vector2i(8, 8))  # select the red tank
+			_confirm_at(Vector2i(8, 8))  # fire in place
+			while state != State.MENU:
+				await get_tree().process_frame
+			action_menu.choose(&"fire")
+			while state != State.TARGETING:
+				await get_tree().process_frame
+			_confirm_at(cursor_cell)  # kill the last blue unit -> rout
+			while state != State.VICTORY:
 				await get_tree().process_frame
 		"aiturn":
 			# hand the turn to the Blue AI and wait until it plays back to Red

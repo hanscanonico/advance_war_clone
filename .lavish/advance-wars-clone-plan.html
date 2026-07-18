@@ -579,10 +579,11 @@ stateDiagram-v2
       </div>
       <div role="alert" class="alert alert-warning alert-vertical sm:alert-horizontal">
         <div>
-          <h3 class="font-bold">Fog of war retrofit</h3>
-          <p class="text-sm">Fog touches rendering, AI, and rules. Mitigation: from M2 on, all
-          "what can this player see" queries go through one <code>Vision</code> API that simply returns
-          "everything" until M7 implements it.</p>
+          <h3 class="font-bold">Fog of war retrofit <span class="badge badge-success badge-sm">Landed in M7</span></h3>
+          <p class="text-sm">Fog touches rendering, AI, and rules. The mitigation held: every
+          "what can this player see" query goes through one <code>Vision</code> API
+          (<code>core/rules/vision.gd</code>), so M7 only had to fill it in and let the presentation
+          layer honour it. The sim itself stays permissive and the AI deliberately sees everything.</p>
         </div>
       </div>
     </div>

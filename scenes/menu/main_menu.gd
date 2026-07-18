@@ -37,11 +37,11 @@ func _populate_maps() -> void:
 	files.sort()
 	for file in files:
 		# Exported builds list .txt files with a .remap suffix.
-		var name := file.trim_suffix(".remap")
-		if not name.ends_with(".txt"):
+		var map_file := file.trim_suffix(".remap")
+		if not map_file.ends_with(".txt"):
 			continue
-		_map_paths.append(MAPS_DIR.path_join(name))
-		map_option.add_item(name.trim_suffix(".txt").capitalize())
+		_map_paths.append(MAPS_DIR.path_join(map_file))
+		map_option.add_item(map_file.trim_suffix(".txt").capitalize())
 	if map_option.item_count > 0:
 		map_option.selected = 0
 

@@ -15,18 +15,18 @@ var _next := 0
 
 
 func _ready() -> void:
-	for name in NAMES:
-		var path := "%s/%s.wav" % [SFX_DIR, name]
+	for sfx_name in NAMES:
+		var path := "%s/%s.wav" % [SFX_DIR, sfx_name]
 		if ResourceLoader.exists(path):
-			_streams[name] = load(path)
+			_streams[sfx_name] = load(path)
 	for i in POOL_SIZE:
 		var player := AudioStreamPlayer.new()
 		add_child(player)
 		_players.append(player)
 
 
-func play(name: StringName, volume_db: float = 0.0) -> void:
-	var stream: AudioStream = _streams.get(name)
+func play(sfx_name: StringName, volume_db: float = 0.0) -> void:
+	var stream: AudioStream = _streams.get(sfx_name)
 	if stream == null:
 		return
 	var player := _players[_next]
