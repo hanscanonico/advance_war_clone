@@ -81,13 +81,8 @@ Follow the official Godot GDScript style guide. Key points:
 - Every bugfix in `core/` should come with a failing test that the fix makes pass.
 - Keep tests deterministic: seed the RNG explicitly.
 
-Run tests headless:
-
-```sh
-godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
-```
-
-(or `-gconfig=.gutconfig.json` once configured).
+Run the suite with `make test` — it runs GUT headless against `tests/unit` via `.gutconfig.json`.
+See README.md for engine setup and the other `make` targets.
 
 ## Running the game
 
