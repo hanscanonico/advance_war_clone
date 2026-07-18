@@ -1,11 +1,19 @@
 extends SceneTree
-## Generates all placeholder art: the 16x16 terrain atlas (9 terrain columns x
-## 3 team rows), the grid cursor sprite, and the project icon.
-## Reproducible programmer art, meant to be replaced by a real tileset later.
+## Generates the ground terrain atlas (9 terrain columns x 3 team rows), the
+## range overlay, the grid cursor sprite, and the project icon.
 ##
-## Run with:  make tiles
+## Unit art and the city/base/hq buildings are deliberately NOT drawn here: they
+## come from the CC0 PixVoxel pack via tools/build_pixvoxel_atlases.sh, which
+## paints the property columns this script leaves as bare paved lots. Running
+## this alone would blank those buildings, so run the pair:  make tiles
+##
+## Tiles are drawn at 16px — the world grid — then scaled 4x on save, because
+## the atlas cell is 64px to give the PixVoxel art room.
 
 const TILE := 16
+## Atlas cells are 4x the world grid. Nearest-neighbour, so the 16px art is
+## pixel-identical on screen at the battle scene's default zoom.
+const SCALE := 4
 const COLS := 9  # road, plains, woods, mountain, river, city, base, hq, sea
 const ROWS := 3  # 0 = neutral, 1 = red, 2 = blue
 
@@ -23,8 +31,6 @@ const ROCK := Color("9e9e9e")
 const ROCK_DARK := Color("757575")
 const SNOW := Color("eeeeee")
 const PAVE := Color("cfcfcf")
-const WALL := Color("e8e0d0")
-const DOOR := Color("37474f")
 const TEAM_COLORS: Array[Color] = [Color("8a9099"), Color("d84a3c"), Color("3c64d8")]
 
 var img: Image
@@ -34,27 +40,28 @@ func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/tiles"))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/ui"))
 	_generate_atlas()
-	_generate_units_atlas()
 	_generate_overlay()
 	_generate_cursor()
 	_generate_icon()
-	print("generate_tiles: wrote terrain_atlas.png, units_atlas.png, overlay.png, cursor.png, icon.png")
+	print("generate_tiles: wrote terrain_atlas.png, overlay.png, cursor.png, icon.png")
 	quit()
 
 
 func _generate_atlas() -> void:
 	img = Image.create_empty(COLS * TILE, ROWS * TILE, false, Image.FORMAT_RGBA8)
 	for row in ROWS:
-		var team: Color = TEAM_COLORS[row]
 		_draw_road(_at(0, row))
 		_draw_plains(_at(1, row))
 		_draw_woods(_at(2, row))
 		_draw_mountain(_at(3, row))
 		_draw_river(_at(4, row))
-		_draw_city(_at(5, row), team)
-		_draw_base(_at(6, row), team)
-		_draw_hq(_at(7, row), team)
+		# city, base, hq: bare lots. build_pixvoxel_atlases.sh paints the
+		# team-coloured building on top, per row.
+		_ground(_at(5, row), PAVE)
+		_ground(_at(6, row), PAVE)
+		_ground(_at(7, row), PAVE)
 		_draw_sea(_at(8, row))
+	img.resize(COLS * TILE * SCALE, ROWS * TILE * SCALE, Image.INTERPOLATE_NEAREST)
 	img.save_png("res://assets/tiles/terrain_atlas.png")
 
 
@@ -124,131 +131,12 @@ func _draw_sea(o: Vector2i) -> void:
 	_fill(o, 12, 12, 2, 1, SNOW)
 
 
-func _draw_city(o: Vector2i, team: Color) -> void:
-	_ground(o, PAVE)
-	_fill(o, 3, 5, 10, 8, WALL)
-	_fill(o, 2, 2, 12, 3, team)
-	_fill(o, 5, 7, 2, 2, DOOR)
-	_fill(o, 9, 7, 2, 2, DOOR)
-	_fill(o, 7, 10, 2, 3, DOOR)
-
-
-func _draw_base(o: Vector2i, team: Color) -> void:
-	_ground(o, PAVE)
-	_fill(o, 11, 2, 2, 4, ROCK_DARK)  # chimney
-	_fill(o, 2, 6, 12, 7, WALL)
-	_fill(o, 2, 4, 12, 3, team)
-	_fill(o, 6, 9, 4, 4, DOOR)
-
-
-func _draw_hq(o: Vector2i, team: Color) -> void:
-	_ground(o, PAVE)
-	_fill(o, 12, 1, 1, 6, ROCK_DARK)  # flag pole
-	_fill(o, 9, 1, 3, 3, team)        # flag
-	_fill(o, 3, 6, 10, 7, WALL)
-	_fill(o, 2, 4, 12, 3, team)
-	_fill(o, 5, 8, 2, 2, DOOR)
-	_fill(o, 9, 8, 2, 2, DOOR)
-	_fill(o, 7, 10, 2, 3, DOOR)
-
-
-const UNIT_COLS := 9  # infantry, mech, recon, tank, md_tank, anti_air, artillery, rockets, apc
-const SKIN := Color("f5d7b2")
-const GUN := Color("3a3f45")
-
-
-func _generate_units_atlas() -> void:
-	img = Image.create_empty(UNIT_COLS * TILE, ROWS * TILE, false, Image.FORMAT_RGBA8)
-	for row in ROWS:
-		var team: Color = TEAM_COLORS[row]
-		var dark := team.darkened(0.35)
-		_draw_infantry(_at(0, row), team)
-		_draw_mech(_at(1, row), team)
-		_draw_recon(_at(2, row), team)
-		_draw_tank(_at(3, row), team, dark)
-		_draw_md_tank(_at(4, row), team, dark)
-		_draw_anti_air(_at(5, row), team, dark)
-		_draw_artillery(_at(6, row), team)
-		_draw_rockets(_at(7, row), team, dark)
-		_draw_apc(_at(8, row), team)
-	img.save_png("res://assets/tiles/units_atlas.png")
-
-
 ## Semi-transparent white tile; the scene modulates it (blue = move range).
 func _generate_overlay() -> void:
 	img = Image.create_empty(TILE, TILE, false, Image.FORMAT_RGBA8)
 	img.fill_rect(Rect2i(0, 0, TILE, TILE), Color(1, 1, 1, 0.5))
 	img.fill_rect(Rect2i(1, 1, TILE - 2, TILE - 2), Color(1, 1, 1, 0.34))
 	img.save_png("res://assets/tiles/overlay.png")
-
-
-func _draw_infantry(o: Vector2i, team: Color) -> void:
-	_fill(o, 7, 3, 3, 3, SKIN)
-	_fill(o, 6, 6, 5, 5, team)
-	_fill(o, 6, 11, 2, 3, GUN)
-	_fill(o, 9, 11, 2, 3, GUN)
-	_fill(o, 11, 5, 1, 6, GUN)  # rifle
-
-
-func _draw_mech(o: Vector2i, team: Color) -> void:
-	_fill(o, 6, 3, 3, 3, SKIN)
-	_fill(o, 5, 6, 5, 5, team)
-	_fill(o, 5, 11, 2, 3, GUN)
-	_fill(o, 8, 11, 2, 3, GUN)
-	_fill(o, 10, 2, 3, 3, GUN)  # bazooka
-	_fill(o, 11, 5, 2, 4, GUN)
-
-
-func _draw_recon(o: Vector2i, team: Color) -> void:
-	_fill(o, 3, 12, 3, 3, GUN)
-	_fill(o, 10, 12, 3, 3, GUN)
-	_fill(o, 2, 8, 12, 4, team)
-	_fill(o, 4, 5, 5, 3, team.lightened(0.25))
-
-
-func _draw_tank(o: Vector2i, team: Color, dark: Color) -> void:
-	_fill(o, 2, 11, 12, 4, GUN)
-	_fill(o, 2, 7, 12, 4, team)
-	_fill(o, 5, 4, 5, 4, dark)
-	_fill(o, 10, 5, 5, 2, GUN)
-
-
-func _draw_md_tank(o: Vector2i, team: Color, dark: Color) -> void:
-	_fill(o, 1, 11, 14, 4, GUN)
-	_fill(o, 1, 6, 14, 5, team)
-	_fill(o, 4, 3, 6, 4, dark)
-	_fill(o, 10, 4, 6, 2, GUN)
-	_fill(o, 2, 7, 2, 1, SNOW)  # highlight to tell it apart from the tank
-
-
-func _draw_anti_air(o: Vector2i, team: Color, dark: Color) -> void:
-	_fill(o, 2, 11, 12, 4, GUN)
-	_fill(o, 2, 8, 12, 3, team)
-	_fill(o, 6, 5, 5, 3, dark)
-	_fill(o, 8, 1, 1, 5, GUN)  # twin AA barrels
-	_fill(o, 10, 1, 1, 5, GUN)
-
-
-func _draw_artillery(o: Vector2i, team: Color) -> void:
-	_fill(o, 2, 11, 12, 4, GUN)
-	_fill(o, 2, 8, 12, 3, team)
-	for i in 6:  # raised barrel
-		_fill(o, 5 + i, 7 - i, 2, 2, GUN)
-
-
-func _draw_rockets(o: Vector2i, team: Color, dark: Color) -> void:
-	_fill(o, 3, 12, 3, 3, GUN)
-	_fill(o, 10, 12, 3, 3, GUN)
-	_fill(o, 2, 9, 12, 3, team)
-	_fill(o, 4, 3, 8, 5, dark)  # launcher rack
-	for x: int in [5, 7, 9]:
-		_fill(o, x, 4, 1, 2, SNOW)  # rocket tips
-
-
-func _draw_apc(o: Vector2i, team: Color) -> void:
-	_fill(o, 2, 11, 12, 4, GUN)
-	_fill(o, 2, 6, 12, 5, team)
-	_fill(o, 5, 7, 4, 2, team.lightened(0.3))  # hatch
 
 
 func _generate_cursor() -> void:

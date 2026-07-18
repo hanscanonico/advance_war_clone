@@ -4,6 +4,11 @@ extends Sprite2D
 ## via refresh(); the battle scene tweens `position` only for move previews.
 
 const TILE := 16
+## The units atlas is drawn at 4x the world grid so the PixVoxel art keeps its
+## detail; the sprite is scaled back down to cover exactly one cell. Grid maths
+## everywhere else still speaks in TILE.
+const SPRITE_PX := 64
+const SPRITE_SCALE := float(TILE) / float(SPRITE_PX)
 const UNITS_ATLAS_PATH := "res://assets/tiles/units_atlas.png"
 const ACTED_TINT := Color(0.55, 0.55, 0.55)
 
@@ -20,8 +25,16 @@ func setup(p_unit: Unit, p_active_team: int) -> void:
 	active_team = p_active_team
 	var atlas := AtlasTexture.new()
 	atlas.atlas = load(UNITS_ATLAS_PATH)
-	atlas.region = Rect2(unit.type.atlas_col * TILE, unit.team * TILE, TILE, TILE)
+	atlas.region = Rect2(
+		unit.type.atlas_col * SPRITE_PX, unit.team * SPRITE_PX, SPRITE_PX, SPRITE_PX
+	)
 	texture = atlas
+	scale = Vector2.ONE * SPRITE_SCALE
+	# The badge is authored against the world grid, so undo the sprite's scale
+	# rather than letting it shrink with the art. Its offset is authored in the
+	# same units and needs the same treatment, or the badge creeps toward centre.
+	hp_label.scale = Vector2.ONE / SPRITE_SCALE
+	hp_label.position /= SPRITE_SCALE
 	refresh()
 
 
