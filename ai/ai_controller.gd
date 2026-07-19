@@ -43,6 +43,9 @@ func _init(p_unit_db: UnitDB, p_profile: AIProfile = null) -> void:
 ## receives some command (waiting in place at worst), so repeated
 ## plan-and-apply calls are guaranteed to reach EndTurnCommand.
 func plan_next_command(state: GameState) -> Command:
+	var power := _plan_power(state)
+	if power != null:
+		return power
 	var best: Command = null
 	var best_score := -INF
 	for unit in state.units_of(state.current_team):
@@ -58,6 +61,36 @@ func plan_next_command(state: GameState) -> Command:
 	if build != null:
 		return build
 	return EndTurnCommand.new()
+
+
+## Fires the Command Power when the meter is full and there is something to
+## spend it on: at least one enemy inside the reach of a unit that has not acted.
+##
+## Deliberately blunt for a first version. Every wave-1 power only helps the turn
+## it goes off on, so "there is a fight to have this turn" is correct by
+## construction for all of them, and there is nothing to score or look ahead
+## through — which keeps the planner deterministic, as the rest of it is.
+##
+## Reach is Manhattan distance against movement plus firing range, ignoring
+## terrain cost. That over-estimates, and deliberately so: the failure it avoids
+## is sitting on a full meter all match.
+func _plan_power(state: GameState) -> Command:
+	var command := PowerCommand.new()
+	if command.validate(state) != "":
+		return null
+	for unit in state.units_of(state.current_team):
+		if unit.acted or unit.carrier != null or unit.type.max_range <= 0:
+			continue
+		var reach := AttackRange.maximum(state, unit)
+		if not AttackRange.is_indirect(unit):
+			reach += MovementResolver.move_budget(state, unit)
+		for enemy in state.units:
+			if enemy.team == unit.team or enemy.carrier != null:
+				continue
+			var dist := absi(enemy.cell.x - unit.cell.x) + absi(enemy.cell.y - unit.cell.y)
+			if dist <= reach:
+				return command
+	return null
 
 
 func _best_unit_plan(state: GameState, unit: Unit) -> UnitPlan:
@@ -77,7 +110,7 @@ func _consider_attacks(
 	if unit.type.max_range <= 0 or state.damage_chart == null:
 		return
 	var dests: Array[Vector2i] = []
-	if unit.type.min_range > 1:
+	if AttackRange.is_indirect(unit):
 		dests = [unit.cell]  # indirect units cannot move and fire
 	else:
 		for cell in reachable.cells():
@@ -87,8 +120,7 @@ func _consider_attacks(
 		for enemy in state.units:
 			if enemy.team == unit.team or enemy.carrier != null:
 				continue
-			var dist := absi(enemy.cell.x - dest.x) + absi(enemy.cell.y - dest.y)
-			if dist < unit.type.min_range or dist > unit.type.max_range:
+			if not AttackRange.covers(state, unit, dest, enemy.cell):
 				continue
 			if not state.damage_chart.can_attack(unit.type.id, enemy.type.id):
 				continue
@@ -151,12 +183,12 @@ func _advance_command(
 ) -> Command:
 	var goal := _advance_goal(state, unit)
 	var best_cell := unit.cell
-	var best_rank := _position_rank(unit, unit.cell, goal)
+	var best_rank := _position_rank(state, unit, unit.cell, goal)
 	var best_cost := 0
 	for cell in reachable.cells():
 		if not reachable.can_stop_at(cell):
 			continue
-		var rank := _position_rank(unit, cell, goal)
+		var rank := _position_rank(state, unit, cell, goal)
 		var cost: int = reachable.costs[cell]
 		if rank < best_rank or (rank == best_rank and cost < best_cost):
 			best_rank = rank
@@ -169,16 +201,22 @@ func _advance_command(
 ## the goal. Indirect units want it inside their firing ring instead, ideally at
 ## maximum standoff, so they never strand themselves inside their minimum range
 ## where they can neither fire nor counter.
-static func _position_rank(unit: Unit, cell: Vector2i, goal: AdvanceGoal) -> int:
+##
+## The ring comes from AttackRange, so a commander who extends it (Rhea Sol)
+## moves the AI's preferred standoff with it rather than leaving the planner
+## hugging a range it no longer has.
+static func _position_rank(state: GameState, unit: Unit, cell: Vector2i, goal: AdvanceGoal) -> int:
 	var dist := absi(goal.cell.x - cell.x) + absi(goal.cell.y - cell.y)
 	if not goal.stand_off:
 		return dist
-	var out_of_ring: int = unit.type.max_range - unit.type.min_range + 1
-	if dist > unit.type.max_range:
-		return out_of_ring + dist - unit.type.max_range
-	if dist < unit.type.min_range:
-		return out_of_ring + unit.type.min_range - dist
-	return unit.type.max_range - dist
+	var low := AttackRange.minimum(state, unit)
+	var high := AttackRange.maximum(state, unit)
+	var out_of_ring := high - low + 1
+	if dist > high:
+		return out_of_ring + dist - high
+	if dist < low:
+		return out_of_ring + low - dist
+	return high - dist
 
 
 ## Damaged units head for a friendly property (repairs), capture units for the
@@ -206,7 +244,7 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 			enemy_cells.append(other.cell)
 	if not enemy_cells.is_empty():
 		goal.cell = _nearest(unit.cell, enemy_cells)
-		goal.stand_off = unit.type.min_range > 1
+		goal.stand_off = AttackRange.is_indirect(unit)
 	return goal
 
 

@@ -49,6 +49,9 @@ var game: GameState
 var _sprites: Dictionary = {}  # Unit -> UnitSprite
 ## Cells the viewing team can see; refreshed by `refresh_fog` after commits.
 var _visible_cells: Dictionary = {}
+## Whose eyes the board is drawn from; set by the same pass. Starts on the
+## opening team, which is who is looking before the first fog refresh runs.
+var _viewing_team: int = GameState.TEAMS[0]
 
 
 ## Builds the tile sets from data and paints the opening board. Call once, after
@@ -219,6 +222,7 @@ func update_path_line(path: Array[Vector2i]) -> void:
 ## entirely.
 func refresh_fog(viewing_team: int, blacked_out: bool) -> void:
 	fog_layer.clear()
+	_viewing_team = viewing_team
 	if not game.fog_enabled:
 		_visible_cells = {}
 		return
@@ -231,21 +235,17 @@ func refresh_fog(viewing_team: int, blacked_out: bool) -> void:
 	for unit in game.units:
 		var sprite: UnitSprite = _sprites[unit]
 		sprite.refresh()
-		if (
-			blacked_out
-			or (
-				unit.carrier == null
-				and unit.team != viewing_team
-				and not _visible_cells.has(unit.cell)
-			)
-		):
+		if blacked_out or (unit.carrier == null and not can_see_unit(unit)):
 			sprite.visible = false
 
 
-## Whether the viewing team can see a cell. With fog off everything is visible.
-## The single question callers should ask before drawing or targeting anything.
-func can_see(cell: Vector2i) -> bool:
-	return not game.fog_enabled or _visible_cells.has(cell)
+## Whether the viewing team can see a unit — the question to ask before drawing
+## or targeting one. Deliberately not "can it see that cell": a doctrine can hide
+## a unit standing somewhere the viewer sees perfectly well, so the two came
+## apart. Vision owns the rule, as it owns every other one; this only supplies
+## the cells already computed for the fog pass.
+func can_see_unit(unit: Unit) -> bool:
+	return Vision.can_see_unit(game, _viewing_team, unit, _visible_cells)
 
 
 # --- HUD and panels ----------------------------------------------------------
@@ -286,12 +286,12 @@ func _refresh_charge_meter() -> void:
 		charge_label.text = "%s  ACTIVE" % co_state.type.power_name
 
 
-func refresh_panel(cell: Vector2i, viewing_team: int) -> void:
+func refresh_panel(cell: Vector2i) -> void:
 	terrain_panel.show_terrain(
 		map.terrain_at(cell), game.owner_at(cell), game.capture_progress.get(cell, -1)
 	)
 	var hovered := game.unit_at(cell)
-	if hovered != null and hovered.team != viewing_team and not can_see(cell):
+	if hovered != null and not can_see_unit(hovered):
 		hovered = null  # hidden enemies stay hidden in the panel too
 	var carrying := ""
 	if hovered != null:

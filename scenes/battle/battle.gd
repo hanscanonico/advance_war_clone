@@ -489,17 +489,21 @@ func _fire_command_power() -> void:
 	if state not in [State.IDLE, State.MENU] or command.validate(game) != "":
 		return
 	command.apply(game)
-	Sfx.play(&"fanfare")
-	animator.show_banner(
-		"%s  -  %s" % [command.commander.display_name, command.commander.power_name]
-	)
-	EventBus.power_activated.emit(command.team, command.commander)
+	_announce_power(command)
 	# A power can change movement, vision and HP at once, so the whole board is
 	# redrawn — and any selection was ranged under rules that no longer apply.
 	_clear_selection()
 	_refresh_panel()
 	_refresh_hud()
 	view.sync_sprites()
+
+
+## The banner, sting and event a fired power raises. Shared, because the AI
+## fires powers through the same command and should look the same doing it.
+func _announce_power(fired: PowerCommand) -> void:
+	Sfx.play(&"fanfare")
+	animator.show_banner("%s  -  %s" % [fired.commander.display_name, fired.commander.power_name])
+	EventBus.power_activated.emit(fired.team, fired.commander)
 
 
 func _is_own_empty_base(cell: Vector2i) -> bool:
@@ -717,6 +721,10 @@ func _execute_ai_command(command: Command) -> void:
 		command.apply(game)
 		EventBus.unit_moved.emit(move.unit)
 		view.refresh_sprite(move.unit)
+	elif command is PowerCommand:
+		command.apply(game)
+		_announce_power(command as PowerCommand)
+		view.sync_sprites()  # the one-shot half may have healed or refuelled
 	elif command is BuildCommand:
 		var build := command as BuildCommand
 		set_cursor_cell(build.cell)
@@ -765,20 +773,16 @@ func _undo_move_preview() -> void:
 ## enemies are not on the board to be shot at.
 func _attackable_cells(unit: Unit, dest: Vector2i, moved: bool) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
-	var type := unit.type
-	if type.max_range <= 0 or not unit.has_ammo():
-		return cells
-	if type.min_range > 1 and moved:
+	if not unit.has_ammo() or (AttackRange.is_indirect(unit) and moved):
 		return cells
 	for other in game.units:
 		if other.team == unit.team or other.carrier != null:
 			continue
-		if not view.can_see(other.cell):
+		if not view.can_see_unit(other):
 			continue  # the player cannot target what they cannot see
-		var dist := absi(other.cell.x - dest.x) + absi(other.cell.y - dest.y)
-		if dist < type.min_range or dist > type.max_range:
+		if not AttackRange.covers(game, unit, dest, other.cell):
 			continue
-		if game.damage_chart.can_attack(type.id, other.type.id):
+		if game.damage_chart.can_attack(unit.type.id, other.type.id):
 			cells.append(other.cell)
 	cells.sort()
 	return cells
@@ -912,4 +916,4 @@ func set_cursor_cell(cell: Vector2i) -> void:
 
 
 func _refresh_panel() -> void:
-	view.refresh_panel(cursor_cell, _viewing_team())
+	view.refresh_panel(cursor_cell)

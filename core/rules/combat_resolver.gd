@@ -143,6 +143,9 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 static func _defender_can_counter(
 	state: GameState, defender: Unit, attacker: Unit, attacker_cell: Vector2i
 ) -> bool:
+	# Deliberately the unit type's own range rather than AttackRange: countering
+	# is adjacency, and a doctrine that extends how far a unit can *initiate*
+	# must not turn an indirect into something that shoots back.
 	if defender.type.max_range != 1:
 		return false  # unarmed and indirect units never counter
 	if not defender.has_ammo():
