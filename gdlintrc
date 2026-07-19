@@ -19,6 +19,6 @@ max-returns: 12
 # Ratchet, not a target: scenes/battle/battle.gd is the longest file and is
 # being split a responsibility at a time. Set just above it so the file cannot
 # grow without tripping the lint, and lowered each time it shrinks — 1320 when
-# it held the demo driver and the whole rendering layer, 985 now that
-# BattleScenarioDriver and BattleView have moved out.
-max-file-lines: 985
+# it held the demo driver, the whole rendering layer, and every animation; 920
+# now that BattleScenarioDriver, BattleView, and BattleAnimator have moved out.
+max-file-lines: 920

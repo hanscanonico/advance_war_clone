@@ -13,12 +13,10 @@ const MAP_PATH := "res://maps/first_steps.txt"
 const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
 const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
 const MAX_ZOOM := 5.0
-const MOVE_STEP_SECONDS := 0.06
-const BANNER_SECONDS := 1.2
 const AI_COMMAND_DELAY := 0.2
 const AI_MAX_COMMANDS_PER_TURN := 300
 ## The AI opens its turn just after the turn banner has cleared.
-const AI_TURN_START_DELAY := BANNER_SECONDS + 0.1
+const AI_TURN_START_DELAY := BattleAnimator.BANNER_SECONDS + 0.1
 
 enum State {
 	IDLE,
@@ -44,8 +42,6 @@ const DIR_ACTIONS: Array = [
 @onready var cursor: Sprite2D = $Cursor
 @onready var camera: Camera2D = $Camera2D
 @onready var action_menu: ActionMenu = %ActionMenu
-@onready var turn_banner: PanelContainer = %TurnBanner
-@onready var banner_label: Label = %BannerLabel
 @onready var victory_screen: PanelContainer = %VictoryScreen
 @onready var victory_label: Label = %VictoryLabel
 @onready var victory_sub_label: Label = %VictorySubLabel
@@ -77,15 +73,17 @@ var _build_cell := Vector2i.ZERO
 ## Everything this scene draws. Battle decides what happens; the view decides
 ## how it looks. Nothing here reaches past it into a TileMapLayer or a sprite.
 var view: BattleView
+## Everything this scene animates. Hands it an outcome that is already decided;
+## it never picks one.
+var animator: BattleAnimator
 
 var _zoom := 2.0
 var _min_zoom := 1.0
-var _banner_tween: Tween
 ## Set only when the command line asks for a scripted capture; see _ready.
 var _scenario_driver: BattleScenarioDriver
 ## True for a run that exists to be photographed. Suppresses the presentation's
-## two open-ended animations — see _start_cursor_pulse and _shake_camera — so
-## captured frames of the same scenario can be compared to each other.
+## two open-ended animations — see BattleAnimator — so captured frames of the
+## same scenario can be compared to each other.
 var _capturing := false
 
 
@@ -126,6 +124,7 @@ func _ready() -> void:
 		game.rng.randomize()
 	view = _build_view()
 	view.setup()
+	animator = _build_animator()
 	action_menu.action_chosen.connect(_on_menu_action)
 	rematch_button.pressed.connect(_rematch)
 	menu_button.pressed.connect(_go_to_main_menu)
@@ -136,18 +135,28 @@ func _ready() -> void:
 	# awaits, and a RefCounted nobody references is freed mid-scenario.
 	var driver := BattleScenarioDriver.new(self)
 	_capturing = driver.requested()
-	# The cursor pulse loops forever, so a captured frame catches it at whatever
-	# phase the tween happens to be in. That alone made otherwise identical
-	# frames differ, which is exactly the noise that hides a real regression —
-	# so a run that exists to be photographed doesn't start it.
-	if not _capturing:
-		_start_cursor_pulse()
+
+	animator.capturing = _capturing
+	animator.start_cursor_pulse()
 	_on_turn_started()  # day 1 gets the same banner/cursor/event as every turn
 	camera.position = cursor.position
 	camera.reset_smoothing()
 	if _capturing:
+		# Smoothing glides the camera toward the cursor over several frames, so
+		# how far it has travelled when the shutter opens depends on real
+		# elapsed time — enough to shift a whole frame by a pixel between runs.
+		# Captures show where the view settles, which is the position UI is
+		# already anchored to anyway (see BattleView.screen_pos_for_cell).
+		camera.position_smoothing_enabled = false
+	if _capturing:
 		_scenario_driver = driver
 		_scenario_driver.run()
+
+
+## The banner belongs to the animator, but dismissing it is something a caller
+## asks the *scene* to do — the scenario driver clears it before a capture.
+func hide_banner() -> void:
+	animator.hide_banner()
 
 
 ## Hands the view the nodes it draws on. Assignment rather than a constructor
@@ -171,6 +180,19 @@ func _build_view() -> BattleView:
 	built.db = db
 	built.map = map
 	built.game = game
+	return built
+
+
+## Same assignment-not-constructor shape as _build_view, and for the same
+## reason: the animator never learns what a Battle is.
+func _build_animator() -> BattleAnimator:
+	var built := BattleAnimator.new()
+	built.node = self
+	built.view = view
+	built.camera = camera
+	built.cursor = cursor
+	built.turn_banner = %TurnBanner
+	built.banner_label = %BannerLabel
 	return built
 
 
@@ -316,19 +338,8 @@ func _animate_move() -> void:
 	state = State.ANIMATING
 	view.paint_move_overlay([])
 	view.update_path_line([])
-	await _animate_path(view.sprite_for(selected), planned_path)
+	await animator.animate_path(view.sprite_for(selected), planned_path)
 	_on_move_animation_done()
-
-
-## Tweens a sprite along a path without touching the sim. Awaitable.
-func _animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
-	if path.size() < 2:
-		return
-	Sfx.play(&"move", -6.0)
-	var tween := create_tween()
-	for i in range(1, path.size()):
-		tween.tween_property(sprite, "position", BattleView.cell_center(path[i]), MOVE_STEP_SECONDS)
-	await tween.finished
 
 
 func _on_move_animation_done() -> void:
@@ -480,7 +491,7 @@ func _handle_map_action(action: StringName) -> void:
 	state = State.IDLE
 	if action == &"save":
 		if SaveGame.save(game, ai_teams):
-			_show_banner("Saved")
+			animator.show_banner("Saved")
 		return
 	if action != &"end_turn":
 		return
@@ -553,13 +564,16 @@ func _begin_turn() -> void:
 	_refresh_hud()
 	_refresh_panel()
 	Sfx.play(&"fanfare", -8.0)
-	_show_banner(
-		(
-			"Day %d - %s"
-			% [
-				game.day,
-				TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
-			]
+	(
+		animator
+		. show_banner(
+			(
+				"Day %d - %s"
+				% [
+					game.day,
+					TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
+				]
+			)
 		)
 	)
 	var homes := game.properties_of(game.current_team)
@@ -590,7 +604,7 @@ func _needs_handoff() -> bool:
 
 func _enter_handoff() -> void:
 	state = State.HANDOFF
-	hide_banner()
+	animator.hide_banner()
 	_refresh_fog()  # blanks the outgoing team's vision before the panel goes up
 	handoff_label.text = (
 		"%s — press confirm when ready"
@@ -683,16 +697,16 @@ func _execute_ai_command(command: Command) -> void:
 		var attack := command as AttackCommand
 		var target := game.unit_at(attack.target_cell)
 		set_cursor_cell(attack.path[attack.path.size() - 1])
-		await _animate_path(view.sprite_for(attack.unit), attack.path)
+		await animator.animate_path(view.sprite_for(attack.unit), attack.path)
 		set_cursor_cell(attack.target_cell)
 		command.apply(game)
 		EventBus.unit_moved.emit(attack.unit)
-		await _animate_combat(attack.result, attack.unit, target)
+		await animator.animate_combat(attack.result, attack.unit, target)
 	elif command is CaptureCommand:
 		var capture := command as CaptureCommand
 		var dest: Vector2i = capture.path[capture.path.size() - 1]
 		set_cursor_cell(dest)
-		await _animate_path(view.sprite_for(capture.unit), capture.path)
+		await animator.animate_path(view.sprite_for(capture.unit), capture.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(capture.unit)
 		if game.owner_at(dest) == capture.unit.team:
@@ -702,7 +716,7 @@ func _execute_ai_command(command: Command) -> void:
 	elif command is MoveCommand:
 		var move := command as MoveCommand
 		set_cursor_cell(move.path[move.path.size() - 1])
-		await _animate_path(view.sprite_for(move.unit), move.path)
+		await animator.animate_path(view.sprite_for(move.unit), move.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(move.unit)
 		view.refresh_sprite(move.unit)
@@ -722,36 +736,13 @@ func _execute_ai_command(command: Command) -> void:
 
 func _enter_victory() -> void:
 	state = State.VICTORY
-	hide_banner()
+	animator.hide_banner()
 	Sfx.play(&"fanfare")
 	victory_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
 	victory_sub_label.text = "Day %d" % game.day
 	victory_screen.show()
 	victory_screen.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	rematch_button.grab_focus()
-
-
-## Shows the banner immediately and cancels any pending auto-hide.
-func _set_banner(text: String) -> void:
-	if _banner_tween != null and _banner_tween.is_valid():
-		_banner_tween.kill()
-	banner_label.text = text
-	turn_banner.show()
-	turn_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-
-
-func _show_banner(text: String) -> void:
-	_set_banner(text)
-	_banner_tween = create_tween()
-	_banner_tween.tween_interval(BANNER_SECONDS)
-	_banner_tween.tween_callback(turn_banner.hide)
-
-
-## Dismisses the banner now, cancelling any pending auto-hide.
-func hide_banner() -> void:
-	if _banner_tween != null and _banner_tween.is_valid():
-		_banner_tween.kill()
-	turn_banner.hide()
 
 
 func _refresh_hud() -> void:
@@ -872,36 +863,12 @@ func _execute_attack(target_cell: Vector2i) -> void:
 	state = State.ANIMATING
 	command.apply(game)
 	EventBus.unit_moved.emit(attacker)
-	await _animate_combat(command.result, attacker, target)
+	await animator.animate_combat(command.result, attacker, target)
 	_clear_selection()
 	_refresh_panel()
 	_refresh_hud()
 	if game.winner != 0:
 		_enter_victory()
-
-
-func _animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
-	var defender_sprite := view.sprite_for(defender)
-	var attacker_sprite := view.sprite_for(attacker)
-	attacker_sprite.refresh()  # snap to the committed destination
-	Sfx.play(&"shot")
-	await defender_sprite.flash_hit()
-	_shake_camera()
-	if result.defender_died:
-		Sfx.play(&"explosion")
-		view.release_sprite(defender)
-		await defender_sprite.die()
-	else:
-		defender_sprite.refresh()
-	if result.countered:
-		Sfx.play(&"shot")
-		await attacker_sprite.flash_hit()
-	if result.attacker_died:
-		view.release_sprite(attacker)
-		await attacker_sprite.die()
-	else:
-		attacker_sprite.refresh()
-	view.reap_dead_sprites()
 
 
 ## Whether a damage forecast applies at all is a flow question — only the
@@ -949,33 +916,3 @@ func set_cursor_cell(cell: Vector2i) -> void:
 
 func _refresh_panel() -> void:
 	view.refresh_panel(cursor_cell, _viewing_team())
-
-
-## Brief camera jitter on combat hits. Presentation-only randomness: this
-## must never touch game.rng, which is reserved for deterministic sim luck.
-##
-## Skipped while capturing. The shake is still mid-tween when a frame is taken,
-## so it offsets the whole board by a few pixels and makes two otherwise
-## identical captures differ everywhere — noise that would hide a real
-## rendering regression.
-func _shake_camera(strength: float = 3.0) -> void:
-	if _capturing:
-		return
-	var tween := create_tween()
-	for i in 4:
-		var offset := Vector2(randf_range(-strength, strength), randf_range(-strength, strength))
-		tween.tween_property(camera, "offset", offset, 0.04)
-	tween.tween_property(camera, "offset", Vector2.ZERO, 0.04)
-
-
-func _start_cursor_pulse() -> void:
-	var tween := create_tween().set_loops()
-	(
-		tween
-		. tween_property(cursor, "scale", Vector2(1.15, 1.15), 0.4)
-		. set_trans(Tween.TRANS_SINE)
-		. set_ease(Tween.EASE_IN_OUT)
-	)
-	tween.tween_property(cursor, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_SINE).set_ease(
-		Tween.EASE_IN_OUT
-	)
