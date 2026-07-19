@@ -1,7 +1,13 @@
+class_name Battle
 extends Node2D
-## Battle scene root (M2 scope): renders map + units, drives cursor/camera,
-## and runs the selection → move → Wait/Cancel flow. All rules live in core/;
-## this scene only issues commands and animates the results.
+## Battle scene root: renders map + units, drives cursor/camera, and runs the
+## interaction flow — selection, movement, menus, targeting, transport, AI
+## turns, and victory. All rules live in core/; this scene only issues commands
+## and animates the results.
+##
+## `confirm_at`, `set_cursor_cell`, and `leave_handoff` are public because they
+## are the entry points player input arrives at, and BattleScenarioDriver
+## stands in for a player through exactly those.
 
 const TILE := 16
 ## Terrain atlas cells are 4x the world grid so the PixVoxel property buildings
@@ -92,6 +98,8 @@ var _visible_cells: Dictionary = {}
 var _zoom := 2.0
 var _min_zoom := 1.0
 var _banner_tween: Tween
+## Set only when the command line asks for a scripted capture; see _ready.
+var _scenario_driver: BattleScenarioDriver
 
 
 func _ready() -> void:
@@ -142,14 +150,19 @@ func _ready() -> void:
 	action_menu.action_chosen.connect(_on_menu_action)
 	rematch_button.pressed.connect(_rematch)
 	menu_button.pressed.connect(_go_to_main_menu)
-	handoff_button.pressed.connect(_leave_handoff)
+	handoff_button.pressed.connect(leave_handoff)
 	_setup_camera()
-	_set_cursor_cell(Vector2i.ZERO)
+	set_cursor_cell(Vector2i.ZERO)
 	_start_cursor_pulse()
 	_on_turn_started()  # day 1 gets the same banner/cursor/event as every turn
 	camera.position = cursor.position
 	camera.reset_smoothing()
-	_check_screenshot_mode()
+	# Dev-only capture flows. The driver is held for the whole scene: `run`
+	# awaits, and a RefCounted nobody references is freed mid-scenario.
+	var driver := BattleScenarioDriver.new(self)
+	if driver.requested():
+		_scenario_driver = driver
+		_scenario_driver.run()
 
 
 func _go_to_main_menu() -> void:
@@ -175,7 +188,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			and (event as InputEventMouseButton).pressed
 		)
 		if event.is_action_pressed(&"confirm") or clicked:
-			_leave_handoff()
+			leave_handoff()
 		return
 	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN]:
 		return  # the menu handles its own input; the rest block input entirely
@@ -186,17 +199,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		var cell := _mouse_cell()
 		if map.in_bounds(cell) and cell != cursor_cell:
-			_set_cursor_cell(cell)
+			set_cursor_cell(cell)
 	elif (
 		event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
 	):
 		var cell := _mouse_cell()
 		if map.in_bounds(cell):
 			if cell != cursor_cell:
-				_set_cursor_cell(cell)
-			_confirm_at(cursor_cell)
+				set_cursor_cell(cell)
+			confirm_at(cursor_cell)
 	elif event.is_action_pressed(&"confirm"):
-		_confirm_at(cursor_cell)
+		confirm_at(cursor_cell)
 	elif event.is_action_pressed(&"cancel"):
 		_cancel()
 	else:
@@ -204,14 +217,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.is_action_pressed(dir[0], true):
 				var next: Vector2i = cursor_cell + dir[1]
 				if map.in_bounds(next):
-					_set_cursor_cell(next)
+					set_cursor_cell(next)
 				return
 
 
 # --- selection / movement flow -----------------------------------------------
 
 
-func _confirm_at(cell: Vector2i) -> void:
+func confirm_at(cell: Vector2i) -> void:
 	match state:
 		State.IDLE:
 			var unit := game.unit_at(cell)
@@ -551,7 +564,7 @@ func _begin_turn() -> void:
 	)
 	var homes := game.properties_of(game.current_team)
 	if not homes.is_empty():
-		_set_cursor_cell(homes[0])
+		set_cursor_cell(homes[0])
 	EventBus.turn_started.emit(game.current_team, game.day)
 	if game.winner == 0 and game.current_team in ai_teams:
 		state = State.AI_TURN
@@ -577,7 +590,7 @@ func _needs_handoff() -> bool:
 
 func _enter_handoff() -> void:
 	state = State.HANDOFF
-	_hide_banner()
+	hide_banner()
 	_refresh_fog()  # blanks the outgoing team's vision before the panel goes up
 	handoff_label.text = (
 		"%s — press confirm when ready"
@@ -588,7 +601,7 @@ func _enter_handoff() -> void:
 	handoff_button.grab_focus()
 
 
-func _leave_handoff() -> void:
+func leave_handoff() -> void:
 	if state != State.HANDOFF:
 		return
 	handoff_screen.hide()
@@ -690,16 +703,16 @@ func _execute_ai_command(command: Command) -> void:
 	if command is AttackCommand:
 		var attack := command as AttackCommand
 		var target := game.unit_at(attack.target_cell)
-		_set_cursor_cell(attack.path[attack.path.size() - 1])
+		set_cursor_cell(attack.path[attack.path.size() - 1])
 		await _animate_path(_sprites[attack.unit], attack.path)
-		_set_cursor_cell(attack.target_cell)
+		set_cursor_cell(attack.target_cell)
 		command.apply(game)
 		EventBus.unit_moved.emit(attack.unit)
 		await _animate_combat(attack.result, attack.unit, target)
 	elif command is CaptureCommand:
 		var capture := command as CaptureCommand
 		var dest: Vector2i = capture.path[capture.path.size() - 1]
-		_set_cursor_cell(dest)
+		set_cursor_cell(dest)
 		await _animate_path(_sprites[capture.unit], capture.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(capture.unit)
@@ -709,14 +722,14 @@ func _execute_ai_command(command: Command) -> void:
 		_sprites[capture.unit].refresh()
 	elif command is MoveCommand:
 		var move := command as MoveCommand
-		_set_cursor_cell(move.path[move.path.size() - 1])
+		set_cursor_cell(move.path[move.path.size() - 1])
 		await _animate_path(_sprites[move.unit], move.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(move.unit)
 		_sprites[move.unit].refresh()
 	elif command is BuildCommand:
 		var build := command as BuildCommand
-		_set_cursor_cell(build.cell)
+		set_cursor_cell(build.cell)
 		command.apply(game)
 		_spawn_sprite_for(build.built_unit)
 		EventBus.unit_built.emit(build.built_unit)
@@ -730,7 +743,7 @@ func _execute_ai_command(command: Command) -> void:
 
 func _enter_victory() -> void:
 	state = State.VICTORY
-	_hide_banner()
+	hide_banner()
 	Sfx.play(&"fanfare")
 	victory_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
 	victory_sub_label.text = "Day %d" % game.day
@@ -756,7 +769,7 @@ func _show_banner(text: String) -> void:
 
 
 ## Dismisses the banner now, cancelling any pending auto-hide.
-func _hide_banner() -> void:
+func hide_banner() -> void:
 	if _banner_tween != null and _banner_tween.is_valid():
 		_banner_tween.kill()
 	turn_banner.hide()
@@ -787,7 +800,7 @@ func _undo_move_preview() -> void:
 	_sprites[selected].refresh()
 	_paint_move_overlay()
 	state = State.UNIT_SELECTED
-	_set_cursor_cell(selected.cell)
+	set_cursor_cell(selected.cell)
 	planned_path = [selected.cell]
 	_update_path_line()
 
@@ -824,7 +837,7 @@ func _enter_targeting() -> void:
 	attack_overlay.clear()
 	for cell in _attack_targets:
 		attack_overlay.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
-	_set_cursor_cell(_attack_targets[0])
+	set_cursor_cell(_attack_targets[0])
 
 
 func _exit_targeting_to_menu() -> void:
@@ -861,7 +874,7 @@ func _enter_drop_targeting() -> void:
 	move_overlay.clear()
 	for cell in _drop_targets:
 		move_overlay.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
-	_set_cursor_cell(_drop_targets[0])
+	set_cursor_cell(_drop_targets[0])
 
 
 func _execute_drop(drop_cell: Vector2i) -> void:
@@ -929,6 +942,16 @@ func _animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defend
 	else:
 		attacker_sprite.refresh()
 	_reap_dead_sprites()
+
+
+## Brings the whole sprite layer back in step with the sim after something
+## edited game state directly instead of going through a command. Only the
+## scenario driver does that, to set up a board a real match would take many
+## turns to reach.
+func sync_sprites_to_state() -> void:
+	_reap_dead_sprites()
+	for unit in game.units:
+		_sprites[unit].refresh()
 
 
 ## Frees the sprite of every unit that has left the sim without an animation
@@ -1055,7 +1078,7 @@ func _mouse_cell() -> Vector2i:
 	return Vector2i((get_global_mouse_position() / TILE).floor())
 
 
-func _set_cursor_cell(cell: Vector2i) -> void:
+func set_cursor_cell(cell: Vector2i) -> void:
 	cursor_cell = cell
 	cursor.position = _cell_center(cell)
 	camera.position = cursor.position
@@ -1133,185 +1156,3 @@ func _start_cursor_pulse() -> void:
 	tween.tween_property(cursor, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_SINE).set_ease(
 		Tween.EASE_IN_OUT
 	)
-
-
-# --- automated verification --------------------------------------------------
-
-
-## `Godot --path . -- --screenshot=/abs/path.png [--select=x,y | --demo=MODE]`
-## boots the scene, optionally drives a demo, saves one frame, and quits.
-## --select previews a unit's movement; see _run_demo for the demo modes.
-func _check_screenshot_mode() -> void:
-	var shot_path := ""
-	var select_cell := Vector2i(-1, -1)
-	var demo := ""
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--screenshot="):
-			shot_path = arg.get_slice("=", 1)
-		elif arg.begins_with("--select="):
-			var parts := arg.get_slice("=", 1).split(",")
-			if parts.size() == 2:
-				select_cell = Vector2i(int(parts[0]), int(parts[1]))
-		elif arg.begins_with("--demo="):
-			demo = arg.get_slice("=", 1)
-	if shot_path == "" and select_cell.x < 0 and demo == "":
-		return
-	_leave_handoff()  # demos and captures drive the board, not the handoff panel
-	_hide_banner()  # the day-1 banner would cover every captured frame
-	if demo != "":
-		_run_demo(demo, shot_path)
-		return
-	if select_cell.x >= 0:
-		_screenshot_demo_select(select_cell)
-	if shot_path != "":
-		_save_screenshot_and_quit(shot_path)
-
-
-## Drives real flows through the same handlers a player's input reaches:
-## attack stops at the targeting preview and resolve fires, both with the
-## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
-## build buys at the red base and buildmenu stops at its open shop list;
-## endturn hands the turn to Blue; aiturn does the same and then waits out
-## Blue's whole AI turn, back to Red's next turn;
-## transport runs load -> drive -> drop, and load, cargo, and drop stop that
-## same chain at the Load menu, the loaded APC's panel, and the drop-target
-## picker; supply holds the APC next to its infantry so Supply is offered;
-## mapmenu stops at the map menu (End Turn / Save); victory routs Blue through
-## a real attack so the victory screen comes up.
-func _run_demo(mode: String, shot_path: String) -> void:
-	await get_tree().process_frame
-	game.rng.seed = 2026  # deterministic demo
-	match mode:
-		"attack", "resolve":
-			_confirm_at(Vector2i(8, 8))  # select the red tank
-			_confirm_at(Vector2i(8, 8))  # fire in place
-			while state != State.MENU:
-				await get_tree().process_frame
-			action_menu.choose(&"fire")
-			while state != State.TARGETING:
-				await get_tree().process_frame
-			if mode == "attack":
-				if shot_path != "":
-					_save_screenshot_and_quit(shot_path)
-				return
-			_confirm_at(cursor_cell)  # fire at the blue tank
-			while state != State.IDLE:
-				await get_tree().process_frame
-		"capture":
-			_confirm_at(Vector2i(4, 3))  # select the red infantry
-			_confirm_at(Vector2i(3, 4))  # move onto the neutral city
-			while state != State.MENU:
-				await get_tree().process_frame
-			action_menu.choose(&"capture")
-			while state != State.IDLE:
-				await get_tree().process_frame
-			_set_cursor_cell(Vector2i(3, 4))  # show capture progress in the panel
-		"build", "buildmenu":
-			_set_cursor_cell(Vector2i(3, 2))  # red base
-			_confirm_at(Vector2i(3, 2))  # open the build menu (funds 2000)
-			while state != State.MENU:
-				await get_tree().process_frame
-			if mode == "buildmenu":
-				if shot_path != "":
-					_save_screenshot_and_quit(shot_path)
-				return
-			action_menu.choose(&"infantry")
-			while state != State.IDLE:
-				await get_tree().process_frame
-		"endturn":
-			_confirm_at(Vector2i(10, 5))  # empty road tile -> map menu
-			while state != State.MENU:
-				await get_tree().process_frame
-			action_menu.choose(&"end_turn")
-			await get_tree().process_frame
-		"load", "cargo", "drop", "transport":
-			_confirm_at(Vector2i(4, 3))  # select the red infantry
-			_confirm_at(Vector2i(3, 3))  # onto the APC -> Load menu
-			while state != State.MENU:
-				await get_tree().process_frame
-			if mode == "load":
-				if shot_path != "":
-					_save_screenshot_and_quit(shot_path)
-				return
-			action_menu.choose(&"load")
-			while state != State.IDLE:
-				await get_tree().process_frame
-			if mode == "cargo":
-				_set_cursor_cell(Vector2i(3, 3))  # panel shows the APC's [+Infantry]
-				if shot_path != "":
-					_save_screenshot_and_quit(shot_path)
-				return
-			_confirm_at(Vector2i(3, 3))  # select the loaded APC
-			_confirm_at(Vector2i(3, 5))  # drive it south
-			while state != State.MENU:
-				await get_tree().process_frame
-			action_menu.choose(&"drop")
-			while state != State.DROP_TARGETING:
-				await get_tree().process_frame
-			if mode == "drop":
-				if shot_path != "":
-					_save_screenshot_and_quit(shot_path)
-				return
-			_confirm_at(cursor_cell)  # drop at the first offered cell
-			while state != State.IDLE:
-				await get_tree().process_frame
-			_set_cursor_cell(Vector2i(3, 5))  # show the APC in the panel
-		"supply":
-			_confirm_at(Vector2i(3, 3))  # select the red APC
-			_confirm_at(Vector2i(3, 3))  # stay put -> menu offers Supply
-			while state != State.MENU:
-				await get_tree().process_frame
-		"mapmenu":
-			_confirm_at(Vector2i(10, 5))  # empty road tile -> End Turn / Save
-			while state != State.MENU:
-				await get_tree().process_frame
-		"victory":
-			# Leave Blue one nearly-dead unit, then win through the ordinary
-			# select -> Fire flow so the real victory handler runs.
-			for unit in game.units.duplicate():
-				if unit.team == 2 and unit.cell != Vector2i(9, 8):
-					game.remove_unit(unit)
-			_reap_dead_sprites()
-			var last_blue := game.unit_at(Vector2i(9, 8))
-			last_blue.hp = 1
-			_sprites[last_blue].refresh()
-			_confirm_at(Vector2i(8, 8))  # select the red tank
-			_confirm_at(Vector2i(8, 8))  # fire in place
-			while state != State.MENU:
-				await get_tree().process_frame
-			action_menu.choose(&"fire")
-			while state != State.TARGETING:
-				await get_tree().process_frame
-			_confirm_at(cursor_cell)  # kill the last blue unit -> rout
-			while state != State.VICTORY:
-				await get_tree().process_frame
-		"aiturn":
-			# hand the turn to the Blue AI and wait until it plays back to Red
-			_confirm_at(Vector2i(10, 5))
-			while state != State.MENU:
-				await get_tree().process_frame
-			action_menu.choose(&"end_turn")
-			while game.winner == 0 and not (game.current_team == 1 and state == State.IDLE):
-				await get_tree().process_frame
-	if shot_path != "":
-		_save_screenshot_and_quit(shot_path)
-
-
-func _screenshot_demo_select(cell: Vector2i) -> void:
-	if not map.in_bounds(cell):
-		return
-	_set_cursor_cell(cell)
-	_confirm_at(cell)
-	if state != State.UNIT_SELECTED:
-		return
-	var farthest := cell
-	var best_cost := -1
-	for candidate in move_range.cells():
-		if move_range.can_stop_at(candidate) and move_range.costs[candidate] > best_cost:
-			best_cost = move_range.costs[candidate]
-			farthest = candidate
-	_set_cursor_cell(farthest)
-
-
-func _save_screenshot_and_quit(path: String) -> void:
-	await ScreenshotUtil.capture_and_quit(self, path)

@@ -37,6 +37,17 @@ else
 	ignore='a^' # matches nothing
 fi
 
+# A script that types against a class whose script uses an autoload inherits
+# the problem one step removed: the dependency fails to compile for the reason
+# above, and this file is then reported with "Failed to compile depended
+# scripts", which names no identifier to match on.
+#
+# That cascade is only ignorable when the underlying autoload error is what
+# caused it — and Godot prints both in the same output, so we can tell. A
+# dependency that fails for a real reason prints that reason here too, and it
+# survives the filter and fails the run.
+cascade='Compile Error: Failed to compile depended scripts'
+
 failed=0
 checked=0
 
@@ -44,8 +55,11 @@ checked=0
 while IFS= read -r file; do
 	checked=$((checked + 1))
 	# Strip the leading './' so reported paths line up with res:// paths.
-	output="$("$GODOT" --headless --path . --check-only -s "${file#./}" 2>&1 |
-		grep -vE "$ignore")"
+	raw="$("$GODOT" --headless --path . --check-only -s "${file#./}" 2>&1)"
+	output="$(grep -vE "$ignore" <<<"$raw")"
+	if grep -qE "$ignore" <<<"$raw"; then
+		output="$(grep -vE "$cascade" <<<"$output")"
+	fi
 	if grep -qE 'SCRIPT ERROR|Parse Error' <<<"$output"; then
 		grep -E 'SCRIPT ERROR|Parse Error|^ +at:' <<<"$output"
 		failed=$((failed + 1))
