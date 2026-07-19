@@ -164,9 +164,12 @@ func _run_victory_demo() -> void:
 	for unit in _battle.game.units.duplicate():
 		if unit.team == 2 and unit.cell != Vector2i(9, 8):
 			_battle.game.remove_unit(unit)
+	# The sim was edited behind the scene's back, so the sprites need resyncing:
+	# drop the ones whose units are gone, then redraw the survivor.
+	_battle.view.reap_dead_sprites()
 	var last_blue := _battle.game.unit_at(Vector2i(9, 8))
 	last_blue.hp = 1
-	_battle.sync_sprites_to_state()  # the sim was edited behind the scene's back
+	_battle.view.refresh_sprite(last_blue)
 	_battle.confirm_at(Vector2i(8, 8))  # select the red tank
 	_battle.confirm_at(Vector2i(8, 8))  # fire in place
 	await _until_state(Battle.State.MENU)
