@@ -68,6 +68,20 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 	return result
 
 
+## Writes the match actually running back into MatchConfig, so a rematch replays
+## *it* — including one resumed from a save, whose map, sides and commanders the
+## menu never saw — rather than whatever the menu last wrote. The mirror of
+## build(), and here for the same reason: it is setup, not flow.
+static func remember(game: GameState, ai_teams: Array[int]) -> void:
+	MatchConfig.map_path = game.map_path
+	MatchConfig.fog_enabled = game.fog_enabled
+	MatchConfig.ai_teams = ai_teams.duplicate()
+	MatchConfig.commanders = {}
+	for team in GameState.TEAMS:
+		MatchConfig.commanders[team] = game.commander_of(team).id
+	MatchConfig.load_save = false
+
+
 ## `--co=alina_ward,viktor_draeg`: red first, blue second, either side blank for
 ## no commander. Keeps headless demos and captures able to pick a matchup
 ## without the menu, exactly as --map and --fog do. Public so it can be tested

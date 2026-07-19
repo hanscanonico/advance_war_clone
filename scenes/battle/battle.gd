@@ -178,13 +178,8 @@ func _go_to_main_menu() -> void:
 	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 
 
-## Replays the setup of the match actually running — including one resumed
-## from a save — rather than whatever the menu last wrote to MatchConfig.
 func _rematch() -> void:
-	MatchConfig.map_path = game.map_path
-	MatchConfig.fog_enabled = game.fog_enabled
-	MatchConfig.ai_teams = ai_teams.duplicate()
-	MatchConfig.load_save = false
+	BattleSetup.remember(game, ai_teams)
 	get_tree().reload_current_scene()
 
 
@@ -346,7 +341,7 @@ func _on_move_animation_done() -> void:
 		actions.append({"id": &"drop", "label": "Drop"})
 	if (
 		selected.type.can_resupply
-		and not SupplyCommand.new(selected, planned_path).adjacent_friendlies(game, dest).is_empty()
+		and not SupplyCommand.new(selected, planned_path).friendlies_in_reach(game, dest).is_empty()
 	):
 		actions.append({"id": &"supply", "label": "Supply"})
 	actions.append({"id": &"wait", "label": "Wait"})

@@ -128,7 +128,7 @@ func test_supply_command_refills_adjacent() -> void:
 	assert_true(state.units[0].acted)
 
 
-func test_supply_command_needs_a_neighbor() -> void:
+func test_supply_command_needs_someone_in_reach() -> void:
 	var state := _state("[terrain]\n...\n[units]\n1 p 0 0")
 	var command := SupplyCommand.new(state.units[0], _path([Vector2i(0, 0)]))
-	assert_eq(command.validate(state), "no one adjacent to supply")
+	assert_eq(command.validate(state), "no one in reach to supply")

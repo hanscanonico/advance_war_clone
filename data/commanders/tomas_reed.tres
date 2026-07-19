@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TomasReed" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/tomas_reed.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"tomas_reed"
+display_name = "Tomas Reed"
+faction = "Verdant League"
+doctrine_text = "Infantry and Mechs +15% attack and capture 20% harder. Vehicles -10% attack."
+power_name = "Popular Uprising"
+power_text = "Infantry and Mechs +1 movement and double capture strength this turn."
+power_cost = 10000
+power_duration = 0
+foot_classes = Array[StringName]([&"foot", &"boot"])
+foot_attack_pct = 15
+vehicle_attack_pct = -10
+capture_pct = 20
+uprising_capture_pct = 100
+uprising_move_bonus = 1

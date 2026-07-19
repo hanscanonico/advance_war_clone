@@ -1,8 +1,12 @@
 class_name SupplyCommand
 extends Command
-## Moves a supply unit (APC), then refills fuel and ammo of every adjacent
-## friendly. Adjacent friendlies are also refilled automatically at turn
-## start; this action is for mid-turn top-ups.
+## Moves a supply unit (APC), then refills fuel and ammo of every friendly in
+## reach. Friendlies in reach are also refilled automatically at turn start;
+## this action is for mid-turn top-ups.
+##
+## "In reach" is one tile for most commanders and two for Gideon Holt, so the
+## radius comes from the hook rather than from a hardcoded adjacency check —
+## here and in TurnRules, the only two places supply is worked out.
 
 var unit: Unit
 var path: Array[Vector2i]
@@ -19,22 +23,26 @@ func validate(state: GameState) -> String:
 		return move_error
 	if not unit.type.can_resupply:
 		return "unit cannot resupply others"
-	if adjacent_friendlies(state, path[path.size() - 1]).is_empty():
-		return "no one adjacent to supply"
+	if friendlies_in_reach(state, path[path.size() - 1]).is_empty():
+		return "no one in reach to supply"
 	return ""
 
 
 func apply(state: GameState) -> void:
 	state.advance_unit(unit, path)
-	for friendly in adjacent_friendlies(state, unit.cell):
+	for friendly in friendlies_in_reach(state, unit.cell):
 		friendly.resupply()
 
 
-## Public so the UI can decide whether to offer the Supply action.
-func adjacent_friendlies(state: GameState, from: Vector2i) -> Array[Unit]:
+## Friendlies this unit could refill standing on `from`. Public so the UI can
+## decide whether to offer the Supply action at all.
+func friendlies_in_reach(state: GameState, from: Vector2i) -> Array[Unit]:
 	var result: Array[Unit] = []
-	for dir in MovementResolver.DIRECTIONS:
-		var other := state.unit_at(from + dir)
-		if other != null and other != unit and other.team == unit.team:
+	var radius := state.commander_of(unit.team).supply_range(state, unit)
+	for other in state.units_of(unit.team):
+		if other == unit or other.carrier != null:
+			continue  # passengers are refilled by their transport, not beside it
+		var dist := absi(other.cell.x - from.x) + absi(other.cell.y - from.y)
+		if dist >= 1 and dist <= radius:
 			result.append(other)
 	return result
