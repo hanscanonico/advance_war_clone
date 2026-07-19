@@ -45,14 +45,15 @@ The AI plugs in at the exact same point as player input.
 ```
 res://
 ├─ core/        # sim: game_state.gd, commands/, rules/  (NO Node references)
-├─ data/        # .tres resources: units/, terrain/, damage_chart
+├─ data/        # .tres resources: units/, terrain/, ai/, damage_chart
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
 │  ├─ menu/     # main_menu.tscn — map select, match options
 │  ├─ common/   # helpers shared by both scenes
 │  └─ ui/       # menus, panels, damage preview
 ├─ autoload/    # singletons: EventBus, MatchConfig, Sfx
-├─ ai/          # ai_controller.gd — plans Commands  (NO Node references)
+├─ ai/          # ai_controller.gd — plans Commands; ai_profile.gd — its weights
+│              (NO Node references)
 ├─ maps/        # map scenes / map resources
 ├─ assets/      # sprites, audio, fonts  (+ LICENSES.md)
 └─ tests/       # GUT tests — target core/ and ai/ only

@@ -133,7 +133,9 @@ vision.
 - `ai/` — the computer opponent (`AIController`). Also pure simulation: it plans one `Command`
   at a time, the exact same command objects player input produces, and the battle scene applies
   and animates them.
-- `data/` — game data as `Resource` files (terrain, units, and the damage chart).
+- `data/` — game data as `Resource` files (terrain, units, the damage chart, and the AI
+  profile in `data/ai/default.tres` — every weight the opponent scores with, so tuning its
+  behaviour is a data edit rather than a code change).
 - `maps/` — plain-text maps: an ASCII terrain grid, a *starting* property-ownership section, and
   a starting-units section. `MapData` (core) is authoritative for terrain and is never mutated by
   play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
