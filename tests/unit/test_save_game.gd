@@ -70,8 +70,11 @@ func test_roundtrip_preserves_rng_sequence() -> void:
 	state.rng.randi()  # advance the stream a little
 	assert_true(SaveGame.save(state, [] as Array[int], TEST_PATH))
 	var loaded := SaveGame.load_game(terrain_db, unit_db, chart, TEST_PATH)
-	assert_eq(loaded.state.rng.randi(), state.rng.randi(),
-		"combat luck must continue identically after loading")
+	assert_eq(
+		loaded.state.rng.randi(),
+		state.rng.randi(),
+		"combat luck must continue identically after loading"
+	)
 
 
 func test_missing_file_returns_null() -> void:
@@ -101,7 +104,7 @@ func test_malformed_unit_entry_returns_null() -> void:
 	assert_true(SaveGame.save(state, [] as Array[int], TEST_PATH))
 	var text := FileAccess.get_file_as_string(TEST_PATH)
 	var file := FileAccess.open(TEST_PATH, FileAccess.WRITE)
-	file.store_string(text.replace("\"fuel\"", "\"petrol\""))
+	file.store_string(text.replace('"fuel"', '"petrol"'))
 	file.close()
 	assert_null(SaveGame.load_game(terrain_db, unit_db, chart, TEST_PATH))
 	assert_push_error("unit entry is missing 'fuel'")
@@ -125,7 +128,7 @@ func test_unknown_unit_type_returns_null() -> void:
 	assert_true(SaveGame.save(state, [] as Array[int], TEST_PATH))
 	var text := FileAccess.get_file_as_string(TEST_PATH)
 	var file := FileAccess.open(TEST_PATH, FileAccess.WRITE)
-	file.store_string(text.replace("\"infantry\"", "\"bogus_unit\""))
+	file.store_string(text.replace('"infantry"', '"bogus_unit"'))
 	file.close()
 	assert_null(SaveGame.load_game(terrain_db, unit_db, chart, TEST_PATH))
 	assert_push_error("unknown unit type")

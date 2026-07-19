@@ -6,6 +6,11 @@ extends PanelContainer
 
 signal action_chosen(action: StringName)
 
+## Row artwork is authored at the atlas's own resolution (64px for the unit
+## sprites), which would dwarf a 10px label, so every icon is capped to one
+## world tile wide. Aspect ratio is preserved, so square art lands at 16x16.
+const ICON_PX := 16
+
 @onready var rows: VBoxContainer = %MenuRows
 
 var _ids: Array[StringName] = []
@@ -14,8 +19,10 @@ var _disabled: Array[bool] = []
 var _index := 0
 
 
-## actions: [{id: StringName, label: String, disabled?: bool}, ...]
+## actions: [{id: StringName, label: String, disabled?: bool, icon?: Texture2D}, ...]
 ## At least one entry must be enabled (menus always include Cancel).
+## `icon` draws to the left of the label; rows that omit it in an illustrated
+## menu get a spacer so every label still starts in the same column.
 func open(actions: Array[Dictionary], screen_pos: Vector2) -> void:
 	for child in rows.get_children():
 		rows.remove_child(child)
@@ -23,11 +30,14 @@ func open(actions: Array[Dictionary], screen_pos: Vector2) -> void:
 	_ids.clear()
 	_labels.clear()
 	_disabled.clear()
+	var spacer := _spacer_icon(actions)
 	for entry: Dictionary in actions:
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.focus_mode = Control.FOCUS_NONE
 		button.add_theme_font_size_override("font_size", 10)
+		button.add_theme_constant_override("icon_max_width", ICON_PX)
+		button.icon = entry.get("icon", spacer)
 		var id: StringName = entry.id
 		var is_disabled: bool = entry.get("disabled", false)
 		button.disabled = is_disabled
@@ -73,6 +83,17 @@ func choose(id: StringName) -> void:
 	if i >= 0 and _disabled[i]:
 		return
 	action_chosen.emit(id)
+
+
+## Transparent stand-in the size icons are capped to, so icon-less rows keep
+## their labels in the same column. Null when no row has an icon at all: plain
+## verb menus then draw exactly as they did before.
+func _spacer_icon(actions: Array[Dictionary]) -> Texture2D:
+	if not actions.any(func(entry: Dictionary) -> bool: return entry.get("icon") != null):
+		return null
+	var image := Image.create(ICON_PX, ICON_PX, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	return ImageTexture.create_from_image(image)
 
 
 ## Advances the highlight, skipping disabled rows.

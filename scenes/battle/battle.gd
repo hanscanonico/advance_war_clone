@@ -24,7 +24,15 @@ const AI_TURN_START_DELAY := BANNER_SECONDS + 0.1
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
 enum State {
-	IDLE, UNIT_SELECTED, ANIMATING, MENU, TARGETING, DROP_TARGETING, VICTORY, AI_TURN, HANDOFF,
+	IDLE,
+	UNIT_SELECTED,
+	ANIMATING,
+	MENU,
+	TARGETING,
+	DROP_TARGETING,
+	VICTORY,
+	AI_TURN,
+	HANDOFF,
 }
 
 const DIR_ACTIONS: Array = [
@@ -161,9 +169,11 @@ func _rematch() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if state == State.HANDOFF:
 		# Only "I'm ready" gets through while the device is being passed over.
-		var clicked := event is InputEventMouseButton \
-			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT \
+		var clicked := (
+			event is InputEventMouseButton
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
 			and (event as InputEventMouseButton).pressed
+		)
 		if event.is_action_pressed(&"confirm") or clicked:
 			_leave_handoff()
 		return
@@ -177,8 +187,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var cell := _mouse_cell()
 		if map.in_bounds(cell) and cell != cursor_cell:
 			_set_cursor_cell(cell)
-	elif event is InputEventMouseButton \
-			and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+	elif (
+		event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
+	):
 		var cell := _mouse_cell()
 		if map.in_bounds(cell):
 			if cell != cursor_cell:
@@ -314,13 +325,18 @@ func _on_move_animation_done() -> void:
 	if not _attack_targets.is_empty():
 		actions.append({"id": &"fire", "label": "Fire"})
 	var dest_terrain := map.terrain_at(dest)
-	if selected.type.can_capture and dest_terrain.is_property \
-			and game.owner_at(dest) != selected.team:
+	if (
+		selected.type.can_capture
+		and dest_terrain.is_property
+		and game.owner_at(dest) != selected.team
+	):
 		actions.append({"id": &"capture", "label": "Capture"})
 	if not game.cargo_of(selected).is_empty() and not _drop_cells(dest).is_empty():
 		actions.append({"id": &"drop", "label": "Drop"})
-	if selected.type.can_resupply and not SupplyCommand.new(selected, planned_path) \
-			.adjacent_friendlies(game, dest).is_empty():
+	if (
+		selected.type.can_resupply
+		and not SupplyCommand.new(selected, planned_path).adjacent_friendlies(game, dest).is_empty()
+	):
 		actions.append({"id": &"supply", "label": "Supply"})
 	actions.append({"id": &"wait", "label": "Wait"})
 	actions.append({"id": &"cancel", "label": "Cancel"})
@@ -464,9 +480,11 @@ func _handle_map_action(action: StringName) -> void:
 
 
 func _is_own_empty_base(cell: Vector2i) -> bool:
-	return map.terrain_at(cell).id == &"base" \
-		and game.owner_at(cell) == game.current_team \
+	return (
+		map.terrain_at(cell).id == &"base"
+		and game.owner_at(cell) == game.current_team
 		and game.unit_at(cell) == null
+	)
 
 
 func _open_build_menu(cell: Vector2i) -> void:
@@ -475,11 +493,17 @@ func _open_build_menu(cell: Vector2i) -> void:
 	state = State.MENU
 	var actions: Array[Dictionary] = []
 	for unit_type in unit_db.all():
-		actions.append({
-			"id": unit_type.id,
-			"label": "%s  %d" % [unit_type.display_name, unit_type.cost],
-			"disabled": game.funds[game.current_team] < unit_type.cost,
-		})
+		(
+			actions
+			. append(
+				{
+					"id": unit_type.id,
+					"label": "%s  %d" % [unit_type.display_name, unit_type.cost],
+					"disabled": game.funds[game.current_team] < unit_type.cost,
+					"icon": UnitSprite.texture_for(unit_type, game.current_team),
+				}
+			)
+		)
 	actions.append({"id": &"cancel", "label": "Cancel"})
 	action_menu.open(actions, _screen_pos_for_cell(cell))
 
@@ -487,11 +511,17 @@ func _open_build_menu(cell: Vector2i) -> void:
 func _open_map_menu() -> void:
 	_menu_context = &"map"
 	state = State.MENU
-	action_menu.open([
-		{"id": &"end_turn", "label": "End Turn"},
-		{"id": &"save", "label": "Save"},
-		{"id": &"cancel", "label": "Cancel"},
-	], _screen_pos_for_cell(cursor_cell))
+	(
+		action_menu
+		. open(
+			[
+				{"id": &"end_turn", "label": "End Turn"},
+				{"id": &"save", "label": "Save"},
+				{"id": &"cancel", "label": "Cancel"},
+			],
+			_screen_pos_for_cell(cursor_cell)
+		)
+	)
 
 
 func _on_turn_started() -> void:
@@ -510,9 +540,15 @@ func _begin_turn() -> void:
 	_refresh_hud()
 	_refresh_panel()
 	Sfx.play(&"fanfare", -8.0)
-	_show_banner("Day %d - %s" % [
-		game.day, TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
-	])
+	_show_banner(
+		(
+			"Day %d - %s"
+			% [
+				game.day,
+				TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
+			]
+		)
+	)
 	var homes := game.properties_of(game.current_team)
 	if not homes.is_empty():
 		_set_cursor_cell(homes[0])
@@ -543,8 +579,9 @@ func _enter_handoff() -> void:
 	state = State.HANDOFF
 	_hide_banner()
 	_refresh_fog()  # blanks the outgoing team's vision before the panel goes up
-	handoff_label.text = "%s — press confirm when ready" % TerrainPanel.TEAM_NAMES.get(
-		game.current_team, str(game.current_team)
+	handoff_label.text = (
+		"%s — press confirm when ready"
+		% TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team))
 	)
 	handoff_screen.show()
 	handoff_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -590,8 +627,14 @@ func _refresh_fog() -> void:
 	for unit in game.units:
 		var sprite: UnitSprite = _sprites[unit]
 		sprite.refresh()
-		if blacked_out or (unit.carrier == null and unit.team != _viewing_team() \
-				and not _visible_cells.has(unit.cell)):
+		if (
+			blacked_out
+			or (
+				unit.carrier == null
+				and unit.team != _viewing_team()
+				and not _visible_cells.has(unit.cell)
+			)
+		):
 			sprite.visible = false
 
 
@@ -720,11 +763,14 @@ func _hide_banner() -> void:
 
 
 func _refresh_hud() -> void:
-	turn_label.text = "Day %d  -  %s  -  Funds %d" % [
-		game.day,
-		TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
-		game.funds[game.current_team],
-	]
+	turn_label.text = (
+		"Day %d  -  %s  -  Funds %d"
+		% [
+			game.day,
+			TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
+			game.funds[game.current_team],
+		]
+	)
 
 
 func _repaint_property(cell: Vector2i) -> void:
@@ -861,9 +907,7 @@ func _execute_attack(target_cell: Vector2i) -> void:
 		_enter_victory()
 
 
-func _animate_combat(
-	result: CombatResolver.CombatResult, attacker: Unit, defender: Unit
-) -> void:
+func _animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
 	var defender_sprite: UnitSprite = _sprites[defender]
 	var attacker_sprite: UnitSprite = _sprites[attacker]
 	attacker_sprite.refresh()  # snap to the committed destination
@@ -913,8 +957,7 @@ func _update_damage_preview() -> void:
 		return
 	atk_label.text = "Atk %d%%" % forecast.attack_damage
 	counter_label.text = (
-		"Counter %d%%" % forecast.counter_damage if forecast.counter_damage >= 0
-		else "No counter"
+		"Counter %d%%" % forecast.counter_damage if forecast.counter_damage >= 0 else "No counter"
 	)
 	var pos := _screen_pos_for_cell(cursor_cell) + Vector2(4, -34)
 	var view := get_viewport().get_visible_rect().size
@@ -1028,12 +1071,17 @@ func _set_cursor_cell(cell: Vector2i) -> void:
 
 func _refresh_panel() -> void:
 	terrain_panel.show_terrain(
-		map.terrain_at(cursor_cell), game.owner_at(cursor_cell),
+		map.terrain_at(cursor_cell),
+		game.owner_at(cursor_cell),
 		game.capture_progress.get(cursor_cell, -1)
 	)
 	var hovered := game.unit_at(cursor_cell)
-	if game.fog_enabled and hovered != null and hovered.team != _viewing_team() \
-			and not _visible_cells.has(cursor_cell):
+	if (
+		game.fog_enabled
+		and hovered != null
+		and hovered.team != _viewing_team()
+		and not _visible_cells.has(cursor_cell)
+	):
 		hovered = null  # hidden enemies stay hidden in the panel too
 	var carrying := ""
 	if hovered != null:
@@ -1050,10 +1098,16 @@ func _screen_pos_for_cell(cell: Vector2i) -> Vector2:
 	var world := _cell_center(cell) + Vector2(TILE, -TILE) / 2.0
 	var view_size := get_viewport().get_visible_rect().size
 	var center := Vector2(
-		clampf(camera.position.x, view_size.x / (2.0 * camera.zoom.x),
-			camera.limit_right - view_size.x / (2.0 * camera.zoom.x)),
-		clampf(camera.position.y, view_size.y / (2.0 * camera.zoom.y),
-			camera.limit_bottom - view_size.y / (2.0 * camera.zoom.y))
+		clampf(
+			camera.position.x,
+			view_size.x / (2.0 * camera.zoom.x),
+			camera.limit_right - view_size.x / (2.0 * camera.zoom.x)
+		),
+		clampf(
+			camera.position.y,
+			view_size.y / (2.0 * camera.zoom.y),
+			camera.limit_bottom - view_size.y / (2.0 * camera.zoom.y)
+		)
 	)
 	return (world - center) * camera.zoom + view_size / 2.0 + Vector2(6, 0)
 
@@ -1063,19 +1117,22 @@ func _screen_pos_for_cell(cell: Vector2i) -> Vector2:
 func _shake_camera(strength: float = 3.0) -> void:
 	var tween := create_tween()
 	for i in 4:
-		var offset := Vector2(
-			randf_range(-strength, strength), randf_range(-strength, strength)
-		)
+		var offset := Vector2(randf_range(-strength, strength), randf_range(-strength, strength))
 		tween.tween_property(camera, "offset", offset, 0.04)
 	tween.tween_property(camera, "offset", Vector2.ZERO, 0.04)
 
 
 func _start_cursor_pulse() -> void:
 	var tween := create_tween().set_loops()
-	tween.tween_property(cursor, "scale", Vector2(1.15, 1.15), 0.4) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(cursor, "scale", Vector2.ONE, 0.4) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	(
+		tween
+		. tween_property(cursor, "scale", Vector2(1.15, 1.15), 0.4)
+		. set_trans(Tween.TRANS_SINE)
+		. set_ease(Tween.EASE_IN_OUT)
+	)
+	tween.tween_property(cursor, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_SINE).set_ease(
+		Tween.EASE_IN_OUT
+	)
 
 
 # --- automated verification --------------------------------------------------
@@ -1113,8 +1170,9 @@ func _check_screenshot_mode() -> void:
 ## Drives real flows through the same handlers a player's input reaches:
 ## attack stops at the targeting preview and resolve fires, both with the
 ## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
-## build buys at the red base; endturn hands the turn to Blue; aiturn does the
-## same and then waits out Blue's whole AI turn, back to Red's next turn;
+## build buys at the red base and buildmenu stops at its open shop list;
+## endturn hands the turn to Blue; aiturn does the same and then waits out
+## Blue's whole AI turn, back to Red's next turn;
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
 ## picker; supply holds the APC next to its infantry so Supply is offered;
@@ -1148,11 +1206,15 @@ func _run_demo(mode: String, shot_path: String) -> void:
 			while state != State.IDLE:
 				await get_tree().process_frame
 			_set_cursor_cell(Vector2i(3, 4))  # show capture progress in the panel
-		"build":
+		"build", "buildmenu":
 			_set_cursor_cell(Vector2i(3, 2))  # red base
 			_confirm_at(Vector2i(3, 2))  # open the build menu (funds 2000)
 			while state != State.MENU:
 				await get_tree().process_frame
+			if mode == "buildmenu":
+				if shot_path != "":
+					_save_screenshot_and_quit(shot_path)
+				return
 			action_menu.choose(&"infantry")
 			while state != State.IDLE:
 				await get_tree().process_frame

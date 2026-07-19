@@ -58,7 +58,8 @@ func test_load_rejects_vehicles_and_full_or_enemy_transports() -> void:
 	)
 	assert_eq(
 		LoadCommand.new(second, _path([Vector2i(2, 0), Vector2i(3, 0)])).validate(state),
-		"path is blocked by an enemy", "enemy transports cannot even be entered"
+		"path is blocked by an enemy",
+		"enemy transports cannot even be entered"
 	)
 
 
@@ -79,9 +80,7 @@ func test_drop_unloads_exhausted_passenger() -> void:
 	var apc := state.units[1]
 	LoadCommand.new(infantry, _path([Vector2i(0, 0), Vector2i(1, 0)])).apply(state)
 	apc.acted = false
-	var command := DropCommand.new(
-		apc, _path([Vector2i(1, 0), Vector2i(2, 0)]), Vector2i(3, 0)
-	)
+	var command := DropCommand.new(apc, _path([Vector2i(1, 0), Vector2i(2, 0)]), Vector2i(3, 0))
 	assert_eq(command.validate(state), "")
 	command.apply(state)
 	assert_null(infantry.carrier)
@@ -102,7 +101,8 @@ func test_drop_rejections() -> void:
 	infantry.cell = apc.cell
 	assert_eq(
 		DropCommand.new(apc, _path([Vector2i(1, 0)]), Vector2i(2, 0)).validate(state),
-		"cargo cannot stand there", "sea is no place for infantry"
+		"cargo cannot stand there",
+		"sea is no place for infantry"
 	)
 	assert_eq(
 		DropCommand.new(apc, _path([Vector2i(1, 0)]), Vector2i(3, 0)).validate(state),
@@ -151,9 +151,11 @@ func test_join_rejections() -> void:
 	)
 	state.units[2].hp = 50
 	assert_ne(
-		JoinCommand.new(mover, _path([Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)]))
-			.validate(state),
-		"", "different unit types cannot join"
+		JoinCommand.new(mover, _path([Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)])).validate(
+			state
+		),
+		"",
+		"different unit types cannot join"
 	)
 
 

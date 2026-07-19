@@ -6,9 +6,9 @@ extends Resource
 const IMPASSABLE := -1
 
 ## Movement classes. Units reference these from their UnitType (M2).
-const FOOT := &"foot"      # infantry
-const BOOT := &"boot"      # mech: crosses mountains and rivers at cost 1
-const TIRES := &"tires"    # recon, rockets
+const FOOT := &"foot"  # infantry
+const BOOT := &"boot"  # mech: crosses mountains and rivers at cost 1
+const TIRES := &"tires"  # recon, rockets
 const TREADS := &"treads"  # tanks, artillery, anti-air, APC
 
 @export var id: StringName

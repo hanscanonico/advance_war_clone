@@ -10,7 +10,13 @@ const VERSION := 1
 ## Keys every save envelope must carry; optional ones (fog, winner,
 ## capture_progress, carrier, ai_teams) fall back to defaults instead.
 const REQUIRED_KEYS: Array = [
-	"map_path", "day", "current_team", "funds", "rng_state", "owners", "units",
+	"map_path",
+	"day",
+	"current_team",
+	"funds",
+	"rng_state",
+	"owners",
+	"units",
 ]
 const REQUIRED_UNIT_KEYS: Array = ["type", "team", "x", "y", "hp", "fuel", "ammo", "acted"]
 const REQUIRED_OWNER_KEYS: Array = ["x", "y", "team"]
@@ -29,17 +35,22 @@ static func has_save(path: String = SAVE_PATH) -> bool:
 static func save(state: GameState, ai_teams: Array[int], path: String = SAVE_PATH) -> bool:
 	var units: Array = []
 	for unit in state.units:
-		units.append({
-			"type": String(unit.type.id),
-			"team": unit.team,
-			"x": unit.cell.x,
-			"y": unit.cell.y,
-			"hp": unit.hp,
-			"fuel": unit.fuel,
-			"ammo": unit.ammo,
-			"acted": unit.acted,
-			"carrier": state.units.find(unit.carrier),  # -1 when on the board
-		})
+		(
+			units
+			. append(
+				{
+					"type": String(unit.type.id),
+					"team": unit.team,
+					"x": unit.cell.x,
+					"y": unit.cell.y,
+					"hp": unit.hp,
+					"fuel": unit.fuel,
+					"ammo": unit.ammo,
+					"acted": unit.acted,
+					"carrier": state.units.find(unit.carrier),  # -1 when on the board
+				}
+			)
+		)
 	var owners: Array = []
 	for cell: Vector2i in state.property_owners:
 		owners.append({"x": cell.x, "y": cell.y, "team": state.property_owners[cell]})
@@ -70,8 +81,7 @@ static func save(state: GameState, ai_teams: Array[int], path: String = SAVE_PAT
 
 ## Returns null (with a pushed error) when the file is missing or invalid.
 static func load_game(
-	terrain_db: TerrainDB, unit_db: UnitDB, damage_chart: DamageChart,
-	path: String = SAVE_PATH
+	terrain_db: TerrainDB, unit_db: UnitDB, damage_chart: DamageChart, path: String = SAVE_PATH
 ) -> LoadedMatch:
 	var text := FileAccess.get_file_as_string(path)
 	if text.is_empty():

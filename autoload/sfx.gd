@@ -5,7 +5,12 @@ extends Node
 
 const SFX_DIR := "res://assets/sfx"
 const NAMES: Array[StringName] = [
-	&"select", &"move", &"shot", &"explosion", &"capture", &"fanfare",
+	&"select",
+	&"move",
+	&"shot",
+	&"explosion",
+	&"capture",
+	&"fanfare",
 ]
 const POOL_SIZE := 6
 

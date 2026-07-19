@@ -88,8 +88,14 @@ func _draw_road(o: Vector2i) -> void:
 func _draw_plains(o: Vector2i) -> void:
 	_ground(o, GRASS)
 	for p: Vector2i in [
-		Vector2i(3, 4), Vector2i(9, 2), Vector2i(12, 7), Vector2i(5, 11),
-		Vector2i(10, 13), Vector2i(14, 10), Vector2i(2, 9), Vector2i(7, 7),
+		Vector2i(3, 4),
+		Vector2i(9, 2),
+		Vector2i(12, 7),
+		Vector2i(5, 11),
+		Vector2i(10, 13),
+		Vector2i(14, 10),
+		Vector2i(2, 9),
+		Vector2i(7, 7),
 	]:
 		_fill(o, p.x, p.y, 1, 1, GRASS_DARK)
 
@@ -146,8 +152,10 @@ func _generate_cursor() -> void:
 	for offset: Vector2i in [Vector2i(1, 1), Vector2i.ZERO]:
 		var c := Color.WHITE if offset == Vector2i.ZERO else shadow
 		for corner: Array in [
-			[0, 0, 1, 1], [TILE - 6, 0, -1, 1],
-			[0, TILE - 6, 1, -1], [TILE - 6, TILE - 6, -1, -1],
+			[0, 0, 1, 1],
+			[TILE - 6, 0, -1, 1],
+			[0, TILE - 6, 1, -1],
+			[TILE - 6, TILE - 6, -1, -1],
 		]:
 			var x: int = corner[0]
 			var y: int = corner[1]

@@ -25,8 +25,10 @@ func test_fog_disabled_sees_everything() -> void:
 
 func test_unit_vision_is_manhattan_range() -> void:
 	# infantry vision 2 in an open 7x7 field
-	var rows := "[terrain]\n" + "\n".join([".......", ".......", ".......",
-		".......", ".......", ".......", "......."])
+	var rows := (
+		"[terrain]\n"
+		+ "\n".join([".......", ".......", ".......", ".......", ".......", ".......", "......."])
+	)
 	var state := _state(rows + "\n[units]\n1 i 3 3")
 	var cells := Vision.visible_cells(state, 1)
 	assert_true(cells.has(Vector2i(3, 1)))
@@ -41,8 +43,7 @@ func test_woods_hide_beyond_adjacency() -> void:
 	assert_true(cells.has(Vector2i(1, 0)), "plains at range 1")
 	assert_false(cells.has(Vector2i(2, 0)), "woods at range 2 stay dark")
 	var close := _state("[terrain]\n.F..\n[units]\n1 i 0 0")
-	assert_true(Vision.visible_cells(close, 1).has(Vector2i(1, 0)),
-		"adjacent woods are revealed")
+	assert_true(Vision.visible_cells(close, 1).has(Vector2i(1, 0)), "adjacent woods are revealed")
 
 
 func test_owned_properties_watch_their_surroundings() -> void:
