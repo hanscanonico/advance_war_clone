@@ -166,7 +166,7 @@ func _run_victory_demo() -> void:
 			_battle.game.remove_unit(unit)
 	# The sim was edited behind the scene's back, so the sprites need resyncing:
 	# drop the ones whose units are gone, then redraw the survivor.
-	_battle.view.reap_dead_sprites()
+	_battle.view.sync_sprites()
 	var last_blue := _battle.game.unit_at(Vector2i(9, 8))
 	last_blue.hp = 1
 	_battle.view.refresh_sprite(last_blue)

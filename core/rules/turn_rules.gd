@@ -9,6 +9,7 @@ const REPAIR_HP := 20  # internal HP (= 2 displayed) per turn on a property
 
 static func begin_turn(state: GameState) -> void:
 	var team := state.current_team
+	_expire_power(state, team)
 	state.funds[team] += state.properties_of(team).size() * GameState.INCOME_PER_PROPERTY
 	for unit in state.units_of(team):
 		unit.acted = false
@@ -17,6 +18,15 @@ static func begin_turn(state: GameState) -> void:
 		if state.owner_at(unit.cell) == unit.team or _adjacent_to_supplier(state, unit):
 			unit.resupply()
 		_repair(state, unit)
+
+
+## A ROUND Command Power covers the opponent's turn and runs out the moment its
+## owner's next one opens — here, before the turn it no longer applies to does
+## anything. OWNER_TURN powers came down earlier, in EndTurnCommand.
+static func _expire_power(state: GameState, team: int) -> void:
+	var co_state := state.commander_state(team)
+	if co_state.power_active and co_state.type.power_duration == CommanderType.Duration.ROUND:
+		co_state.power_active = false
 
 
 ## +2 displayed HP on a friendly property, paid proportionally to unit cost.

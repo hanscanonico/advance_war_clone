@@ -1,16 +1,32 @@
 class_name CombatResolver
 extends RefCounted
-## Resolves combat per the plan's formula:
+## Resolves combat. The formula, normative — every general is balance-tested
+## against exactly this chain, in exactly this order, with exactly one rounding
+## at the end:
 ##
-##   damage% = base(attacker, defender)
-##             x attacker_displayed_hp / 10
-##             x (1 - 0.1 x terrain_stars x defender_displayed_hp / 10)
-##             + luck(0..9)          [resolve only; forecast omits luck]
+##   stars  = clamp(terrain_stars + def_co.star_bonus - att_co.star_pierce, 0, 5)
+##   att    = 100 + att_co.attack_bonus
+##   def    = 100 + def_co.defense_bonus
+##   raw    = base(attacker, defender)
+##            x att / 100
+##            x attacker_displayed_hp / 10
+##            x (1 - 0.1 x stars x defender_displayed_hp / 10)
+##            x (200 - def) / 100
+##   damage = max(0, round(raw))     + luck   [resolve only; forecast omits it]
+##
+## The (200 - def) / 100 term is the Advance Wars defence shape: +10 defence is
+## x0.9 damage taken, -10 is x1.1. With the neutral commander both att and def
+## are 100 and the two new terms are exactly 1.0, so a match with no CO resolves
+## bit-for-bit as it did before commanders existed.
 ##
 ## Damage% subtracts internal HP (0-100) directly. Luck comes from the
-## GameState's seeded RNG so matches stay deterministic and replayable.
+## GameState's seeded RNG, and its bounds come from the attacking commander, so
+## matches stay deterministic and replayable either way.
+##
+## Both forecast() and resolve() go through _damage_pct, which is what keeps the
+## damage preview honest about doctrines for free.
 
-const LUCK_MAX := 9
+const LUCK_MAX := CommanderType.LUCK_MAX
 
 
 class Forecast:
@@ -40,11 +56,14 @@ static func forecast(
 		return result
 	var damage := _damage_pct(
 		state,
-		attacker.type,
-		attacker.displayed_hp(),
-		defender.type,
-		defender.displayed_hp(),
-		defender.cell
+		Engagement.create(
+			attacker,
+			attacker_cell,
+			attacker.displayed_hp(),
+			defender,
+			defender.cell,
+			defender.displayed_hp()
+		)
 	)
 	if damage < 0:
 		return result
@@ -54,33 +73,42 @@ static func forecast(
 	if hp_after > 0 and _defender_can_counter(state, defender, attacker, attacker_cell):
 		result.counter_damage = _damage_pct(
 			state,
-			defender.type,
-			ceili(hp_after / 10.0),
-			attacker.type,
-			attacker.displayed_hp(),
-			attacker_cell
+			Engagement.create(
+				defender,
+				defender.cell,
+				ceili(hp_after / 10.0),
+				attacker,
+				attacker_cell,
+				attacker.displayed_hp(),
+				true
+			)
 		)
 	return result
 
 
 ## Applies the attack (with luck), then the counter-attack if the defender
-## survives and can reach. Dead units are removed from the state.
+## survives and can reach. Dead units are removed from the state, and both sides
+## bank Command Power charge for the HP that changed hands.
 static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatResult:
 	var result := CombatResult.new()
-	var base := _damage_pct(
-		state,
-		attacker.type,
+	var fight := Engagement.create(
+		attacker,
+		attacker.cell,
 		attacker.displayed_hp(),
-		defender.type,
-		defender.displayed_hp(),
-		defender.cell
+		defender,
+		defender.cell,
+		defender.displayed_hp()
 	)
+	var base := _damage_pct(state, fight)
 	if base < 0:
 		push_error("CombatResolver: %s cannot attack %s" % [attacker.type.id, defender.type.id])
 		return result
 	if attacker.type.max_ammo > 0:
 		attacker.ammo = maxi(0, attacker.ammo - 1)
-	result.attack_damage = base + state.rng.randi_range(0, LUCK_MAX)
+	result.attack_damage = base + _luck(state, fight)
+	# Banked before the unit is removed: a kill charges for the HP it actually
+	# took off, not for the overkill the roll happened to produce.
+	state.bank_losses(defender, mini(result.attack_damage, defender.hp), attacker.team)
 	defender.hp = maxi(0, defender.hp - result.attack_damage)
 	if defender.hp == 0:
 		result.defender_died = true
@@ -88,20 +116,23 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 		return result
 	if not _defender_can_counter(state, defender, attacker, attacker.cell):
 		return result
-	var counter_base := _damage_pct(
-		state,
-		defender.type,
+	var counter := Engagement.create(
+		defender,
+		defender.cell,
 		defender.displayed_hp(),
-		attacker.type,
+		attacker,
+		attacker.cell,
 		attacker.displayed_hp(),
-		attacker.cell
+		true
 	)
+	var counter_base := _damage_pct(state, counter)
 	if counter_base < 0:
 		return result
 	if defender.type.max_ammo > 0:
 		defender.ammo = maxi(0, defender.ammo - 1)
 	result.countered = true
-	result.counter_damage = counter_base + state.rng.randi_range(0, LUCK_MAX)
+	result.counter_damage = counter_base + _luck(state, counter)
+	state.bank_losses(attacker, mini(result.counter_damage, attacker.hp), defender.team)
 	attacker.hp = maxi(0, attacker.hp - result.counter_damage)
 	if attacker.hp == 0:
 		result.attacker_died = true
@@ -122,17 +153,37 @@ static func _defender_can_counter(
 	return state.damage_chart.can_attack(defender.type.id, attacker.type.id)
 
 
-static func _damage_pct(
-	state: GameState,
-	att_type: UnitType,
-	att_hp: int,
-	def_type: UnitType,
-	def_hp: int,
-	def_cell: Vector2i
-) -> int:
-	var base := state.damage_chart.base_damage(att_type.id, def_type.id)
+## One luck roll, from the attacking commander's range. Always exactly one draw
+## from the match RNG whatever the range, so a doctrine that narrows luck cannot
+## put a replay out of step with the seed it was recorded on.
+static func _luck(state: GameState, fight: Engagement) -> int:
+	var att_co := state.commander_of(fight.attacker.team)
+	var low := att_co.luck_min(state, fight)
+	return state.rng.randi_range(low, maxi(low, att_co.luck_max(state, fight)))
+
+
+static func _damage_pct(state: GameState, fight: Engagement) -> int:
+	var base := state.damage_chart.base_damage(fight.attacker.type.id, fight.defender.type.id)
 	if base < 0:
 		return -1
-	var stars := state.map.terrain_at(def_cell).defense_stars
-	var raw := base * (att_hp / 10.0) * (1.0 - 0.1 * stars * def_hp / 10.0)
+	var att_co := state.commander_of(fight.attacker.team)
+	var def_co := state.commander_of(fight.defender.team)
+	var stars := clampi(
+		(
+			state.map.terrain_at(fight.defender_cell).defense_stars
+			+ def_co.star_bonus(state, fight)
+			- att_co.star_pierce(state, fight)
+		),
+		0,
+		CommanderType.MAX_STARS
+	)
+	var att := 100 + att_co.attack_bonus(state, fight)
+	var def := 100 + def_co.defense_bonus(state, fight)
+	var raw := (
+		base
+		* (att / 100.0)
+		* (fight.attacker_hp / 10.0)
+		* (1.0 - 0.1 * stars * fight.defender_hp / 10.0)
+		* ((200 - def) / 100.0)
+	)
 	return maxi(0, roundi(raw))

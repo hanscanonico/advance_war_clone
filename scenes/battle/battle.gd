@@ -9,9 +9,7 @@ extends Node2D
 ## are the entry points player input arrives at, and BattleScenarioDriver
 ## stands in for a player through exactly those.
 
-const MAP_PATH := "res://maps/first_steps.txt"
 const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
-const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
 const MAX_ZOOM := 5.0
 const AI_COMMAND_DELAY := 0.2
 const AI_MAX_COMMANDS_PER_TURN := 300
@@ -53,6 +51,7 @@ const DIR_ACTIONS: Array = [
 
 var db: TerrainDB
 var unit_db: UnitDB
+var commander_db: CommanderDB
 var map: MapData
 var game: GameState
 var ai: AIController
@@ -90,42 +89,18 @@ var _capturing := false
 func _ready() -> void:
 	db = TerrainDB.load_default()
 	unit_db = UnitDB.load_default()
+	commander_db = CommanderDB.load_default()
 	ai = AIController.new(unit_db)
-	var chart: DamageChart = load(DAMAGE_CHART_PATH)
-	# Match setup comes from the main menu; command-line flags override it.
-	var map_path := MatchConfig.map_path
-	ai_teams = MatchConfig.ai_teams.duplicate()
-	var fog := MatchConfig.fog_enabled
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--map="):
-			map_path = "res://maps/%s.txt" % arg.get_slice("=", 1)
-	if "--hotseat" in OS.get_cmdline_user_args():
-		ai_teams = []
-	if "--fog" in OS.get_cmdline_user_args():
-		fog = true
-	if MatchConfig.load_save and SaveGame.has_save():
-		MatchConfig.load_save = false
-		var loaded := SaveGame.load_game(db, unit_db, chart)
-		if loaded != null:
-			game = loaded.state
-			ai_teams = loaded.ai_teams
-			map = game.map
-	if game == null:
-		map = MapData.load_from_file(map_path, db)
-		if map == null and map_path != MAP_PATH:
-			push_error("failed to load %s; falling back to %s" % [map_path, MAP_PATH])
-			map_path = MAP_PATH
-			map = MapData.load_from_file(map_path, db)
-		assert(map != null, "failed to load %s" % map_path)
-		game = GameState.create(map, unit_db, chart)
-		assert(game != null, "failed to build game state from %s" % map_path)
-		game.map_path = map_path
-		game.fog_enabled = fog
-		game.rng.randomize()
+	# Which match this is, BattleSetup decides; from here the scene just runs it.
+	var built := BattleSetup.build(db, unit_db, commander_db)
+	map = built.map
+	game = built.game
+	ai_teams = built.ai_teams
 	view = _build_view()
 	view.setup()
 	animator = _build_animator()
 	action_menu.action_chosen.connect(_on_menu_action)
+	view.power_button.pressed.connect(_fire_command_power)
 	rematch_button.pressed.connect(_rematch)
 	menu_button.pressed.connect(_go_to_main_menu)
 	handoff_button.pressed.connect(leave_handoff)
@@ -177,6 +152,9 @@ func _build_view() -> BattleView:
 	built.atk_label = %AtkLabel
 	built.counter_label = %CounterLabel
 	built.turn_label = %TurnLabel
+	built.charge_bar = %ChargeBar
+	built.charge_label = %ChargeLabel
+	built.power_button = %PowerButton
 	built.db = db
 	built.map = map
 	built.game = game
@@ -489,6 +467,9 @@ func _handle_build_action(action: StringName) -> void:
 
 func _handle_map_action(action: StringName) -> void:
 	state = State.IDLE
+	if action == &"power":
+		_fire_command_power()
+		return
 	if action == &"save":
 		if SaveGame.save(game, ai_teams):
 			animator.show_banner("Saved")
@@ -502,6 +483,28 @@ func _handle_map_action(action: StringName) -> void:
 		return
 	command.apply(game)
 	_on_turn_started()
+
+
+## Fires the current team's Command Power. Reached from the HUD button and from
+## the map menu; both go through PowerCommand, like every other action. Guarded
+## rather than assumed legal, because the HUD button sits outside the selection
+## flow — it is reachable mid-move — and the command is the authority on that.
+func _fire_command_power() -> void:
+	var command := PowerCommand.new()
+	if state not in [State.IDLE, State.MENU] or command.validate(game) != "":
+		return
+	command.apply(game)
+	Sfx.play(&"fanfare")
+	animator.show_banner(
+		"%s  -  %s" % [command.commander.display_name, command.commander.power_name]
+	)
+	EventBus.power_activated.emit(command.team, command.commander)
+	# A power can change movement, vision and HP at once, so the whole board is
+	# redrawn — and any selection was ranged under rules that no longer apply.
+	_clear_selection()
+	_refresh_panel()
+	_refresh_hud()
+	view.sync_sprites()
 
 
 func _is_own_empty_base(cell: Vector2i) -> bool:
@@ -536,17 +539,16 @@ func _open_build_menu(cell: Vector2i) -> void:
 func _open_map_menu() -> void:
 	_menu_context = &"map"
 	state = State.MENU
-	(
-		action_menu
-		. open(
-			[
-				{"id": &"end_turn", "label": "End Turn"},
-				{"id": &"save", "label": "Save"},
-				{"id": &"cancel", "label": "Cancel"},
-			],
-			view.screen_pos_for_cell(cursor_cell)
-		)
-	)
+	var actions: Array[Dictionary] = []
+	# The HUD button is the obvious way to fire a power; this keeps it reachable
+	# from the keyboard too, which the rest of the game already is.
+	var co_state := game.commander_state(game.current_team)
+	if co_state.is_ready():
+		actions.append({"id": &"power", "label": co_state.type.power_name})
+	actions.append({"id": &"end_turn", "label": "End Turn"})
+	actions.append({"id": &"save", "label": "Save"})
+	actions.append({"id": &"cancel", "label": "Cancel"})
+	action_menu.open(actions, view.screen_pos_for_cell(cursor_cell))
 
 
 func _on_turn_started() -> void:

@@ -63,6 +63,45 @@ unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(140, 0)
 
+[node name="RedCoRow" type="HBoxContainer" parent="Center/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="RedCoLabel" type="Label" parent="Center/Rows/RedCoRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Red CO"
+
+[node name="RedCoOption" type="OptionButton" parent="Center/Rows/RedCoRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(140, 0)
+
+[node name="BlueCoRow" type="HBoxContainer" parent="Center/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="BlueCoLabel" type="Label" parent="Center/Rows/BlueCoRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Blue CO"
+
+[node name="BlueCoOption" type="OptionButton" parent="Center/Rows/BlueCoRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(140, 0)
+
+[node name="CoDoctrineLabel" type="Label" parent="Center/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(300, 44)
+theme_override_font_sizes/font_size = 9
+autowrap_mode = 2
+horizontal_alignment = 1
+text = ""
+
 [node name="FogCheck" type="CheckButton" parent="Center/Rows"]
 unique_name_in_owner = true
 layout_mode = 2

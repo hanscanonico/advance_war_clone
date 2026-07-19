@@ -8,6 +8,14 @@ const TEAMS: Array[int] = [1, 2]
 const CAPTURE_POINTS := 20
 const INCOME_PER_PROPERTY := 1000
 
+## Command Power charge, as a percentage of the value destroyed in an exchange:
+## the side that *loses* the HP banks the first, the side that dealt it banks
+## the second. Asymmetric on purpose — the aggressor cannot out-charge the
+## defender on the same trade, so a player winning the field does not run away
+## with the meter as well.
+const CHARGE_PCT_LOST := 100
+const CHARGE_PCT_DEALT := 50
+
 var map: MapData
 var units: Array[Unit] = []
 var damage_chart: DamageChart
@@ -28,6 +36,9 @@ var capture_progress: Dictionary = {}
 var winner: int = 0
 ## Fog of war (a match option; see Vision for the rules).
 var fog_enabled := false
+## team -> CommanderState. A team with no entry plays the neutral commander,
+## which is created on demand — see commander_state().
+var commanders: Dictionary = {}
 ## res:// path of the map this match runs on; kept for save files.
 var map_path := ""
 
@@ -64,6 +75,54 @@ static func create(
 		state.units.append(Unit.create(type, entry.team, cell))
 	TurnRules.begin_turn(state)  # day-1 income for the first player
 	return state
+
+
+# --- commanders --------------------------------------------------------------
+
+
+## A team's commander record, created neutral on demand so no caller ever has to
+## branch on "does this side have a CO".
+func commander_state(team: int) -> CommanderState:
+	if not commanders.has(team):
+		commanders[team] = CommanderState.create(CommanderType.neutral())
+	return commanders[team]
+
+
+## The doctrine hooks to ask about a team's units. Never null.
+func commander_of(team: int) -> CommanderType:
+	return commander_state(team).type
+
+
+func set_commander(team: int, type: CommanderType) -> void:
+	commanders[team] = CommanderState.create(type)
+
+
+func power_active(team: int) -> bool:
+	return commander_state(team).power_active
+
+
+## Banks charge for a team, capped at what its power costs: an idle meter can
+## never hold a second power's worth. A commander with no power banks nothing,
+## which is what keeps a no-CO match free of the whole economy.
+func add_charge(team: int, points: int) -> void:
+	var co_state := commander_state(team)
+	if not co_state.type.has_power() or points <= 0:
+		return
+	co_state.charge = mini(co_state.charge + points, co_state.type.power_cost)
+
+
+## Banks both sides' share of one unit losing `hp_lost` internal HP. Value is
+## the victim's cost prorated by the HP taken off it — halving a 7 000 Tank is
+## 3 500 points — and all of it is integer math so replays stay exact.
+func bank_losses(victim: Unit, hp_lost: int, dealer_team: int) -> void:
+	if hp_lost <= 0:
+		return
+	var value := victim.type.cost * hp_lost / 100
+	add_charge(victim.team, value * CHARGE_PCT_LOST / 100)
+	add_charge(dealer_team, value * CHARGE_PCT_DEALT / 100)
+
+
+# --- board -------------------------------------------------------------------
 
 
 func unit_at(cell: Vector2i) -> Unit:
@@ -127,7 +186,10 @@ func advance_unit(unit: Unit, path: Array[Vector2i]) -> void:
 		capture_progress.erase(path[0])
 	var fuel_spent := 0
 	for i in range(1, path.size()):
-		fuel_spent += map.terrain_at(path[i]).move_cost(unit.type.move_class)
+		# Through MovementResolver, not the terrain directly, so a doctrine that
+		# discounts terrain charges the discounted fuel too — the player is never
+		# billed for a step the range overlay showed them as cheaper.
+		fuel_spent += MovementResolver.step_cost(self, unit, map.terrain_at(path[i]))
 	unit.fuel = maxi(0, unit.fuel - fuel_spent)
 	unit.cell = dest
 	unit.acted = true

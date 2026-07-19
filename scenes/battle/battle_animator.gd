@@ -68,7 +68,7 @@ func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defende
 		await attacker_sprite.die()
 	else:
 		attacker_sprite.refresh()
-	view.reap_dead_sprites()
+	view.sync_sprites()
 
 
 # --- banner ------------------------------------------------------------------

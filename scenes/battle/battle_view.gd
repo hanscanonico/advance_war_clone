@@ -38,6 +38,9 @@ var damage_preview: PanelContainer
 var atk_label: Label
 var counter_label: Label
 var turn_label: Label
+var charge_bar: ProgressBar
+var charge_label: Label
+var power_button: Button
 
 var db: TerrainDB
 var map: MapData
@@ -160,13 +163,18 @@ func set_active_team(team: int) -> void:
 		_sprites[unit].set_active_team(team)
 
 
-## Frees the sprite of every unit that has left the sim without an animation
-## of its own — cargo goes down with its transport, so a single death can take
-## units the combat result never names. Keeps `_sprites` in step with
-## `game.units`.
-func reap_dead_sprites() -> void:
+## Brings every sprite back in step with the sim in one pass, for the changes
+## that touch more of the board than a caller can name unit by unit.
+##
+## Two of those. A death can take units the combat result never mentions —
+## cargo goes down with its transport — so any sprite whose unit has left
+## `game.units` is freed. And a Command Power can heal or refuel a whole side at
+## once, so every surviving sprite is redrawn rather than just the one that
+## acted.
+func sync_sprites() -> void:
 	for unit: Unit in _sprites.keys():
 		if unit in game.units:
+			refresh_sprite(unit)
 			continue
 		var sprite: UnitSprite = _sprites[unit]
 		_sprites.erase(unit)
@@ -252,6 +260,30 @@ func refresh_hud() -> void:
 			game.funds[game.current_team],
 		]
 	)
+	_refresh_charge_meter()
+
+
+## The meter, the label and the button belong to whoever's turn it is. A side
+## playing without a commander has no meter at all, so the whole group hides and
+## the HUD looks exactly as it did before commanders existed.
+func _refresh_charge_meter() -> void:
+	var co_state := game.commander_state(game.current_team)
+	var showing := co_state.type.has_power()
+	charge_bar.visible = showing
+	charge_label.visible = showing
+	power_button.visible = showing
+	if not showing:
+		return
+	charge_bar.value = co_state.charge_ratio()
+	charge_label.text = (
+		"%s  %d/%d" % [co_state.type.display_name, co_state.charge, co_state.type.power_cost]
+	)
+	power_button.text = co_state.type.power_name
+	power_button.disabled = not co_state.is_ready()
+	# An active power reads off the meter alone, which is empty either way while
+	# it runs — so say so rather than leaving the player guessing.
+	if co_state.power_active:
+		charge_label.text = "%s  ACTIVE" % co_state.type.power_name
 
 
 func refresh_panel(cell: Vector2i, viewing_team: int) -> void:

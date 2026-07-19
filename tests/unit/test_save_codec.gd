@@ -49,9 +49,9 @@ func test_encode_decode_restores_the_match_without_touching_disk() -> void:
 	assert_eq(loaded.ai_teams, [1] as Array[int])
 
 
-func test_encoded_save_declares_version_1() -> void:
-	assert_eq(int(_encoded()["version"]), 1)
-	assert_eq(SaveCodec.VERSION, 1)
+func test_encoded_save_declares_the_current_version() -> void:
+	assert_eq(int(_encoded()["version"]), 2)
+	assert_eq(SaveCodec.VERSION, 2)
 	assert_eq(SaveGame.VERSION, SaveCodec.VERSION, "the facade must report the codec's version")
 
 
@@ -75,10 +75,65 @@ func test_validate_accepts_an_encoded_save() -> void:
 	assert_eq(SaveCodec.validate(_encoded()), "")
 
 
-func test_wrong_version_is_rejected() -> void:
+func test_a_version_this_codec_cannot_read_is_rejected() -> void:
 	var data := _encoded()
-	data["version"] = 2
+	data["version"] = 99
 	assert_string_contains(SaveCodec.validate(data), "version")
+
+
+# --- commanders and version 1 -------------------------------------------------
+
+
+func test_commanders_survive_the_round_trip() -> void:
+	var commander_db := CommanderDB.load_default()
+	var state := _first_steps_state()
+	state.set_commander(1, commander_db.by_id(&"alina_ward"))
+	state.set_commander(2, commander_db.by_id(&"viktor_draeg"))
+	state.add_charge(1, 4000)
+	state.commander_state(1).power_active = true
+
+	var data := SaveCodec.encode(state, [] as Array[int])
+	var loaded := SaveCodec.decode(data, terrain_db, unit_db, chart, commander_db)
+	assert_not_null(loaded)
+	assert_eq(loaded.state.commander_of(1).id, &"alina_ward")
+	assert_eq(loaded.state.commander_of(2).id, &"viktor_draeg")
+	assert_eq(loaded.state.commander_state(1).charge, 4000)
+	assert_true(loaded.state.power_active(1), "a power that was up stays up across a save")
+	assert_false(loaded.state.power_active(2))
+
+
+## R4: a save written before commanders existed has no commander block at all.
+## It must load as the no-commander match it recorded, not fail.
+func test_a_version_1_save_loads_as_a_no_commander_match() -> void:
+	var data := _encoded()
+	data["version"] = 1
+	data.erase("commanders")
+	assert_eq(SaveCodec.validate(data), "", "version 1 is still readable")
+	var loaded := _decode(data)
+	assert_not_null(loaded)
+	for team in GameState.TEAMS:
+		assert_eq(loaded.state.commander_of(team).id, CommanderType.NEUTRAL_ID)
+		assert_eq(loaded.state.commander_state(team).charge, 0)
+		assert_false(loaded.state.power_active(team))
+
+
+func test_a_commander_who_no_longer_exists_falls_back_to_neutral() -> void:
+	var data := _encoded()
+	data["commanders"] = {"1": {"id": "a_general_who_was_cut", "charge": 9000, "active": true}}
+	var loaded := _decode(data)
+	assert_not_null(loaded)
+	assert_eq(loaded.state.commander_of(1).id, CommanderType.NEUTRAL_ID)
+	assert_eq(loaded.state.commander_state(1).charge, 0, "and banks nothing, having no power")
+	assert_false(loaded.state.power_active(1))
+
+
+func test_a_hand_edited_meter_is_still_capped() -> void:
+	var commander_db := CommanderDB.load_default()
+	var data := _encoded()
+	data["commanders"] = {"1": {"id": "alina_ward", "charge": 999999, "active": false}}
+	var loaded := SaveCodec.decode(data, terrain_db, unit_db, chart, commander_db)
+	assert_not_null(loaded)
+	assert_eq(loaded.state.commander_state(1).charge, loaded.state.commander_of(1).power_cost)
 
 
 func test_missing_required_key_is_named() -> void:
