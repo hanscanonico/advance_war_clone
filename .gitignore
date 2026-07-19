@@ -1,8 +1,10 @@
 # Godot
 .godot/
 
-# Vendored engine binary (see README for setup)
-bin/
+# Vendored engine binary (see README for setup). No trailing slash: a git
+# worktree shares no ignored files with the main checkout, so the usual fix is
+# to symlink bin/ across — and `bin/` would not match a symlink named `bin`.
+bin
 
 # macOS
 .DS_Store

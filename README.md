@@ -17,6 +17,10 @@ mkdir -p bin && curl -sL -o /tmp/godot.zip \
 `make lint` and `make format` additionally need [gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit)
 (`pipx install "gdtoolkit==4.*"`). Everything else runs off the vendored engine alone.
 
+Working in a `git worktree`? `bin/` is gitignored, so a new worktree has no engine and every
+target fails with "Godot binary not found". Symlink the one you already have:
+`ln -s /path/to/main/checkout/bin bin`.
+
 Then:
 
 ```sh
