@@ -8,22 +8,10 @@ extends RefCounted
 ## Deliberately "credible, not strong": greedy per-unit utility scoring with
 ## no lookahead. Deterministic for a given state (ties break by scan order),
 ## so replays and tests stay stable.
-
-## Scoring weights, tuned by feel. Attack value scales with the target's cost
-## and expected damage; captures sit around city-capture value with a large
-## bonus for the enemy HQ and for finishing a capture in progress.
-const KILL_BONUS := 1.6
-const COUNTER_WEIGHT := 0.6
-const CAPTURE_SCORE := 900.0
-const HQ_CAPTURE_MULTIPLIER := 3.0
-const CAPTURE_PROGRESS_BONUS := 45.0  # per point already chipped off
-const STEP_COST_PENALTY := 4.0
-const RETREAT_HP := 45
-const MIN_USEFUL_SCORE := 40.0
-const ADVANCE_SCORE := 1.0
-## Build preference when enough capture units exist, strongest first.
-const BUILD_PRIORITY: Array[StringName] = [&"md_tank", &"tank", &"artillery", &"mech"]
-const CAPTURE_UNIT_TARGET := 3
+##
+## Every number it weighs lives in an AIProfile resource rather than in this
+## file, so tuning and difficulty are data edits. This class decides *how* to
+## choose; the profile decides *what it is worth*.
 
 
 class UnitPlan:
@@ -39,10 +27,15 @@ class AdvanceGoal:
 
 
 var unit_db: UnitDB
+## Every number this planner weighs. Never null: an omitted profile falls back
+## to the shipped default, so callers that do not care about tuning — the battle
+## scene, most tests — need not mention it.
+var profile: AIProfile
 
 
-func _init(p_unit_db: UnitDB) -> void:
+func _init(p_unit_db: UnitDB, p_profile: AIProfile = null) -> void:
 	unit_db = p_unit_db
+	profile = p_profile if p_profile != null else AIProfile.load_default()
 
 
 ## The next best command for the current team: the highest-scored action of
@@ -72,9 +65,9 @@ func _best_unit_plan(state: GameState, unit: Unit) -> UnitPlan:
 	var reachable := MovementResolver.reachable(state, unit)
 	_consider_attacks(state, unit, reachable, plan)
 	_consider_captures(state, unit, reachable, plan)
-	if plan.score < MIN_USEFUL_SCORE:
+	if plan.score < profile.min_useful_score:
 		plan.command = _advance_command(state, unit, reachable)
-		plan.score = ADVANCE_SCORE
+		plan.score = profile.advance_score
 	return plan
 
 
@@ -101,7 +94,9 @@ func _consider_attacks(
 				continue
 			var forecast := CombatResolver.forecast(state, unit, dest, enemy)
 			var step_cost: int = reachable.costs[dest]
-			var score: float = _attack_score(unit, enemy, forecast) - STEP_COST_PENALTY * step_cost
+			var score: float = (
+				_attack_score(unit, enemy, forecast) - profile.step_cost_penalty * step_cost
+			)
 			if score > plan.score:
 				plan.score = score
 				plan.command = AttackCommand.new(unit, reachable.path_to(dest), enemy.cell)
@@ -109,17 +104,17 @@ func _consider_attacks(
 
 ## Expected damage value (target cost x damage fraction, kill-boosted) minus
 ## discounted counter risk against our own cost.
-static func _attack_score(unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast) -> float:
+func _attack_score(unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast) -> float:
 	if not forecast.can_attack:
 		return -INF
 	var damage := mini(forecast.attack_damage, enemy.hp)
 	var value := float(enemy.type.cost) * damage / 100.0
 	if forecast.attack_damage >= enemy.hp:
-		value *= KILL_BONUS
+		value *= profile.kill_bonus
 	var risk := 0.0
 	if forecast.counter_damage > 0:
 		var counter := mini(forecast.counter_damage, unit.hp)
-		risk = float(unit.type.cost) * counter / 100.0 * COUNTER_WEIGHT
+		risk = float(unit.type.cost) * counter / 100.0 * profile.counter_weight
 		if forecast.counter_damage >= unit.hp:
 			risk *= 2.0
 	return value - risk
@@ -136,13 +131,13 @@ func _consider_captures(
 		var terrain := state.map.terrain_at(cell)
 		if not terrain.is_property or state.owner_at(cell) == unit.team:
 			continue
-		var score := CAPTURE_SCORE
+		var score := profile.capture_score
 		if terrain.id == &"hq":
-			score *= HQ_CAPTURE_MULTIPLIER
+			score *= profile.hq_capture_multiplier
 		var points: int = state.capture_progress.get(cell, GameState.CAPTURE_POINTS)
 		var step_cost: int = reachable.costs[cell]
-		score += (GameState.CAPTURE_POINTS - points) * CAPTURE_PROGRESS_BONUS
-		score -= STEP_COST_PENALTY * step_cost
+		score += (GameState.CAPTURE_POINTS - points) * profile.capture_progress_bonus
+		score -= profile.step_cost_penalty * step_cost
 		if score > plan.score:
 			plan.score = score
 			plan.command = CaptureCommand.new(unit, reachable.path_to(cell))
@@ -192,7 +187,7 @@ static func _position_rank(unit: Unit, cell: Vector2i, goal: AdvanceGoal) -> int
 func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	var goal := AdvanceGoal.new()
 	goal.cell = unit.cell
-	if unit.hp <= RETREAT_HP:
+	if unit.hp <= profile.retreat_hp:
 		var owned := state.properties_of(unit.team)
 		if not owned.is_empty():
 			goal.cell = _nearest(unit.cell, owned)
@@ -248,9 +243,9 @@ func _pick_build(state: GameState) -> UnitType:
 	for unit in state.units_of(state.current_team):
 		if unit.type.can_capture:
 			capture_units += 1
-	if infantry != null and capture_units < CAPTURE_UNIT_TARGET and funds >= infantry.cost:
+	if infantry != null and capture_units < profile.capture_unit_target and funds >= infantry.cost:
 		return infantry
-	for id in BUILD_PRIORITY:
+	for id in profile.build_priority:
 		var unit_type := unit_db.by_id(id)
 		if unit_type != null and funds >= unit_type.cost:
 			return unit_type
