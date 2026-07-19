@@ -14,6 +14,29 @@ hotseat:
 test:
 	$(GODOT) --headless --path . -s res://addons/gut/gut_cmdln.gd
 
+# The merge gate, in one command. Order is cheapest-feedback-first: parsing
+# fails fastest, style next, the suite last.
+#
+# Note on exit noise: every headless run ends with "N ObjectDB instances were
+# leaked at exit" and "resources still in use". That is the engine failing to
+# tear down a *script* reference cycle — AttackCommand.validate() referring to
+# its sibling MoveCommand pins the core script graph — and it reproduces in
+# twelve lines with no GUT involved. No gameplay object leaks. Attempted
+# workarounds (static call, split statements) do not avoid it, so the gate
+# reads exit status and ignores the diagnostics.
+#
+# Needs Godot 4.7+ (vendored under bin/, see README) and gdtoolkit 4.x for the
+# lint and format steps: pipx install "gdtoolkit==4.*"
+verify: check lint format-check test
+
+# Presentation smoke: drives the battle scene's demo scenarios and proves each
+# still produces a frame. Renders, so it needs a display — keep it out of any
+# headless CI job. `make smoke MODES="attack capture"` narrows it down;
+# SMOKE_KEEP=1 keeps the captures for eyeballing.
+MODES ?=
+smoke:
+	tools/smoke_scenarios.sh $(MODES)
+
 # Every .gd file that is actually ours: skips the engine cache, vendored addons,
 # the engine binary, and .claude/worktrees, which holds whole nested checkouts of
 # this same repo and would otherwise be linted as if it were project source.
@@ -73,5 +96,5 @@ screenshot:
 menu-screenshot:
 	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
-.PHONY: run hotseat test check lint format format-check tiles sprites-check \
-	ground sprites sfx import screenshot menu-screenshot
+.PHONY: run hotseat test verify smoke check lint format format-check tiles \
+	sprites-check ground sprites sfx import screenshot menu-screenshot

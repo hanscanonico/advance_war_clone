@@ -17,11 +17,17 @@ mkdir -p bin && curl -sL -o /tmp/godot.zip \
 `make lint` and `make format` additionally need [gdtoolkit](https://github.com/Scony/godot-gdscript-toolkit)
 (`pipx install "gdtoolkit==4.*"`). Everything else runs off the vendored engine alone.
 
+Working in a `git worktree`? `bin/` is gitignored, so a new worktree has no engine and every
+target fails with "Godot binary not found". Symlink the one you already have:
+`ln -s /path/to/main/checkout/bin bin`.
+
 Then:
 
 ```sh
 make run             # boot the game — the main menu (map, fog, 1P / 2P / Continue)
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
+make verify          # the merge gate: check + lint + format-check + test, in one command
+make smoke           # drive the battle scene's demo scenarios; prove each still renders
 make test            # run the GUT unit test suite (headless)
 make check           # parse + type check every .gd file (fast; no scene tree)
 make lint            # gdlint — style and smells (config: gdlintrc)
@@ -33,6 +39,19 @@ make import          # (re)import assets headless
 make screenshot      # boot the battle scene, save screenshot.png, quit
 make menu-screenshot # the same, for the main menu
 ```
+
+`make verify` is the one command to run before merging: it parse-checks, lints, checks formatting,
+and runs the suite, cheapest step first. Every headless run ends with `ObjectDB instances were
+leaked at exit` and `resources still in use` — that is the engine failing to tear down a *script*
+reference cycle (`AttackCommand.validate()` referring to its sibling `MoveCommand` pins the core
+script graph), reproducible in twelve lines with no GUT involved. No gameplay object leaks, so the
+gate reads exit status and ignores it.
+
+`make smoke` covers what unit tests deliberately do not: GUT is limited to the Node-free `core/`
+and `ai/`, so the battle scene is verified by driving it. Each demo scenario runs the same handlers
+a player's input reaches and must still produce a frame. It renders, so it needs a display — it is
+a local gate, not a headless-CI one. Narrow it with `make smoke MODES="attack capture"`, and keep
+the captures to look at with `SMOKE_KEEP=1 make smoke`.
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
