@@ -16,7 +16,9 @@ disable:
 # sprawl.
 max-returns: 12
 
-# Ratchet, not a target: scenes/battle/battle.gd is 1255 lines and should be
+# Ratchet, not a target: scenes/battle/battle.gd is 1317 lines and should be
 # split. This is set just above it so the file cannot grow further without
-# tripping the lint, and should be lowered as it shrinks.
-max-file-lines: 1300
+# tripping the lint, and should be lowered as it shrinks. The jump from 1300
+# came from running gdformat over the file, which splits long calls across
+# several lines; it added no code.
+max-file-lines: 1320

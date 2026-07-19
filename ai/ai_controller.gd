@@ -101,8 +101,7 @@ func _consider_attacks(
 				continue
 			var forecast := CombatResolver.forecast(state, unit, dest, enemy)
 			var step_cost: int = reachable.costs[dest]
-			var score: float = _attack_score(unit, enemy, forecast) \
-				- STEP_COST_PENALTY * step_cost
+			var score: float = _attack_score(unit, enemy, forecast) - STEP_COST_PENALTY * step_cost
 			if score > plan.score:
 				plan.score = score
 				plan.command = AttackCommand.new(unit, reachable.path_to(dest), enemy.cell)
@@ -110,9 +109,7 @@ func _consider_attacks(
 
 ## Expected damage value (target cost x damage fraction, kill-boosted) minus
 ## discounted counter risk against our own cost.
-static func _attack_score(
-	unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast
-) -> float:
+static func _attack_score(unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast) -> float:
 	if not forecast.can_attack:
 		return -INF
 	var damage := mini(forecast.attack_damage, enemy.hp)

@@ -66,17 +66,39 @@ func test_non_contiguous_path_is_rejected() -> void:
 func test_path_exceeding_movement_is_rejected() -> void:
 	# infantry has 3 movement; a 4-step path is too long
 	var state := _state("[terrain]\n......\n[units]\n1 i 0 0")
-	var command := MoveCommand.new(state.units[0], _path([
-		Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0),
-	]))
+	var command := (
+		MoveCommand
+		. new(
+			state.units[0],
+			_path(
+				[
+					Vector2i(0, 0),
+					Vector2i(1, 0),
+					Vector2i(2, 0),
+					Vector2i(3, 0),
+					Vector2i(4, 0),
+				]
+			)
+		)
+	)
 	assert_ne(command.validate(state), "")
 
 
 func test_path_through_enemy_is_rejected() -> void:
 	var state := _state("[terrain]\n....\n[units]\n1 i 0 0\n2 i 1 0")
-	var command := MoveCommand.new(state.units[0], _path([
-		Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
-	]))
+	var command := (
+		MoveCommand
+		. new(
+			state.units[0],
+			_path(
+				[
+					Vector2i(0, 0),
+					Vector2i(1, 0),
+					Vector2i(2, 0),
+				]
+			)
+		)
+	)
 	assert_ne(command.validate(state), "")
 
 

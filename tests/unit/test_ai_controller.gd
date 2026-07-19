@@ -107,9 +107,7 @@ func test_builds_infantry_when_short_on_capture_units() -> void:
 
 
 func test_builds_tank_with_funds_and_enough_capture_units() -> void:
-	var state := _state(
-		"[terrain]\nB....\n[owners]\n1 0 0\n[units]\n1 i 1 0\n1 i 2 0\n1 m 3 0"
-	)
+	var state := _state("[terrain]\nB....\n[owners]\n1 0 0\n[units]\n1 i 1 0\n1 i 2 0\n1 m 3 0")
 	for unit in state.units:
 		unit.acted = true
 	state.funds[1] = 7000
@@ -135,8 +133,11 @@ func test_full_turn_on_real_map_terminates_legally() -> void:
 	var ended := false
 	for i in 200:
 		var command := ai.plan_next_command(state)
-		assert_eq(command.validate(state), "",
-			"AI produced an illegal command on iteration %d: %s" % [i, command])
+		assert_eq(
+			command.validate(state),
+			"",
+			"AI produced an illegal command on iteration %d: %s" % [i, command]
+		)
 		command.apply(state)
 		commands += 1
 		if command is EndTurnCommand:

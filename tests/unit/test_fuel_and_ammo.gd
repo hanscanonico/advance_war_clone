@@ -34,8 +34,9 @@ func test_units_start_with_full_tanks() -> void:
 func test_movement_spends_fuel_by_terrain_cost() -> void:
 	# tank through woods: 2 + 2 internal cost
 	var state := _state("[terrain]\n.FF\n[units]\n1 t 0 0")
-	MoveCommand.new(state.units[0], _path([Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)])) \
-		.apply(state)
+	MoveCommand.new(state.units[0], _path([Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)])).apply(
+		state
+	)
 	assert_eq(state.units[0].fuel, 70 - 4)
 
 
@@ -67,13 +68,9 @@ func test_attack_and_counter_consume_ammo() -> void:
 func test_out_of_ammo_blocks_attack() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 t 0 0\n2 t 1 0")
 	state.units[0].ammo = 0
-	var command := AttackCommand.new(
-		state.units[0], _path([Vector2i(0, 0)]), Vector2i(1, 0)
-	)
+	var command := AttackCommand.new(state.units[0], _path([Vector2i(0, 0)]), Vector2i(1, 0))
 	assert_eq(command.validate(state), "out of ammo")
-	var forecast := CombatResolver.forecast(
-		state, state.units[0], Vector2i(0, 0), state.units[1]
-	)
+	var forecast := CombatResolver.forecast(state, state.units[0], Vector2i(0, 0), state.units[1])
 	assert_false(forecast.can_attack)
 
 

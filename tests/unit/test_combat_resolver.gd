@@ -29,9 +29,7 @@ func test_chart_loads() -> void:
 func test_forecast_full_hp_on_plains() -> void:
 	# tank vs infantry on plains (1 star): 25 * 1.0 * 0.9 = 22.5 -> 23
 	var state := _state("[terrain]\n...\n[units]\n1 t 0 0\n2 i 1 0")
-	var forecast := CombatResolver.forecast(
-		state, state.units[0], Vector2i(0, 0), state.units[1]
-	)
+	var forecast := CombatResolver.forecast(state, state.units[0], Vector2i(0, 0), state.units[1])
 	assert_true(forecast.can_attack)
 	assert_eq(forecast.attack_damage, 23)
 	# counter: infantry at 8 HP (77 internal) vs tank on plains:
@@ -58,25 +56,19 @@ func test_forecast_damaged_attacker_scales() -> void:
 	# tank at 5 displayed HP: 55 * 0.5 * 0.9 = 24.75 -> 25 vs full tank
 	var state := _state("[terrain]\n..\n[units]\n1 t 0 0\n2 t 1 0")
 	state.units[0].hp = 50
-	var forecast := CombatResolver.forecast(
-		state, state.units[0], Vector2i(0, 0), state.units[1]
-	)
+	var forecast := CombatResolver.forecast(state, state.units[0], Vector2i(0, 0), state.units[1])
 	assert_eq(forecast.attack_damage, 25)
 
 
 func test_forecast_unarmed_attacker_cannot_attack() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 p 0 0\n2 i 1 0")
-	var forecast := CombatResolver.forecast(
-		state, state.units[0], Vector2i(0, 0), state.units[1]
-	)
+	var forecast := CombatResolver.forecast(state, state.units[0], Vector2i(0, 0), state.units[1])
 	assert_false(forecast.can_attack)
 
 
 func test_forecast_no_counter_from_indirect_defender() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 t 0 0\n2 g 1 0")
-	var forecast := CombatResolver.forecast(
-		state, state.units[0], Vector2i(0, 0), state.units[1]
-	)
+	var forecast := CombatResolver.forecast(state, state.units[0], Vector2i(0, 0), state.units[1])
 	assert_true(forecast.can_attack)
 	assert_eq(forecast.counter_damage, -1, "artillery never counters")
 

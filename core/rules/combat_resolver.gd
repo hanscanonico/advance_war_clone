@@ -39,8 +39,12 @@ static func forecast(
 	if not attacker.has_ammo():
 		return result
 	var damage := _damage_pct(
-		state, attacker.type, attacker.displayed_hp(),
-		defender.type, defender.displayed_hp(), defender.cell
+		state,
+		attacker.type,
+		attacker.displayed_hp(),
+		defender.type,
+		defender.displayed_hp(),
+		defender.cell
 	)
 	if damage < 0:
 		return result
@@ -49,8 +53,12 @@ static func forecast(
 	var hp_after := maxi(0, defender.hp - damage)
 	if hp_after > 0 and _defender_can_counter(state, defender, attacker, attacker_cell):
 		result.counter_damage = _damage_pct(
-			state, defender.type, ceili(hp_after / 10.0),
-			attacker.type, attacker.displayed_hp(), attacker_cell
+			state,
+			defender.type,
+			ceili(hp_after / 10.0),
+			attacker.type,
+			attacker.displayed_hp(),
+			attacker_cell
 		)
 	return result
 
@@ -60,8 +68,12 @@ static func forecast(
 static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatResult:
 	var result := CombatResult.new()
 	var base := _damage_pct(
-		state, attacker.type, attacker.displayed_hp(),
-		defender.type, defender.displayed_hp(), defender.cell
+		state,
+		attacker.type,
+		attacker.displayed_hp(),
+		defender.type,
+		defender.displayed_hp(),
+		defender.cell
 	)
 	if base < 0:
 		push_error("CombatResolver: %s cannot attack %s" % [attacker.type.id, defender.type.id])
@@ -77,8 +89,12 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 	if not _defender_can_counter(state, defender, attacker, attacker.cell):
 		return result
 	var counter_base := _damage_pct(
-		state, defender.type, defender.displayed_hp(),
-		attacker.type, attacker.displayed_hp(), attacker.cell
+		state,
+		defender.type,
+		defender.displayed_hp(),
+		attacker.type,
+		attacker.displayed_hp(),
+		attacker.cell
 	)
 	if counter_base < 0:
 		return result
@@ -107,8 +123,12 @@ static func _defender_can_counter(
 
 
 static func _damage_pct(
-	state: GameState, att_type: UnitType, att_hp: int,
-	def_type: UnitType, def_hp: int, def_cell: Vector2i
+	state: GameState,
+	att_type: UnitType,
+	att_hp: int,
+	def_type: UnitType,
+	def_hp: int,
+	def_cell: Vector2i
 ) -> int:
 	var base := state.damage_chart.base_damage(att_type.id, def_type.id)
 	if base < 0:

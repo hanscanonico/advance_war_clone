@@ -25,7 +25,10 @@ func test_lookup_by_id() -> void:
 func test_sea_impassable_for_all_ground_classes() -> void:
 	var sea := db.by_id(&"sea")
 	for move_class: StringName in [
-		TerrainType.FOOT, TerrainType.BOOT, TerrainType.TIRES, TerrainType.TREADS,
+		TerrainType.FOOT,
+		TerrainType.BOOT,
+		TerrainType.TIRES,
+		TerrainType.TREADS,
 	]:
 		assert_false(sea.is_passable(move_class), "sea should block %s" % move_class)
 		assert_eq(sea.move_cost(move_class), TerrainType.IMPASSABLE)

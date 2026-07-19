@@ -54,8 +54,12 @@ static func create(
 			push_error("GameState: two starting units on cell %s" % cell)
 			return null
 		if not p_map.terrain_at(cell).is_passable(type.move_class):
-			push_error("GameState: %s cannot stand on %s at %s"
-				% [type.id, p_map.terrain_at(cell).id, cell])
+			push_error(
+				(
+					"GameState: %s cannot stand on %s at %s"
+					% [type.id, p_map.terrain_at(cell).id, cell]
+				)
+			)
 			return null
 		state.units.append(Unit.create(type, entry.team, cell))
 	TurnRules.begin_turn(state)  # day-1 income for the first player

@@ -8,14 +8,17 @@ extends RefCounted
 ## - Friendly-occupied cells can be passed through but not stopped on.
 
 const DIRECTIONS: Array[Vector2i] = [
-	Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.DOWN,
+	Vector2i.UP,
+	Vector2i.LEFT,
+	Vector2i.RIGHT,
+	Vector2i.DOWN,
 ]
 
 
 class MoveRange:
 	var origin: Vector2i
-	var costs: Dictionary = {}      # Vector2i -> int movement spent to enter
-	var parents: Dictionary = {}    # Vector2i -> Vector2i previous cell
+	var costs: Dictionary = {}  # Vector2i -> int movement spent to enter
+	var parents: Dictionary = {}  # Vector2i -> Vector2i previous cell
 	var stoppable: Dictionary = {}  # Vector2i -> bool may end movement here
 
 	func has(cell: Vector2i) -> bool:
