@@ -111,3 +111,34 @@ func test_the_power_expires_with_the_turn() -> void:
 	assert_eq(CaptureCommand.capture_strength(state, state.units[0]), 22)
 	EndTurnCommand.new().apply(state)
 	assert_eq(CaptureCommand.capture_strength(state, state.units[0]), 12, "back to the passive")
+
+
+# --- when the AI thinks it is worth firing ------------------------------------
+
+
+## The marginal case Uprising's gate exists for. Infantry move 3, so a city four
+## plains away is out of reach — until the power's own +1 puts it in. The gate is
+## asked *before* the power fires, so measuring under movement it is not yet
+## granting would refuse in exactly the situation that most wants it.
+func test_the_gate_counts_the_move_the_power_would_grant() -> void:
+	var state := _state("[terrain]\n....C\n[units]\n1 i 0 0")
+	assert_false(
+		MovementResolver.reachable(state, state.units[0]).has(Vector2i(4, 0)),
+		"sanity: four tiles is beyond an infantry's normal three"
+	)
+	assert_true(state.commander_of(1).wants_power(state, 1), "Uprising's own +1 reaches it")
+
+
+## Ground reachable without the power still opens the gate, so the allowance
+## widens it rather than moving it.
+func test_the_gate_still_opens_for_ground_reachable_anyway() -> void:
+	var state := _state("[terrain]\n.C...\n[units]\n1 i 0 0")
+	assert_true(state.commander_of(1).wants_power(state, 1))
+
+
+## Fuel caps the allowance as it caps everything else: no power marches a unit
+## on an empty tank.
+func test_the_gate_does_not_reach_on_an_empty_tank() -> void:
+	var state := _state("[terrain]\n....C\n[units]\n1 i 0 0")
+	state.units[0].fuel = 0
+	assert_false(state.commander_of(1).wants_power(state, 1))

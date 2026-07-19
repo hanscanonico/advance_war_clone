@@ -48,9 +48,15 @@ class MoveRange:
 ## How far `unit` may travel this turn: its type's movement points plus whatever
 ## its commander's doctrine adds, capped by fuel — an empty tank keeps a unit
 ## where it stands however generous the doctrine.
-static func move_budget(state: GameState, unit: Unit) -> int:
+##
+## `extra` is a hypothetical allowance on top, for asking "how far would this
+## unit get with one more point?" without touching match state. The AI weighs a
+## power that grants movement with it, since such a power has to be judged by
+## the reach it *would* create rather than the reach the unit has without it.
+## Fuel still caps the total: no allowance conjures range out of an empty tank.
+static func move_budget(state: GameState, unit: Unit, extra: int = 0) -> int:
 	var bonus := state.commander_of(unit.team).move_bonus(state, unit)
-	return mini(unit.type.move_points + bonus, unit.fuel)
+	return mini(unit.type.move_points + bonus + extra, unit.fuel)
 
 
 ## What one step onto `terrain` actually costs `unit`, after its commander's
@@ -68,12 +74,14 @@ static func step_cost(state: GameState, unit: Unit, terrain: TerrainType) -> int
 	return maxi(1, state.commander_of(unit.team).terrain_cost(state, unit, terrain, base))
 
 
-static func reachable(state: GameState, unit: Unit) -> MoveRange:
+## `extra` is the hypothetical allowance described on move_budget, and is the
+## only thing it changes here: every other rule of the fill is untouched.
+static func reachable(state: GameState, unit: Unit, extra: int = 0) -> MoveRange:
 	var result := MoveRange.new()
 	result.origin = unit.cell
 	result.costs[unit.cell] = 0
 	result.stoppable[unit.cell] = true
-	var budget := move_budget(state, unit)
+	var budget := move_budget(state, unit, extra)
 	var frontier: Array[Vector2i] = [unit.cell]
 	while not frontier.is_empty():
 		# Maps are small; a linear min-scan beats a heap in simplicity.

@@ -258,11 +258,21 @@ func _can_strike(state: GameState, team: int, attacker_team: int, ready_only: bo
 ## a property it does not already own. This one asks the real flood fill rather
 ## than a distance guess: "the ground is actually takeable" is the whole
 ## question for a power measured in capture points.
-func _can_reach_capture(state: GameState, team: int) -> bool:
+##
+## `extra_move` is the movement the power being weighed would itself grant, and
+## has to be counted because the gate is asked *before* the power fires, so the
+## doctrine's own move_bonus is still switched off. Measuring without it refuses
+## to fire in exactly the case the power exists for: a property one step beyond
+## normal reach that only firing puts in range. The allowance goes through
+## MovementResolver, so the budget keeps one owner and fuel still caps it.
+##
+## Erring toward firing matches _can_strike above: a banked meter that is never
+## spent is the failure worth avoiding.
+func _can_reach_capture(state: GameState, team: int, extra_move: int = 0) -> bool:
 	for unit in state.units_of(team):
 		if unit.acted or unit.carrier != null or not unit.type.can_capture:
 			continue
-		var reach := MovementResolver.reachable(state, unit)
+		var reach := MovementResolver.reachable(state, unit, extra_move)
 		for cell in reach.cells():
 			if not reach.can_stop_at(cell):
 				continue

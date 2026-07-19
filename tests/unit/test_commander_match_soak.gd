@@ -20,6 +20,49 @@ extends GutTest
 const DAYS := 8
 const COMMAND_CAP := 2000
 
+## A fixture rather than a shipped map, because the per-commander assertion
+## below needs every gate to be *openable* from the starting position instead of
+## by luck of the advance heuristic:
+##
+## - contested cities inside an infantry's first move, for Popular Uprising and
+##   Ghost March, which wait on ground rather than on a fight;
+## - woods under a starting unit on each side, because Vanish does nothing with
+##   nobody in cover and so refuses to fire — on crossfire.txt no unit starts on
+##   woods, which left Sable Wren passing only if the AI happened to route a
+##   unit through an F tile;
+## - both armies inside each other's reach on day one, which is what opens the
+##   offensive gates, banks meters through trading, and wears units down far
+##   enough for Open the Depots.
+##
+## 180-degree rotationally symmetric, (x, y) -> (11 - x, 8 - y), so neither side
+## gets a terrain or income edge.
+const MAP := """
+[terrain]
+............
+.Q.C...F....
+.B..F.......
+.....F......
+............
+......F.....
+.......F..B.
+....F...C.Q.
+............
+[owners]
+1 1 1
+1 1 2
+2 10 7
+2 10 6
+[units]
+1 i 4 2
+1 m 5 3
+1 t 4 3
+1 r 3 2
+2 i 7 6
+2 m 6 5
+2 t 7 5
+2 r 8 6
+"""
+
 var terrain_db: TerrainDB
 var unit_db: UnitDB
 var chart: DamageChart
@@ -51,13 +94,22 @@ func test_no_pairing_ever_plans_a_command_the_rules_reject() -> void:
 	# every wave-2 power was gated on an offensive opening its owner may never
 	# get. If a doctrine's timing hook goes wrong, this is what notices.
 	for id in ids:
-		assert_gt(int(fired[id]), 0, "%s never fired a power in either pairing" % id)
+		assert_gt(
+			int(fired[id]),
+			0,
+			(
+				"%s banked a meter for %d days and never spent it. Either its " % [id, DAYS]
+				+ "wants_power gate regressed — test_power_gating.gd checks each "
+				+ "gate directly and will say which — or MAP above no longer "
+				+ "sets up the situation that gate waits for."
+			)
+		)
 
 
 ## Plays one pairing out, tallying each fired power against the commander who
 ## fired it. Fails the test on the first command the rules turn down.
 func _play(red: StringName, blue: StringName, rng_seed: int, fired: Dictionary) -> void:
-	var map := MapData.load_from_file("res://maps/crossfire.txt", terrain_db)
+	var map := MapData.parse(MAP, terrain_db)
 	var state := GameState.create(map, unit_db, chart)
 	state.rng.seed = rng_seed
 	# Half the pairings under fog, so the vision hooks are exercised too.

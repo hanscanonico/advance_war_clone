@@ -145,3 +145,12 @@ func test_the_terrain_discount_outlives_the_power() -> void:
 	_fire_power(state)
 	EndTurnCommand.new().apply(state)
 	assert_eq(MovementResolver.step_cost(state, state.units[0], mountain), 1)
+
+
+## Ghost March grants +1 move, and the AI's gate weighs the ground that movement
+## would open rather than the ground she can reach without firing — a city four
+## plains from an infantry that moves three is exactly the case it buys.
+func test_the_gate_counts_the_move_the_power_would_grant() -> void:
+	var state := _state("[terrain]\n....C\n[units]\n1 i 0 0")
+	assert_false(MovementResolver.reachable(state, state.units[0]).has(Vector2i(4, 0)))
+	assert_true(state.commander_of(1).wants_power(state, 1))

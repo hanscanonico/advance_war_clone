@@ -38,9 +38,10 @@ func move_bonus(state: GameState, unit: Unit) -> int:
 
 ## Uprising is measured in capture points, not damage, so it waits for a
 ## property his infantry can actually stand on this turn rather than for a
-## fight it would contribute nothing to.
+## fight it would contribute nothing to. Measured with the move the power itself
+## grants, since a property one step out of reach is precisely what firing fixes.
 func wants_power(state: GameState, team: int) -> bool:
-	return _can_reach_capture(state, team)
+	return _can_reach_capture(state, team, uprising_move_bonus)
 
 
 func _is_foot(unit: Unit) -> bool:

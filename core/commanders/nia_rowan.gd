@@ -40,8 +40,9 @@ func sees_into_woods(state: GameState, unit: Unit) -> bool:
 ## Ghost March buys ground and sight rather than damage, so a property she can
 ## take counts as much as an enemy she can reach — otherwise a commander with no
 ## combat modifier at all banks a full meter while walking across an empty map.
+## The ground is measured with the march's own movement, which is the point of it.
 func wants_power(state: GameState, team: int) -> bool:
-	return super(state, team) or _can_reach_capture(state, team)
+	return super(state, team) or _can_reach_capture(state, team, march_move_bonus)
 
 
 func _marching(state: GameState, unit: Unit) -> bool:

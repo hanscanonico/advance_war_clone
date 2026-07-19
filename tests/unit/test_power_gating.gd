@@ -134,6 +134,10 @@ func test_uprising_holds_when_the_property_is_out_of_range() -> void:
 	assert_false(_wants(state))
 
 
+## The marginal case — a property only the power itself puts in reach — is
+## pinned per general, in test_tomas_reed.gd and test_nia_rowan.gd, beside the
+## movement bonus each one grants.
+
 # --- Sable Wren: an ambush needs somewhere to hide ---------------------------
 
 
