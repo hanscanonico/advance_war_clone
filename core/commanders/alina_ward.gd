@@ -17,17 +17,17 @@ func attack_bonus(state: GameState, fight: Engagement) -> int:
 	var bonus := 0
 	if _has_mixed_neighbour(state, fight.attacker, fight.attacker_cell):
 		bonus += combined_arms_pct
-	if is_active(state, fight.attacker.team):
+	if _is_active(state, fight.attacker.team):
 		bonus += push_attack_pct
 	return bonus
 
 
 func defense_bonus(state: GameState, fight: Engagement) -> int:
-	return push_defense_pct if is_active(state, fight.defender.team) else 0
+	return push_defense_pct if _is_active(state, fight.defender.team) else 0
 
 
 func move_bonus(state: GameState, unit: Unit) -> int:
-	return push_move_bonus if is_active(state, unit.team) else 0
+	return push_move_bonus if _is_active(state, unit.team) else 0
 
 
 ## A friendly of a *different* movement class on one of the four cells around

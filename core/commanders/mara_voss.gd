@@ -23,10 +23,19 @@ func attack_bonus(state: GameState, fight: Engagement) -> int:
 	if not fight.is_counter:
 		return initiate_attack_pct
 	var bonus := counter_attack_pct
-	if is_active(state, fight.attacker.team):
+	if _is_active(state, fight.attacker.team):
 		bonus += hold_counter_pct
 	return bonus
 
 
 func defense_bonus(state: GameState, fight: Engagement) -> int:
-	return hold_defense_pct if is_active(state, fight.defender.team) else 0
+	return hold_defense_pct if _is_active(state, fight.defender.team) else 0
+
+
+## Gated on the opponent's reach rather than her own, which is the whole point
+## of her: Hold the Line fires when an enemy can get to her, not when she can
+## get to an enemy. The default offensive read leaves a commander built to be
+## attacked banking a meter she never spends, because the turn she wants to
+## spend it on is the one she is not playing.
+func wants_power(state: GameState, team: int) -> bool:
+	return _can_strike(state, team, _opponent_of(team), false)

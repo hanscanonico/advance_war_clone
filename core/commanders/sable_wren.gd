@@ -34,13 +34,30 @@ func defense_bonus(state: GameState, fight: Engagement) -> int:
 ## the same thing in practice — a unit acts once per turn — so this does not
 ## carry per-unit state it would then have to save and restore.
 func attack_bonus(state: GameState, fight: Engagement) -> int:
-	if not is_active(state, fight.attacker.team):
+	if not _is_active(state, fight.attacker.team):
 		return 0
 	return ambush_attack_pct if _terrain_at(state, fight.attacker_cell) == cover_terrain else 0
 
 
 func hides_unit(state: GameState, unit: Unit) -> bool:
-	return is_active(state, unit.team) and _terrain_at(state, unit.cell) == cover_terrain
+	return _is_active(state, unit.team) and _terrain_at(state, unit.cell) == cover_terrain
+
+
+## An ambush is spent on the opponent's turn, so it is gated on theirs: it fires
+## when an enemy can reach her line, not when she can reach one. It also needs
+## somewhere to hide — with nobody in cover both halves of Vanish are no-ops, and
+## a banked meter is worth more than a power that does nothing.
+func wants_power(state: GameState, team: int) -> bool:
+	if not _has_unit_in_cover(state, team):
+		return false
+	return _can_strike(state, team, _opponent_of(team), false)
+
+
+func _has_unit_in_cover(state: GameState, team: int) -> bool:
+	for unit in state.units_of(team):
+		if unit.carrier == null and _terrain_at(state, unit.cell) == cover_terrain:
+			return true
+	return false
 
 
 func _terrain_at(state: GameState, cell: Vector2i) -> StringName:

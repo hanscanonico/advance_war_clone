@@ -21,7 +21,7 @@ func attack_bonus(state: GameState, fight: Engagement) -> int:
 	if not AttackRange.is_indirect(fight.attacker):
 		return 0
 	var bonus := indirect_attack_pct
-	if is_active(state, fight.attacker.team):
+	if _is_active(state, fight.attacker.team):
 		bonus += saturation_attack_pct
 	return bonus
 
@@ -33,6 +33,6 @@ func defense_bonus(_state: GameState, fight: Engagement) -> int:
 ## The extra tile only reaches units that shoot over distance to begin with, so
 ## it never turns a direct unit into something that outranges a counter.
 func range_bonus(state: GameState, unit: Unit) -> int:
-	if not is_active(state, unit.team) or not AttackRange.is_indirect(unit):
+	if not _is_active(state, unit.team) or not AttackRange.is_indirect(unit):
 		return 0
 	return saturation_range_bonus

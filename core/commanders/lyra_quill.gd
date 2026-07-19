@@ -16,7 +16,7 @@ extends CommanderType
 
 
 func luck_min(state: GameState, fight: Engagement) -> int:
-	if is_active(state, fight.attacker.team):
+	if _is_active(state, fight.attacker.team):
 		return LUCK_MAX  # every roll is the best one
 	return lucky_floor
 
@@ -26,4 +26,4 @@ func defense_bonus(_state: GameState, _fight: Engagement) -> int:
 
 
 func attack_bonus(state: GameState, fight: Engagement) -> int:
-	return solution_attack_pct if is_active(state, fight.attacker.team) else 0
+	return solution_attack_pct if _is_active(state, fight.attacker.team) else 0

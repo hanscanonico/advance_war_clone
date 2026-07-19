@@ -55,7 +55,19 @@ static func can_see_unit(
 		return true
 	if not visible.has(unit.cell):
 		return false
-	return not state.commander_of(unit.team).hides_unit(state, unit)
+	return not is_hidden_from(state, viewer_team, unit)
+
+
+## Whether a *doctrine* hides `unit` from `viewer_team` — the invisibility half
+## of Sable Wren's Vanish, and nothing else today. Split out from can_see_unit
+## because it is the one visibility rule the AI respects: the planner sees the
+## whole board deliberately, but a power that makes units unseeable would be
+## inert against it otherwise, so it asks this instead of ignoring fog wholesale.
+## Terrain, range and property sight stay invisible to that question.
+static func is_hidden_from(state: GameState, viewer_team: int, unit: Unit) -> bool:
+	if not state.fog_enabled or unit.team == viewer_team:
+		return false
+	return state.commander_of(unit.team).hides_unit(state, unit)
 
 
 ## How far a unit sees: its type's range, plus what its own commander adds, less

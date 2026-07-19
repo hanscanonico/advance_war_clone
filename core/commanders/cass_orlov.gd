@@ -21,7 +21,7 @@ func attack_bonus(state: GameState, fight: Engagement) -> int:
 	var bonus := 0
 	if fight.defender_hp <= finish_hp:
 		bonus += finish_attack_pct
-	if is_active(state, fight.attacker.team) and fight.defender_hp <= no_escape_hp:
+	if _is_active(state, fight.attacker.team) and fight.defender_hp <= no_escape_hp:
 		bonus += no_escape_attack_pct
 	return bonus
 
@@ -31,6 +31,6 @@ func defense_bonus(_state: GameState, _fight: Engagement) -> int:
 
 
 func move_bonus(state: GameState, unit: Unit) -> int:
-	if not is_active(state, unit.team) or unit.type.id not in no_escape_ids:
+	if not _is_active(state, unit.team) or unit.type.id not in no_escape_ids:
 		return 0
 	return no_escape_move_bonus

@@ -492,10 +492,11 @@ func _fire_command_power() -> void:
 	_announce_power(command)
 	# A power can change movement, vision and HP at once, so the whole board is
 	# redrawn — and any selection was ranged under rules that no longer apply.
+	# sync_sprites rewrites visibility, so _clear_selection's fog pass runs last.
+	view.sync_sprites()
 	_clear_selection()
 	_refresh_panel()
 	_refresh_hud()
-	view.sync_sprites()
 
 
 ## The banner, sting and event a fired power raises. Shared, because the AI
@@ -625,8 +626,8 @@ func leave_handoff() -> void:
 
 
 ## The perspective fog is drawn from: the human whose turn it is, or the
-## first human team while the AI plays. The AI itself deliberately sees
-## everything — a simple, openly-cheating opponent instead of a guessing one.
+## first human team while the AI plays. The AI sees everything bar one thing:
+## a unit a doctrine hides is hidden from it too — see Vision.is_hidden_from.
 func _viewing_team() -> int:
 	if game.current_team not in ai_teams:
 		return game.current_team

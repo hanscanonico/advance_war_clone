@@ -25,15 +25,22 @@ func attack_bonus(_state: GameState, fight: Engagement) -> int:
 
 func capture_bonus_pct(state: GameState, unit: Unit) -> int:
 	var bonus := capture_pct
-	if is_active(state, unit.team):
+	if _is_active(state, unit.team):
 		bonus += uprising_capture_pct
 	return bonus
 
 
 func move_bonus(state: GameState, unit: Unit) -> int:
-	if not is_active(state, unit.team) or not _is_foot(unit):
+	if not _is_active(state, unit.team) or not _is_foot(unit):
 		return 0
 	return uprising_move_bonus
+
+
+## Uprising is measured in capture points, not damage, so it waits for a
+## property his infantry can actually stand on this turn rather than for a
+## fight it would contribute nothing to.
+func wants_power(state: GameState, team: int) -> bool:
+	return _can_reach_capture(state, team)
 
 
 func _is_foot(unit: Unit) -> bool:

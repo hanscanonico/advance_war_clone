@@ -63,34 +63,40 @@ func plan_next_command(state: GameState) -> Command:
 	return EndTurnCommand.new()
 
 
-## Fires the Command Power when the meter is full and there is something to
-## spend it on: at least one enemy inside the reach of a unit that has not acted.
+## Fires the Command Power when the meter is full and the commander says the
+## moment is right.
 ##
-## Deliberately blunt for a first version. Every wave-1 power only helps the turn
-## it goes off on, so "there is a fight to have this turn" is correct by
-## construction for all of them, and there is nothing to score or look ahead
-## through — which keeps the planner deterministic, as the rest of it is.
-##
-## Reach is Manhattan distance against movement plus firing range, ignoring
-## terrain cost. That over-estimates, and deliberately so: the failure it avoids
-## is sitting on a full meter all match.
+## *When* is the commander's business, not the planner's, because the roster
+## disagrees about it: an attack power wants a fight this turn, Hold the Line
+## wants one next turn, Open the Depots wants a worn-down army and no fight at
+## all. CommanderType.wants_power carries that per general — same as every other
+## doctrine — so this stays one question and gains no chain of special cases.
+## The neutral default is the offensive read the whole roster used to share.
 func _plan_power(state: GameState) -> Command:
 	var command := PowerCommand.new()
 	if command.validate(state) != "":
 		return null
-	for unit in state.units_of(state.current_team):
-		if unit.acted or unit.carrier != null or unit.type.max_range <= 0:
+	var team := state.current_team
+	if not state.commander_of(team).wants_power(state, team):
+		return null
+	return command
+
+
+## The enemy units this planner may act on. The AI sees the whole board on
+## purpose — an openly-cheating opponent rather than a guessing one — with
+## exactly one exception: a unit a doctrine has hidden (Sable Wren's Vanish) is
+## hidden from it too, because otherwise an invisibility power is inert in the
+## one-player match, which is the only match most people play. Vision answers
+## that; visibility is never re-derived here.
+static func _visible_enemies(state: GameState, team: int) -> Array[Unit]:
+	var enemies: Array[Unit] = []
+	for unit in state.units:
+		if unit.team == team or unit.carrier != null:
 			continue
-		var reach := AttackRange.maximum(state, unit)
-		if not AttackRange.is_indirect(unit):
-			reach += MovementResolver.move_budget(state, unit)
-		for enemy in state.units:
-			if enemy.team == unit.team or enemy.carrier != null:
-				continue
-			var dist := absi(enemy.cell.x - unit.cell.x) + absi(enemy.cell.y - unit.cell.y)
-			if dist <= reach:
-				return command
-	return null
+		if Vision.is_hidden_from(state, team, unit):
+			continue
+		enemies.append(unit)
+	return enemies
 
 
 func _best_unit_plan(state: GameState, unit: Unit) -> UnitPlan:
@@ -116,10 +122,9 @@ func _consider_attacks(
 		for cell in reachable.cells():
 			if reachable.can_stop_at(cell):
 				dests.append(cell)
+	var enemies := _visible_enemies(state, unit.team)
 	for dest in dests:
-		for enemy in state.units:
-			if enemy.team == unit.team or enemy.carrier != null:
-				continue
+		for enemy in enemies:
 			if not AttackRange.covers(state, unit, dest, enemy.cell):
 				continue
 			if not state.damage_chart.can_attack(unit.type.id, enemy.type.id):
@@ -239,9 +244,8 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 			goal.cell = _nearest(unit.cell, capturable)
 			return goal
 	var enemy_cells: Array[Vector2i] = []
-	for other in state.units:
-		if other.team != unit.team and other.carrier == null:
-			enemy_cells.append(other.cell)
+	for other in _visible_enemies(state, unit.team):
+		enemy_cells.append(other.cell)
 	if not enemy_cells.is_empty():
 		goal.cell = _nearest(unit.cell, enemy_cells)
 		goal.stand_off = AttackRange.is_indirect(unit)

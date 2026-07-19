@@ -17,8 +17,11 @@ extends Resource
 ## 1. Simulation state only. Never a Node, never a scene — this is core/.
 ## 2. Integer percentage points, never floats, so no doctrine can drift the
 ##    damage numbers a golden-value test pins down.
-## 3. A hook checks `is_active()` itself. A Command Power is not a separate
+## 3. A hook checks `_is_active()` itself. A Command Power is not a separate
 ##    system; it is "this hook returns a bigger number while the power runs".
+##
+## `_is_active` and the `_can_*` predicates below are the subclass toolkit rather
+## than hooks — underscored because nothing outside this hierarchy calls them.
 
 ## Inclusive bounds of the standard combat luck roll. They live here rather than
 ## on CombatResolver because a doctrine may narrow or shift the range (Lyra
@@ -71,7 +74,7 @@ func has_power() -> bool:
 
 ## True while this commander's team is running its Command Power. Hooks that a
 ## power touches gate on this; the passive half of a doctrine ignores it.
-func is_active(state: GameState, team: int) -> bool:
+func _is_active(state: GameState, team: int) -> bool:
 	return state.power_active(team)
 
 
@@ -186,6 +189,84 @@ func repair_cost_pct(_state: GameState, _unit: Unit) -> int:
 
 ## One-shot effects fired the instant the power activates: refills, heals, the
 ## enemy debuffs Signal Jam applies. Anything that lasts for the duration of the
-## power belongs in the hooks above, gated on is_active(), not here.
+## power belongs in the hooks above, gated on _is_active(), not here.
 func on_power_activated(_state: GameState, _team: int) -> void:
 	pass
+
+
+## Whether the AI should spend a full meter now. Asked once per planning pass,
+## before any unit acts; the meter being full and the power being legal are
+## already settled by PowerCommand, so this is only the question of timing.
+##
+## The default is the offensive read — "there is a fight to have this turn" —
+## which is correct for every power whose value lands on the turn it fires: the
+## attack and movement doctrines. The powers that are not about this turn's
+## fight override it, and each does so in its own subclass, so a general's sense
+## of timing lives beside the rest of its doctrine instead of in the planner.
+##
+## Rule-based, lookahead-free and RNG-free, like the planner that calls it.
+func wants_power(state: GameState, team: int) -> bool:
+	return _can_strike(state, team, team, true)
+
+
+# --- subclass toolkit --------------------------------------------------------
+
+
+## The other side. Two-sided today; the first team that is not this one, so a
+## third side would not silently break it.
+func _opponent_of(team: int) -> int:
+	for other in GameState.TEAMS:
+		if other != team:
+			return other
+	return team
+
+
+## True when a unit of `attacker_team` can bring one of the opposing side into
+## range. `ready_only` limits the attackers to units that have not acted, which
+## is the right question about the side whose turn it is and the wrong one about
+## the side waiting to reply.
+##
+## Reach is Manhattan distance against movement plus firing range, ignoring
+## terrain cost. It over-estimates deliberately: the failure worth avoiding is a
+## commander sitting on a full meter all match.
+##
+## Anything hidden from `team` — the commander doing the asking — is skipped on
+## both sides of the question, so no doctrine plans around a unit its own side
+## cannot see. Vision owns that judgement; it is not re-derived here.
+func _can_strike(state: GameState, team: int, attacker_team: int, ready_only: bool) -> bool:
+	for unit in state.units:
+		if unit.team != attacker_team or unit.carrier != null or unit.type.max_range <= 0:
+			continue
+		if ready_only and unit.acted:
+			continue
+		if Vision.is_hidden_from(state, team, unit):
+			continue
+		var reach := AttackRange.maximum(state, unit)
+		if not AttackRange.is_indirect(unit):
+			reach += MovementResolver.move_budget(state, unit)
+		for target in state.units:
+			if target.team == attacker_team or target.carrier != null:
+				continue
+			if Vision.is_hidden_from(state, team, target):
+				continue
+			if absi(target.cell.x - unit.cell.x) + absi(target.cell.y - unit.cell.y) <= reach:
+				return true
+	return false
+
+
+## True when a capture unit of `team` that has not acted can finish this turn on
+## a property it does not already own. This one asks the real flood fill rather
+## than a distance guess: "the ground is actually takeable" is the whole
+## question for a power measured in capture points.
+func _can_reach_capture(state: GameState, team: int) -> bool:
+	for unit in state.units_of(team):
+		if unit.acted or unit.carrier != null or not unit.type.can_capture:
+			continue
+		var reach := MovementResolver.reachable(state, unit)
+		for cell in reach.cells():
+			if not reach.can_stop_at(cell):
+				continue
+			var terrain := state.map.terrain_at(cell)
+			if terrain != null and terrain.is_property and state.owner_at(cell) != team:
+				return true
+	return false

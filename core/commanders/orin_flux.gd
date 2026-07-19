@@ -23,7 +23,7 @@ func vision_bonus(_state: GameState, unit: Unit) -> int:
 ## one hook a doctrine uses to reach the other side of the board. Vision floors
 ## the total at 0, so a jammed scout goes blind rather than inside-out.
 func enemy_vision_bonus(state: GameState, unit: Unit) -> int:
-	return jam_vision_penalty if is_active(state, _opponent_of(unit.team)) else 0
+	return jam_vision_penalty if _is_active(state, _opponent_of(unit.team)) else 0
 
 
 func on_power_activated(state: GameState, team: int) -> void:
@@ -35,10 +35,11 @@ func on_power_activated(state: GameState, team: int) -> void:
 			unit.ammo = maxi(0, unit.ammo - jam_ammo_loss)
 
 
-## Whose commander is being asked about `team`'s units. Two-sided today; the
-## first team that is not this one, so a third side would not silently break it.
-func _opponent_of(team: int) -> int:
-	for other in GameState.TEAMS:
-		if other != team:
-			return other
-	return team
+## A debuff is at its best going off *before* the exchange, so this asks whether
+## the two armies are in contact at all rather than whether he personally has a
+## shot: a tile of sight and a turn of fuel and ammo change what the opponent
+## can do next turn whichever side is closing the distance.
+func wants_power(state: GameState, team: int) -> bool:
+	if _can_strike(state, team, team, false):
+		return true
+	return _can_strike(state, team, _opponent_of(team), false)

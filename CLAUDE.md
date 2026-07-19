@@ -111,7 +111,10 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
 - Keep the vision/fog boundary clean: `core/rules/vision.gd` is the single authority for "what can
   this player see?" — ask it, never re-derive visibility. Fog is enforced in the presentation layer
   (the sim stays permissive, the UI refuses to target or inspect what the viewer cannot see), and
-  the AI deliberately sees everything.
+  the AI deliberately sees everything **except** units a doctrine hides — it asks
+  `Vision.is_hidden_from` for that one case, so an invisibility power is not inert against it.
+  Terrain, range and property sight stay invisible to the AI's omniscience; don't widen the
+  exception without a matching decision in the plan.
 
 ## Commits
 

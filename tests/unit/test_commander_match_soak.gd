@@ -39,16 +39,24 @@ func test_no_pairing_ever_plans_a_command_the_rules_reject() -> void:
 		if co.id != CommanderType.NEUTRAL_ID:
 			ids.append(co.id)
 	assert_gt(ids.size(), 0, "there should be commanders to play")
-	var powers_fired := 0
+	var fired: Dictionary = {}
+	for id in ids:
+		fired[id] = 0
 	for i in ids.size():
-		# Each general as red once, against the next in the list as blue.
-		powers_fired += _play(ids[i], ids[(i + 1) % ids.size()], 1000 + i)
-	assert_gt(powers_fired, 0, "the AI should have fired powers over this many turns")
+		# Each general as red once, against the next in the list as blue — so
+		# every one of them plays two pairings, one from each side.
+		_play(ids[i], ids[(i + 1) % ids.size()], 1000 + i, fired)
+	# Per commander, not summed. A sum passes while a general banks a full meter
+	# all match and never spends it, which is exactly the bug that hid behind it:
+	# every wave-2 power was gated on an offensive opening its owner may never
+	# get. If a doctrine's timing hook goes wrong, this is what notices.
+	for id in ids:
+		assert_gt(int(fired[id]), 0, "%s never fired a power in either pairing" % id)
 
 
-## Returns how many Command Powers went off. Fails the test on the first command
-## the rules turn down.
-func _play(red: StringName, blue: StringName, rng_seed: int) -> int:
+## Plays one pairing out, tallying each fired power against the commander who
+## fired it. Fails the test on the first command the rules turn down.
+func _play(red: StringName, blue: StringName, rng_seed: int, fired: Dictionary) -> void:
 	var map := MapData.load_from_file("res://maps/crossfire.txt", terrain_db)
 	var state := GameState.create(map, unit_db, chart)
 	state.rng.seed = rng_seed
@@ -57,7 +65,6 @@ func _play(red: StringName, blue: StringName, rng_seed: int) -> int:
 	state.set_commander(1, commander_db.by_id(red))
 	state.set_commander(2, commander_db.by_id(blue))
 	var ai := AIController.new(unit_db)
-	var powers := 0
 	var commands := 0
 	while state.winner == 0 and state.day <= DAYS and commands < COMMAND_CAP:
 		var command := ai.plan_next_command(state)
@@ -69,10 +76,10 @@ func _play(red: StringName, blue: StringName, rng_seed: int) -> int:
 					% [red, blue, state.day, error]
 				)
 			)
-			return powers
+			return
 		if command is PowerCommand:
-			powers += 1
+			var who: StringName = red if state.current_team == 1 else blue
+			fired[who] = int(fired[who]) + 1
 		command.apply(state)
 		commands += 1
 	assert_lt(commands, COMMAND_CAP, "%s vs %s should not need this many commands" % [red, blue])
-	return powers
