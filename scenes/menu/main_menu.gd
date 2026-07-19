@@ -8,7 +8,6 @@ const MAPS_DIR := "res://maps"
 @onready var map_option: OptionButton = %MapOption
 @onready var red_co_option: OptionButton = %RedCoOption
 @onready var blue_co_option: OptionButton = %BlueCoOption
-@onready var co_doctrine_label: Label = %CoDoctrineLabel
 @onready var fog_check: CheckButton = %FogCheck
 @onready var one_player_button: Button = %OnePlayerButton
 @onready var two_player_button: Button = %TwoPlayerButton
@@ -56,41 +55,37 @@ func _populate_maps() -> void:
 
 ## Both dropdowns list every general, neutral first, so "No Commander" stays the
 ## default and the menu opens on the match this game has always played.
+##
+## What each one actually does rides in the tooltip rather than in a blurb on
+## the menu: the design viewport is 640x360, and a doctrine plus a power
+## description for two sides is more text than that has room for without
+## pushing the start buttons off the bottom.
 func _populate_commanders() -> void:
 	for commander in _commander_db.all():
 		_commander_ids.append(commander.id)
-		var label := commander.display_name
-		if commander.faction != "":
-			label = "%s  -  %s" % [commander.display_name, commander.faction]
-		red_co_option.add_item(label)
-		blue_co_option.add_item(label)
+		red_co_option.add_item(commander.display_name)
+		blue_co_option.add_item(commander.display_name)
 	red_co_option.selected = 0
 	blue_co_option.selected = 0
-	red_co_option.item_selected.connect(_on_commander_selected)
-	blue_co_option.item_selected.connect(_on_commander_selected)
-	_refresh_doctrine_text()
+	red_co_option.item_selected.connect(_on_commander_selected.bind(red_co_option))
+	blue_co_option.item_selected.connect(_on_commander_selected.bind(blue_co_option))
+	_refresh_tooltip(red_co_option)
+	_refresh_tooltip(blue_co_option)
 
 
-func _on_commander_selected(_index: int) -> void:
-	_refresh_doctrine_text()
+func _on_commander_selected(_index: int, option: OptionButton) -> void:
+	_refresh_tooltip(option)
 
 
-## One shared blurb rather than one per side: the picker is a menu, not a
-## codex, and two paragraphs of doctrine would crowd out the buttons.
-func _refresh_doctrine_text() -> void:
-	var lines: Array[String] = []
-	for entry: Array in [["Red", red_co_option], ["Blue", blue_co_option]]:
-		var option: OptionButton = entry[1]
-		var commander := _commander_at(option.selected)
-		if not commander.has_power():
-			continue
-		lines.append(
-			(
-				"%s - %s  |  %s: %s"
-				% [entry[0], commander.doctrine_text, commander.power_name, commander.power_text]
-			)
-		)
-	co_doctrine_label.text = "\n".join(lines)
+func _refresh_tooltip(option: OptionButton) -> void:
+	var commander := _commander_at(option.selected)
+	if not commander.has_power():
+		option.tooltip_text = "No commander: the standard rules, and no Command Power."
+		return
+	option.tooltip_text = (
+		"%s\n%s\n\n%s: %s"
+		% [commander.faction, commander.doctrine_text, commander.power_name, commander.power_text]
+	)
 
 
 func _commander_at(index: int) -> CommanderType:

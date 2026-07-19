@@ -178,4 +178,24 @@ func test_every_shipped_commander_is_well_formed() -> void:
 		assert_ne(co.display_name, "", "%s needs a name" % co.id)
 		assert_ne(co.faction, "", "%s needs a faction" % co.id)
 		assert_ne(co.power_name, "", "%s needs a power name" % co.id)
-		assert_gt(co.power_cost, 0, "%s needs a power cost" % co.id)
+		assert_ne(co.doctrine_text, "", "%s needs doctrine text for the picker" % co.id)
+		assert_ne(co.power_text, "", "%s needs power text for the picker" % co.id)
+		# The plan's band. Below it a power fires most turns and stops being an
+		# event; above it a match can end before the meter ever fills. A number
+		# outside this is a balance decision, not a typo, so it has to be made
+		# here as well as in the .tres.
+		assert_between(co.power_cost, 8000, 14000, "%s power cost" % co.id)
+
+
+## Twelve generals, three to a faction. Pinned so a half-added general — a
+## script with no .tres, or a .tres with the wrong faction string — shows up as
+## a failure rather than as a gap in the picker nobody notices.
+func test_the_roster_is_four_factions_of_three() -> void:
+	var counts: Dictionary = {}
+	for co in CommanderDB.load_default().all():
+		if co.id == CommanderType.NEUTRAL_ID:
+			continue
+		counts[co.faction] = int(counts.get(co.faction, 0)) + 1
+	assert_eq(counts.size(), 4, "four factions, got %s" % [counts.keys()])
+	for faction: String in counts:
+		assert_eq(counts[faction], 3, "%s should field three generals" % faction)

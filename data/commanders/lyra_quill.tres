@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="LyraQuill" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/lyra_quill.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"lyra_quill"
+display_name = "Lyra Quill"
+faction = "Aurora Compact"
+doctrine_text = "Combat luck rolls 4-9 instead of 0-9. All units -5% defence."
+power_name = "Perfect Solution"
+power_text = "Every attack rolls maximum luck and gains +10% attack this turn."
+power_cost = 12000
+power_duration = 0
+lucky_floor = 4
+defense_pct = -5
+solution_attack_pct = 10
