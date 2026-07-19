@@ -79,8 +79,9 @@ jumps to that team's first property.
 - Moving spends fuel equal to the terrain cost of each step; attacking spends one ammo, and so
   does each counter-attack, so a dry unit can neither fire nor counter. At the start of your turn
   every unit standing on one of your properties or next to one of your APCs is refilled
-- Confirm on one of your empty bases: the build menu lists units cheapest first; rows you can't
-  afford are greyed out. A bought unit spawns exhausted and acts next turn
+- Confirm on one of your empty bases: the build menu lists units cheapest first, each row drawing
+  the unit's artwork in your team's colours beside its name and cost; rows you can't afford are
+  greyed out. A bought unit spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
   team (the day counter advances when the rotation wraps back to Red), and **Save**, which writes
   the whole match — map, day, funds, ownership, every unit, and the RNG stream — over the single

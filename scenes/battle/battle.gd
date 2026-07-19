@@ -1115,8 +1115,8 @@ func _check_screenshot_mode() -> void:
 ## attack stops at the targeting preview and resolve fires, both with the
 ## frontline tanks; capture takes the city at (3,4) with the infantry at (4,3);
 ## build buys at the red base and buildmenu stops at its open shop list;
-## endturn hands the turn to Blue; aiturn does the
-## same and then waits out Blue's whole AI turn, back to Red's next turn;
+## endturn hands the turn to Blue; aiturn does the same and then waits out
+## Blue's whole AI turn, back to Red's next turn;
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
 ## picker; supply holds the APC next to its infantry so Supply is offered;
