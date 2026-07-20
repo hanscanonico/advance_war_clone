@@ -134,8 +134,8 @@ text = "Counter 45%"
 [node name="TurnHud" type="PanelContainer" parent="UI"]
 offset_left = 8.0
 offset_top = 8.0
-offset_right = 190.0
-offset_bottom = 28.0
+offset_right = 8.0
+offset_bottom = 8.0
 
 [node name="HudMargin" type="MarginContainer" parent="UI/TurnHud"]
 layout_mode = 2
@@ -144,11 +144,40 @@ theme_override_constants/margin_top = 3
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 3
 
-[node name="TurnLabel" type="Label" parent="UI/TurnHud/HudMargin"]
+[node name="HudRow" type="HBoxContainer" parent="UI/TurnHud/HudMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TurnLabel" type="Label" parent="UI/TurnHud/HudMargin/HudRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Day 1  -  Red Army  -  Funds 0"
+
+[node name="ChargeBar" type="ProgressBar" parent="UI/TurnHud/HudMargin/HudRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(90, 14)
+max_value = 1.0
+step = 0.001
+show_percentage = false
+
+[node name="ChargeLabel" type="Label" parent="UI/TurnHud/HudMargin/HudRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Power"
+
+[node name="PowerButton" type="Button" parent="UI/TurnHud/HudMargin/HudRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 10
+text = "Power"
 
 [node name="TurnBanner" type="PanelContainer" parent="UI"]
 unique_name_in_owner = true

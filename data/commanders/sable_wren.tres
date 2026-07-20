@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SableWren" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/sable_wren.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"sable_wren"
+display_name = "Sable Wren"
+faction = "Verdant League"
+doctrine_text = "Units in Woods get +1 defence star. Units on Roads -10% defence."
+power_name = "Vanish"
+power_text = "Her units in Woods become invisible, even to adjacent enemies, and attack from cover at +40% until her next turn."
+power_cost = 10000
+power_duration = 1
+woods_star_bonus = 1
+road_defense_pct = -10
+cover_terrain = &"woods"
+road_terrain = &"road"
+ambush_attack_pct = 40

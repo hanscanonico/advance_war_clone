@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MaraVoss" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/mara_voss.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"mara_voss"
+display_name = "Mara Voss"
+faction = "Iron Dominion"
+doctrine_text = "Direct units +20% counterattack damage, -10% when initiating."
+power_name = "Hold the Line"
+power_text = "+30% defence and +40% counter damage through the opponent's next turn."
+power_cost = 11000
+power_duration = 1
+counter_attack_pct = 20
+initiate_attack_pct = -10
+hold_defense_pct = 30
+hold_counter_pct = 40

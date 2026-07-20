@@ -9,8 +9,9 @@ extends RefCounted
 ## failures with separate messages.
 ##
 ## The public surface is deliberately unchanged: `save`, `load_game`,
-## `has_save`, `SAVE_PATH`, and `VERSION` are what callers use, and the on-disk
-## format is still version 1.
+## `has_save`, `SAVE_PATH`, and `VERSION` are what callers use. The on-disk
+## format is version 2 (commanders); version 1 files still load, as no-commander
+## matches — see SaveCodec.
 
 const SAVE_PATH := "user://save.json"
 const VERSION := SaveCodec.VERSION
@@ -31,7 +32,11 @@ static func save(state: GameState, ai_teams: Array[int], path: String = SAVE_PAT
 
 ## Returns null (with a pushed error) when the file is missing or invalid.
 static func load_game(
-	terrain_db: TerrainDB, unit_db: UnitDB, damage_chart: DamageChart, path: String = SAVE_PATH
+	terrain_db: TerrainDB,
+	unit_db: UnitDB,
+	damage_chart: DamageChart,
+	path: String = SAVE_PATH,
+	commander_db: CommanderDB = null
 ) -> SaveCodec.LoadedMatch:
 	var text := FileAccess.get_file_as_string(path)
 	if text.is_empty():
@@ -41,4 +46,4 @@ static func load_game(
 	if json.parse(text) != OK or not json.data is Dictionary:
 		push_error("SaveGame: %s is not a valid save" % path)
 		return null
-	return SaveCodec.decode(json.data, terrain_db, unit_db, damage_chart)
+	return SaveCodec.decode(json.data, terrain_db, unit_db, damage_chart, commander_db)

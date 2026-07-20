@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CassianRook" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/cassian_rook.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"cassian_rook"
+display_name = "Cassian Rook"
+faction = "Aurora Compact"
+doctrine_text = "Recon and APC +1 movement; Tanks and Md Tanks -10% attack."
+power_name = "Rapid Redeployment"
+power_text = "Every unit +2 movement and -20% attack this turn."
+power_cost = 9000
+power_duration = 0
+light_ids = Array[StringName]([&"recon", &"apc"])
+light_move_bonus = 1
+heavy_ids = Array[StringName]([&"tank", &"md_tank"])
+heavy_attack_pct = -10
+redeploy_move_bonus = 2
+redeploy_attack_pct = -20

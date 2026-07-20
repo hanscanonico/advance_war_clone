@@ -18,6 +18,11 @@ var unit: Unit
 ## Team whose turn it is. Only that team's units grey out when exhausted;
 ## `acted` on the waiting team is stale until its own turn readies it.
 var active_team: int = 0
+## True when the viewing team may not see this unit. BattleView owns the answer
+## — `Vision` decides it — and the sprite only remembers it. Held rather than
+## re-derived so that every redraw honours it: a sprite that worked visibility
+## out for itself would un-hide a fogged enemy on the next refresh.
+var fogged: bool = false
 
 @onready var hp_label: Label = $HpLabel
 
@@ -52,10 +57,11 @@ func set_active_team(team: int) -> void:
 
 
 ## Re-syncs position, visibility, acted tint, and HP badge from the sim
-## state. Carried units are hidden until dropped.
+## state. Carried units are hidden until dropped, and so is anything the
+## viewing team may not see — see `fogged`.
 func refresh() -> void:
 	position = Vector2(unit.cell * TILE) + Vector2(TILE, TILE) / 2.0
-	visible = unit.carrier == null
+	visible = unit.carrier == null and not fogged
 	modulate = ACTED_TINT if unit.acted and unit.team == active_team else Color.WHITE
 	hp_label.visible = unit.displayed_hp() < 10
 	hp_label.text = str(unit.displayed_hp())

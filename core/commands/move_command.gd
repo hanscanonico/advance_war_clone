@@ -15,6 +15,13 @@ func _init(p_unit: Unit, p_path: Array[Vector2i]) -> void:
 ## Validates everything about moving `unit` along `path` except the
 ## destination-occupancy rule, which each movement-type command (Move, Load,
 ## Join) defines for itself. Returns "" when legal.
+##
+## Step cost and the movement budget both come from MovementResolver, never from
+## the terrain or the unit type directly. That is not a stylistic preference:
+## the flood fill is what produced the path being checked here, so anything this
+## works out for itself is a second opinion, and a doctrine that changes movement
+## makes the two disagree — the range overlay offers a cell and the command then
+## refuses it.
 static func validate_path_steps(
 	state: GameState, unit_moving: Unit, unit_path: Array[Vector2i]
 ) -> String:
@@ -35,17 +42,19 @@ static func validate_path_steps(
 		var terrain := state.map.terrain_at(unit_path[i])
 		if terrain == null:
 			return "path leaves the map"
-		var step := terrain.move_cost(unit_moving.type.move_class)
+		var step := MovementResolver.step_cost(state, unit_moving, terrain)
 		if step == TerrainType.IMPASSABLE:
 			return "path crosses impassable terrain"
 		var occupant := state.unit_at(unit_path[i])
 		if occupant != null and occupant.team != unit_moving.team:
 			return "path is blocked by an enemy"
 		cost += step
-	if cost > unit_moving.type.move_points:
-		return "path exceeds movement points"
+	# Fuel first, because the budget below is already capped by it — asking the
+	# other way round would report a dry tank as a path that is simply too long.
 	if cost > unit_moving.fuel:
 		return "not enough fuel"
+	if cost > MovementResolver.move_budget(state, unit_moving):
+		return "path exceeds movement points"
 	return ""
 
 

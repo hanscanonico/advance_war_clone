@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commanders &amp; Command Powers — Implementation Plan</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  .cop-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+  }
+  .cop-formula {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9rem;
+  }
+  .mermaid { display: flex; justify-content: center; overflow-x: auto; }
+  .cop-faction { border-left-width: 6px; }
+  .cop-meridian { border-left-color: #1e3a8a; }
+  .cop-iron { border-left-color: #7f1d1d; }
+  .cop-verdant { border-left-color: #166534; }
+  .cop-aurora { border-left-color: #7c3aed; }
+  .cop-swatch { width: 0.85rem; height: 0.85rem; border-radius: 9999px; display: inline-block; }
+</style>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+
+  // Render Mermaid in a theme that matches the artifact page, and re-render when
+  // the viewer flips the page theme - Mermaid never restyles an already-rendered
+  // SVG on its own, so a fixed theme clashes in either light or dark mode.
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, {
+      attributes: true,
+      attributeFilter: ["data-theme", "class", "style"],
+    });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener(
+    "transitionend",
+    ({ propertyName }) => {
+      if (propertyName === "background-color") queueRender();
+    },
+    true,
+  );
+  darkQuery.addEventListener("change", queueRender);
+</script>
+</head>
+<body class="bg-base-200 text-base-content">
+<main class="mx-auto max-w-6xl p-4 sm:p-6 lg:p-10 space-y-10">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero bg-base-100 rounded-box border border-base-content/10">
+    <div class="hero-content flex-col text-center py-10">
+      <p class="badge badge-soft badge-primary">Post-M7 stretch feature · Commanders</p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight text-balance px-2">Commanders &amp; Command Powers</h1>
+      <p class="max-w-3xl text-base-content/80">
+        Four factions, twelve generals, each with a permanent <strong>Doctrine</strong> and one
+        chargeable <strong>Command Power</strong>. This plan maps every doctrine onto the systems the
+        sim already has, proposes a single hook layer so commander rules never leak into resolvers,
+        and cuts the work into four milestones that each end in something playable.
+      </p>
+      <div class="stats stats-vertical sm:stats-horizontal shadow mt-4">
+        <div class="stat">
+          <div class="stat-title">Factions</div>
+          <div class="stat-value text-2xl">4</div>
+          <div class="stat-desc">3 generals each</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Wave 1</div>
+          <div class="stat-value text-2xl">6 generals</div>
+          <div class="stat-desc">C1 – C3</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">New command</div>
+          <div class="stat-value text-2xl">Power</div>
+          <div class="stat-desc">fits the existing pattern</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">New mechanics</div>
+          <div class="stat-value text-2xl">~1</div>
+          <div class="stat-desc">the charge meter — everything else is modifiers</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 1 CURRENT STATE ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">1 · Why this is cheaper than it looks</h2>
+    <p class="max-w-3xl">Every subsystem the twelve doctrines touch already exists in <span class="cop-code">core/</span>
+    and is already unit-tested. The feature is therefore <strong>one new economy (charge) + one new command +
+    a modifier layer</strong>, not new mechanics. Verified against the code:</p>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm">
+        <thead>
+          <tr><th>Doctrine needs</th><th>Already in the sim</th><th>Where</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Attack / defence %</td>
+            <td>Single damage function shared by resolve <em>and</em> the luck-free forecast — one hook point keeps the damage preview honest for free</td>
+            <td><span class="cop-code">combat_resolver.gd · _damage_pct()</span></td>
+          </tr>
+          <tr>
+            <td>Combat luck (Lyra)</td>
+            <td>Seeded <span class="cop-code">randi_range(0, LUCK_MAX)</span> on the match RNG, deterministic replays</td>
+            <td><span class="cop-code">combat_resolver.gd:83,104</span></td>
+          </tr>
+          <tr>
+            <td>Fuel &amp; ammo (Gideon, Orin)</td>
+            <td>Per-step fuel spend, ammo per shot, <span class="cop-code">resupply()</span></td>
+            <td><span class="cop-code">game_state.gd · advance_unit()</span>, <span class="cop-code">unit.gd</span></td>
+          </tr>
+          <tr>
+            <td>Supply radius (Gideon)</td>
+            <td>Adjacency check at distance 1, in exactly two places</td>
+            <td><span class="cop-code">turn_rules.gd:37</span>, <span class="cop-code">supply_command.gd:34</span></td>
+          </tr>
+          <tr>
+            <td>Repair cost (Gideon)</td>
+            <td>Paid repairs proportional to unit cost</td>
+            <td><span class="cop-code">turn_rules.gd · _repair()</span></td>
+          </tr>
+          <tr>
+            <td>Capture strength (Tomas)</td>
+            <td>20 capture points chipped by displayed HP</td>
+            <td><span class="cop-code">capture_command.gd · apply()</span></td>
+          </tr>
+          <tr>
+            <td>Terrain move costs (Nia)</td>
+            <td>Cost per movement class, Dijkstra flood fill, fuel-capped budget</td>
+            <td><span class="cop-code">movement_resolver.gd</span>, <span class="cop-code">terrain_type.gd</span></td>
+          </tr>
+          <tr>
+            <td>Vision &amp; fog (Nia, Orin, Sable)</td>
+            <td>Single authority for visibility, woods adjacency rule included</td>
+            <td><span class="cop-code">core/rules/vision.gd</span></td>
+          </tr>
+          <tr>
+            <td>Indirect range (Rhea)</td>
+            <td><span class="cop-code">min_range / max_range</span> on UnitType, checked in three places (see risk R3)</td>
+            <td><span class="cop-code">attack_command.gd:36</span>, <span class="cop-code">ai_controller.gd:98</span>, counter check</td>
+          </tr>
+          <tr>
+            <td>Unit costs for the charge formula</td>
+            <td>Costs live in <span class="cop-code">data/units/*.tres</span> (infantry 1 000 → md tank 16 000)</td>
+            <td><span class="cop-code">unit_type.gd · cost</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div role="alert" class="alert alert-info">
+      <span><strong>Design collision found &amp; resolved — Sable Wren.</strong> Her power "Vanish: units in Woods
+      can only be revealed from an adjacent tile during fog" was <em>already the base rule for everyone</em>:
+      <span class="cop-code">vision.gd:43</span> hides any unit in woods from non-adjacent viewers, so that
+      clause was a no-op as written. <strong>Decided (D4):</strong> Vanish is reworked to true invisibility —
+      during the power her woods units are hidden <em>even from adjacent tiles</em>, revealed only when an
+      enemy tries to enter their cell; the +40% first strike from woods stays.</span>
+    </div>
+  </section>
+
+  <!-- ============ 2 ROSTER ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">2 · The roster</h2>
+    <p class="max-w-3xl">Twelve generals across four factions. <span class="badge badge-success badge-sm">wave 1</span>
+    marks the six that ship first — each of them exercises a different hook family, so together they
+    prove the whole architecture without demanding any new mechanic.</p>
+
+    <!-- Meridian -->
+    <div class="card card-border bg-base-100 cop-faction cop-meridian">
+      <div class="card-body space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="cop-swatch" style="background:#1e3a8a"></span>
+          <span class="cop-swatch" style="background:#eab308"></span>
+          <h3 class="card-title">Meridian Coalition</h3>
+          <span class="badge badge-ghost badge-sm">navy · white · gold</span>
+        </div>
+        <p class="text-sm text-base-content/80">Professional, well-funded alliance built on coordination,
+        logistics, and artillery. Reliable and flexible, rarely the absolute best at any one thing.</p>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>General</th><th>Doctrine (passive)</th><th>Command Power</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Alina Ward</strong><br><span class="badge badge-success badge-sm">wave 1 · C1</span></td>
+                <td>+10% attack when adjacent to a friendly unit of a <em>different movement class</em> (foot/boot/tires/treads).</td>
+                <td><strong>Coordinated Push</strong> — all units +1 movement, +10% attack, +10% defence this turn.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Gideon Holt</strong><br><span class="badge badge-success badge-sm">wave 1 · C2</span></td>
+                <td>APCs supply from 2 tiles away. Property repairs cost 20% less.</td>
+                <td><strong>Open the Depots</strong> — every unit refills fuel &amp; ammo and heals 1 displayed HP.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Rhea Sol</strong><br><span class="badge badge-success badge-sm">wave 1 · C3</span></td>
+                <td>Artillery and Rockets +10% attack, −10% defence.</td>
+                <td><strong>Grid Saturation</strong> — indirect units +1 max range and +20% attack this turn.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Iron -->
+    <div class="card card-border bg-base-100 cop-faction cop-iron">
+      <div class="card-body space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="cop-swatch" style="background:#7f1d1d"></span>
+          <span class="cop-swatch" style="background:#27272a"></span>
+          <h3 class="card-title">Iron Dominion</h3>
+          <span class="badge badge-ghost badge-sm">dark red · black steel</span>
+        </div>
+        <p class="text-sm text-base-content/80">Industrial military state: armour, pressure, overwhelming
+        force. Frightening with momentum, but predictable and expensive.</p>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>General</th><th>Doctrine (passive)</th><th>Command Power</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Viktor Draeg</strong><br><span class="badge badge-success badge-sm">wave 1 · C1</span></td>
+                <td>Tanks and Md Tanks +15% attack. Infantry and Mechs −10% attack.</td>
+                <td><strong>Armoured Breakthrough</strong> — tread units +1 movement and ignore one terrain-defence star when attacking.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Mara Voss</strong><br><span class="badge badge-ghost badge-sm">wave 2</span></td>
+                <td>Direct units +20% counterattack damage, −10% when initiating.</td>
+                <td><strong>Hold the Line</strong> — +30% defence and +40% counter damage <em>through the opponent's next turn</em>.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Cass Orlov</strong><br><span class="badge badge-ghost badge-sm">wave 2</span></td>
+                <td>+15% attack vs enemies at 5 HP or below, −10% defence.</td>
+                <td><strong>No Escape</strong> — +30% attack vs damaged enemies; Recon and Tanks +1 movement.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verdant -->
+    <div class="card card-border bg-base-100 cop-faction cop-verdant">
+      <div class="card-body space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="cop-swatch" style="background:#166534"></span>
+          <span class="cop-swatch" style="background:#d6b98c"></span>
+          <h3 class="card-title">Verdant League</h3>
+          <span class="badge badge-ghost badge-sm">forest green · tan</span>
+        </div>
+        <p class="text-sm text-base-content/80">Rangers and resistance forces: difficult terrain,
+        reconnaissance, capture. Cheap armies and map control, weaker in open-field vehicle battles.</p>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>General</th><th>Doctrine (passive)</th><th>Command Power</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Nia Rowan</strong><br><span class="badge badge-success badge-sm">wave 1 · C3</span></td>
+                <td>Infantry and Mechs cross Woods and Mountains for 1 movement point less (minimum 1).</td>
+                <td><strong>Ghost March</strong> — foot units and Recon +1 movement, +1 vision; woods don't block their vision this turn.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Tomas Reed</strong><br><span class="badge badge-success badge-sm">wave 1 · C2</span></td>
+                <td>Infantry and Mechs +15% attack and capture 20% harder. Vehicles −10% attack.</td>
+                <td><strong>Popular Uprising</strong> — Infantry and Mechs +1 movement, double capture strength this turn.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Sable Wren</strong><br><span class="badge badge-ghost badge-sm">wave 2 · reworked</span></td>
+                <td>Units in Woods get +1 defence star. Units on Roads −10% defence.</td>
+                <td><strong>Vanish</strong> (reworked, D4) — her woods units become invisible even from adjacent
+                tiles, revealed only when an enemy tries to enter their cell; their first attack from Woods
+                gains +40% attack.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aurora -->
+    <div class="card card-border bg-base-100 cop-faction cop-aurora">
+      <div class="card-body space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="cop-swatch" style="background:#7c3aed"></span>
+          <span class="cop-swatch" style="background:#22d3ee"></span>
+          <h3 class="card-title">Aurora Compact</h3>
+          <span class="badge badge-ghost badge-sm">white · violet · cyan</span>
+        </div>
+        <p class="text-sm text-base-content/80">High-tech coalition: intelligence, precision, rapid
+        deployment. Exceptional information and positioning, lower raw combat efficiency.</p>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>General</th><th>Doctrine (passive)</th><th>Command Power</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Lyra Quill</strong><br><span class="badge badge-ghost badge-sm">wave 2</span></td>
+                <td>Luck range 4–9 instead of 0–9 (consistent damage). All units −5% defence.</td>
+                <td><strong>Perfect Solution</strong> — every attack gets maximum luck and +10% attack this turn.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Orin Flux</strong><br><span class="badge badge-ghost badge-sm">wave 2</span></td>
+                <td>Recon and APC +1 vision.</td>
+                <td><strong>Signal Jam</strong> — enemies lose 10 fuel and 1 ammo; enemy vision −1 until their next turn.</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap"><strong>Cassian Rook</strong><br><span class="badge badge-ghost badge-sm">wave 2</span></td>
+                <td>Recon and APC +1 movement; Tanks and Md Tanks −10% attack.</td>
+                <td><strong>Rapid Redeployment</strong> — every unit +2 movement, −20% attack this turn.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 ARCHITECTURE ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">3 · Architecture — one hook layer, zero commander <span class="cop-code">if</span>s in resolvers</h2>
+    <p class="max-w-3xl">The question the design must answer: <em>where do commander rules live so that
+    twelve generals don't smear special cases across every resolver?</em> Answer: a single
+    <strong><span class="cop-code">CommanderType</span> Resource base class</strong> whose hook methods return neutral
+    defaults. Resolvers call the hooks unconditionally; a match without commanders uses the neutral
+    instance and behaves exactly as today. Each general is a tiny subclass in
+    <span class="cop-code">core/commanders/</span> overriding two or three hooks, with its balance numbers as
+    <span class="cop-code">@export</span>s on a <span class="cop-code">.tres</span> in <span class="cop-code">data/commanders/</span> — behaviour in small typed
+    classes, numbers in data, exactly like the rest of the repo.</p>
+
+    <pre class="mermaid">
+flowchart TD
+    input["Player input / AI planner"] --> cmd["Command objects<br/>Move · Attack · Capture · Build · Power (new)"]
+    cmd --> state["GameState<br/>+ commanders: team → CommanderState (new)"]
+    state --> combat["CombatResolver"]
+    state --> movement["MovementResolver"]
+    state --> turns["TurnRules"]
+    state --> vision["Vision"]
+    combat --> hooks["CommanderType hooks<br/>neutral defaults, overridden per general"]
+    movement --> hooks
+    turns --> hooks
+    vision --> hooks
+    hooks --> res["data/commanders/*.tres<br/>balance numbers as @export"]
+    state --> events["typed events"] --> scenes["battle scene + HUD animate"]
+    </pre>
+
+    <h3 class="text-xl font-semibold">New and touched files</h3>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h4 class="card-title text-base">New</h4>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li><span class="cop-code">core/commander_type.gd</span> — Resource base class: identity, power metadata, hook methods with neutral defaults</li>
+            <li><span class="cop-code">core/commanders/&lt;general&gt;.gd</span> — one small subclass per general</li>
+            <li><span class="cop-code">core/commands/power_command.gd</span> — validate charge, activate the power</li>
+            <li><span class="cop-code">data/commanders/&lt;general&gt;.tres</span> — instance per general, balance numbers as exports</li>
+            <li><span class="cop-code">core/commander_db.gd</span> — id → CommanderType lookup (mirrors UnitDB)</li>
+            <li><span class="cop-code">tests/unit/test_commander_hooks.gd</span>, <span class="cop-code">test_power_command.gd</span>, <span class="cop-code">test_charge_meter.gd</span> + one file per shipped general</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h4 class="card-title text-base">Touched</h4>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li><span class="cop-code">game_state.gd</span> — <span class="cop-code">commanders: Dictionary</span> (team → CommanderState: type, charge, power_active), <span class="cop-code">commander_of(team)</span>, <span class="cop-code">add_charge()</span></li>
+            <li><span class="cop-code">combat_resolver.gd</span> — attack/defence/star/luck hooks in <span class="cop-code">_damage_pct</span> + charge accrual in <span class="cop-code">resolve</span></li>
+            <li><span class="cop-code">movement_resolver.gd</span> — move budget + per-step terrain cost hooks</li>
+            <li><span class="cop-code">turn_rules.gd</span> — supply radius, repair cost, power expiry</li>
+            <li><span class="cop-code">capture_command.gd</span>, <span class="cop-code">supply_command.gd</span>, <span class="cop-code">attack_command.gd</span>, <span class="cop-code">vision.gd</span> — one hook call each</li>
+            <li><span class="cop-code">save_game.gd</span> — VERSION 2 (commander id, charge, active power per team; missing keys → neutral commander, so v1 saves still load)</li>
+            <li><span class="cop-code">ai_controller.gd</span>, <span class="cop-code">match_config.gd</span>, <span class="cop-code">main_menu</span>, <span class="cop-code">battle</span> HUD, <span class="cop-code">event_bus.gd</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="text-xl font-semibold">The hook API</h3>
+    <p class="max-w-3xl text-sm">All hooks live on <span class="cop-code">CommanderType</span>, take sim state only
+    (no Nodes), and check <span class="cop-code">power_active</span> themselves so a power is just "the hook returns a
+    bigger number while active". Percent hooks return integer percentage points — no float creep.</p>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm">
+        <thead>
+          <tr><th>Hook</th><th>Neutral default</th><th>Wave-1 users</th><th>Call site</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="cop-code">attack_bonus(state, unit, target, is_counter) -&gt; int</td>
+            <td>0</td>
+            <td>Alina, Viktor, Rhea, Tomas + every offensive power</td>
+            <td class="cop-code">combat_resolver · _damage_pct</td>
+          </tr>
+          <tr>
+            <td class="cop-code">defense_bonus(state, unit, attacker) -&gt; int</td>
+            <td>0</td>
+            <td>Rhea (−10 on indirects), Coordinated Push</td>
+            <td class="cop-code">combat_resolver · _damage_pct</td>
+          </tr>
+          <tr>
+            <td class="cop-code">star_bonus(state, defender) / star_pierce(state, attacker) -&gt; int</td>
+            <td>0</td>
+            <td>Armoured Breakthrough (pierce 1); Sable passive later</td>
+            <td class="cop-code">combat_resolver · _damage_pct</td>
+          </tr>
+          <tr>
+            <td class="cop-code">luck_min(state) / luck_max(state) -&gt; int</td>
+            <td>0 / 9</td>
+            <td>— (Lyra &amp; Perfect Solution, wave 2)</td>
+            <td class="cop-code">combat_resolver · resolve</td>
+          </tr>
+          <tr>
+            <td class="cop-code">move_bonus(state, unit) -&gt; int</td>
+            <td>0</td>
+            <td>Coordinated Push, Breakthrough, Ghost March, Uprising</td>
+            <td class="cop-code">movement_resolver · budget</td>
+          </tr>
+          <tr>
+            <td class="cop-code">terrain_cost(unit, terrain, base) -&gt; int</td>
+            <td>base</td>
+            <td>Nia (woods/mountains −1, min 1, foot &amp; boot)</td>
+            <td class="cop-code">movement_resolver + game_state.advance_unit (fuel)</td>
+          </tr>
+          <tr>
+            <td class="cop-code">range_bonus(state, unit) -&gt; int</td>
+            <td>0</td>
+            <td>Grid Saturation (+1 max range on indirects)</td>
+            <td>new shared <span class="cop-code">attack_range()</span> helper — see R3</td>
+          </tr>
+          <tr>
+            <td class="cop-code">vision_bonus(unit) -&gt; int / sees_into_woods(unit) -&gt; bool</td>
+            <td>0 / false</td>
+            <td>Ghost March; Orin later</td>
+            <td class="cop-code">vision.gd · visible_cells</td>
+          </tr>
+          <tr>
+            <td class="cop-code">capture_bonus_pct(state, unit) -&gt; int</td>
+            <td>0</td>
+            <td>Tomas (+20 passive, +100 during Uprising)</td>
+            <td class="cop-code">capture_command · apply</td>
+          </tr>
+          <tr>
+            <td class="cop-code">supply_range() -&gt; int</td>
+            <td>1</td>
+            <td>Gideon (2)</td>
+            <td class="cop-code">turn_rules:41 + supply_command:34</td>
+          </tr>
+          <tr>
+            <td class="cop-code">repair_cost_pct() -&gt; int</td>
+            <td>100</td>
+            <td>Gideon (80)</td>
+            <td class="cop-code">turn_rules · _repair</td>
+          </tr>
+          <tr>
+            <td class="cop-code">on_power_activated(state, team) -&gt; void</td>
+            <td>no-op</td>
+            <td>Open the Depots (refill + heal); Signal Jam later</td>
+            <td class="cop-code">power_command · apply</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-xl font-semibold">Damage formula, updated</h3>
+    <div class="card card-border bg-base-100">
+      <div class="card-body space-y-2">
+        <p class="cop-formula">stars&nbsp; = clampi(terrain_stars + def_co.star_bonus − att_co.star_pierce, 0, 5)</p>
+        <p class="cop-formula">att&nbsp;&nbsp;&nbsp; = 100 + att_co.attack_bonus(unit, target, is_counter)</p>
+        <p class="cop-formula">def&nbsp;&nbsp;&nbsp; = 100 + def_co.defense_bonus(unit, attacker)</p>
+        <p class="cop-formula">raw&nbsp;&nbsp;&nbsp; = base × att/100 × att_hp/10 × (1 − 0.1 × stars × def_hp/10) × (200 − def)/100</p>
+        <p class="cop-formula">damage = maxi(0, roundi(raw)) &nbsp;&nbsp;·&nbsp;&nbsp; resolve adds luck = rng.randi_range(luck_min, luck_max)</p>
+        <p class="text-sm text-base-content/70">The <span class="cop-code">(200 − def)/100</span> term is the classic
+        Advance&nbsp;Wars defence shape: +10 defence → ×0.9 damage, −10 → ×1.1. Multiplier order and the
+        single final round are fixed here so every general is balance-tested against the same math.
+        Both <span class="cop-code">forecast()</span> and <span class="cop-code">resolve()</span> go through
+        <span class="cop-code">_damage_pct</span>, so the damage preview reflects doctrines automatically.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4 CHARGE & POWERS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">4 · Charge meter &amp; Command Powers</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-2">
+          <h3 class="card-title text-base">Value-weighted charge — integer only</h3>
+          <p class="text-sm">Your formula, kept, but in integer charge points so saves and replays stay
+          exact (internal HP is already 0–100, i.e. a percentage):</p>
+          <p class="cop-formula">charge += unit.type.cost × hp_lost / 100</p>
+          <p class="text-sm">Halving a 7 000-cost Tank ⇒ 7000 × 50 / 100 = <strong>3 500 points</strong> —
+          your "3.5 charge" at ×1000 scale. Powers cost 8 000–14 000 points.
+          Accrues in <span class="cop-code">CombatResolver.resolve()</span> for both the attack and the counter,
+          capped at the power's cost. <strong>Decided (D2) — asymmetric split:</strong> the side <em>losing</em> HP
+          charges at 100%, the side dealing it at 50% — the classic comeback pressure that stops one
+          player snowballing meter and match at once.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-2">
+          <h3 class="card-title text-base">PowerCommand — just another command</h3>
+          <p class="text-sm"><strong>validate:</strong> it's your turn, charge ≥ <span class="cop-code">power_cost</span>,
+          no power already active this turn. <strong>apply:</strong> deduct the full cost, set
+          <span class="cop-code">power_active</span>, run <span class="cop-code">on_power_activated()</span> for one-shot
+          effects (Open the Depots' refill + heal). It enters the same command log as everything else,
+          so saves, replays, and the AI get it for free.</p>
+          <p class="text-sm"><strong>Duration:</strong> an enum on CommanderType.
+          <span class="cop-code">OWNER_TURN</span> powers deactivate in <span class="cop-code">EndTurnCommand</span>;
+          <span class="cop-code">ROUND</span> powers (only Hold the Line so far) deactivate at the owner's next
+          <span class="cop-code">begin_turn</span>. Two clear expiry points, no ambiguous timing, easy for the AI
+          to evaluate.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="text-xl font-semibold">Wave-1 power costs (starting values — all live in <span class="cop-code">data/</span>)</h3>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm">
+        <thead>
+          <tr><th>Power</th><th>General</th><th>Cost (points)</th><th>≈ value destroyed</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Open the Depots</td><td>Gideon</td><td>8 000</td><td>one Tank + change</td><td>Utility, no direct damage swing</td></tr>
+          <tr><td>Ghost March</td><td>Nia</td><td>9 000</td><td>~9 000 of losses</td><td>Mobility + info, no combat bonus</td></tr>
+          <tr><td>Popular Uprising</td><td>Tomas</td><td>10 000</td><td>~10 000</td><td>Can steal a property race outright</td></tr>
+          <tr><td>Armoured Breakthrough</td><td>Viktor</td><td>11 000</td><td>~11 000</td><td>Movement + star-pierce on his buffed tanks</td></tr>
+          <tr><td>Coordinated Push</td><td>Alina</td><td>12 000</td><td>~12 000</td><td>Army-wide attack, defence and movement</td></tr>
+          <tr><td>Grid Saturation</td><td>Rhea</td><td>12 000</td><td>~12 000</td><td>+1 range breaks siege lines; strongest tempo swing</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 5 WAVE 1 DETAIL ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">5 · Wave 1, general by general</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100 cop-faction cop-meridian">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Alina Ward <span class="badge badge-outline badge-sm">C1</span></h3>
+          <p class="text-sm"><strong>Hooks:</strong> <span class="cop-code">attack_bonus</span> scans the four neighbours for a
+          friendly with a different <span class="cop-code">move_class</span> (all four classes already exist on
+          UnitType). Power adds flat attack/defence/move bonuses while active.</p>
+          <p class="text-sm text-base-content/70"><strong>Tests:</strong> bonus on/off by adjacency; Infantry+Mech
+          (foot vs boot) counts as different; power raises movement in
+          <span class="cop-code">MovementResolver.reachable</span> and expires on end turn.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 cop-faction cop-iron">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Viktor Draeg <span class="badge badge-outline badge-sm">C1</span></h3>
+          <p class="text-sm"><strong>Hooks:</strong> <span class="cop-code">attack_bonus</span> keyed on unit id
+          (tank/md_tank +15, infantry/mech −10). Power: <span class="cop-code">move_bonus</span> +1 for treads,
+          <span class="cop-code">star_pierce</span> 1.</p>
+          <p class="text-sm text-base-content/70"><strong>Tests:</strong> tank damage up, infantry damage down,
+          recon unchanged; pierced star vs a city (3★→2★) matches hand-computed damage; stars clamp at 0.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 cop-faction cop-meridian">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Gideon Holt <span class="badge badge-outline badge-sm">C2</span></h3>
+          <p class="text-sm"><strong>Hooks:</strong> <span class="cop-code">supply_range()</span> → 2 (turn-start supply and
+          the Supply action both switch from hardcoded adjacency to the hook);
+          <span class="cop-code">repair_cost_pct()</span> → 80. Power is pure
+          <span class="cop-code">on_power_activated</span>: resupply every unit, +10 internal HP.</p>
+          <p class="text-sm text-base-content/70"><strong>Tests:</strong> supply at distance 2 but not 3; repair
+          charges 80% of the proportional cost; power heals 1 displayed HP and refills a drained tank.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 cop-faction cop-verdant">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Tomas Reed <span class="badge badge-outline badge-sm">C2</span></h3>
+          <p class="text-sm"><strong>Hooks:</strong> <span class="cop-code">attack_bonus</span> (foot +15, vehicles −10);
+          <span class="cop-code">capture_bonus_pct</span> +20 ⇒ capture chip becomes
+          <span class="cop-code">displayed_hp × (100 + bonus) / 100</span> rounded down. Power: +100 (double) and
+          <span class="cop-code">move_bonus</span> +1 for foot units.</p>
+          <p class="text-sm text-base-content/70"><strong>Tests:</strong> 10-HP infantry chips 12 points not 10;
+          uprising captures a city in one turn from 20 points with 10-HP infantry (20 chip);
+          vehicle attack penalty visible in forecast.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 cop-faction cop-meridian">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Rhea Sol <span class="badge badge-outline badge-sm">C3</span></h3>
+          <p class="text-sm"><strong>Hooks:</strong> <span class="cop-code">attack_bonus</span> +10 /
+          <span class="cop-code">defense_bonus</span> −10 for <span class="cop-code">min_range &gt; 1</span> units. Power:
+          <span class="cop-code">range_bonus</span> +1 and attack +20. Requires the shared
+          <span class="cop-code">attack_range()</span> helper (R3) so command validation, AI targeting, and the UI
+          range overlay all agree.</p>
+          <p class="text-sm text-base-content/70"><strong>Tests:</strong> artillery hits at range 4 only while the
+          power is active; AI finds the extended-range shot; counter rules unchanged (indirects still
+          never counter).</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 cop-faction cop-verdant">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Nia Rowan <span class="badge badge-outline badge-sm">C3</span></h3>
+          <p class="text-sm"><strong>Hooks:</strong> <span class="cop-code">terrain_cost</span> (woods/mountain −1, min 1, foot
+          &amp; boot) — called from both the Dijkstra step <em>and</em> <span class="cop-code">advance_unit</span>'s fuel
+          spend so fuel matches the path cost the player saw. Power: <span class="cop-code">move_bonus</span> and
+          <span class="cop-code">vision_bonus</span> +1, <span class="cop-code">sees_into_woods</span> true for foot + recon.</p>
+          <p class="text-sm text-base-content/70"><strong>Tests:</strong> infantry reaches one hex deeper through
+          woods; fuel spent equals discounted cost; under fog, Ghost March reveals a woods tile at
+          range that stays hidden for a neutral commander.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 MILESTONES ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">6 · Milestones — each ends playable</h2>
+    <ul class="timeline timeline-snap-icon max-md:timeline-compact timeline-vertical">
+      <li>
+        <div class="timeline-middle">✦</div>
+        <div class="timeline-start md:text-end mb-6">
+          <div class="text-lg font-bold">C1 · The spine + first matchup</div>
+          <p class="text-sm max-w-md">CommanderType with neutral defaults, hooks plumbed through combat
+          and movement, charge accrual, PowerCommand, save v2, CO picker in the main menu, HUD meter +
+          Power button. Ships with <strong>Alina vs Viktor</strong> — pure stat modifiers, so the whole pipe is
+          proven before any exotic hook exists. A no-commander match must play byte-identical to today
+          (regression: same seed, same commands, same result).</p>
+        </div>
+        <hr>
+      </li>
+      <li>
+        <hr>
+        <div class="timeline-middle">✦</div>
+        <div class="timeline-end mb-6">
+          <div class="text-lg font-bold">C2 · Economy &amp; boots</div>
+          <p class="text-sm max-w-md"><strong>Gideon + Tomas.</strong> Supply radius, repair discount, one-shot
+          power effects, capture strength. After C2 every hook family except range/vision is exercised
+          by a shipped general.</p>
+        </div>
+        <hr>
+      </li>
+      <li>
+        <hr>
+        <div class="timeline-middle">✦</div>
+        <div class="timeline-start md:text-end mb-6">
+          <div class="text-lg font-bold">C3 · Range, terrain &amp; fog + AI powers</div>
+          <p class="text-sm max-w-md"><strong>Rhea + Nia.</strong> The shared <span class="cop-code">attack_range()</span> helper,
+          terrain-cost and vision hooks, fog interactions. The AI starts firing powers (see §7). Wave 1
+          complete: six generals, four factions represented.</p>
+        </div>
+        <hr>
+      </li>
+      <li>
+        <hr>
+        <div class="timeline-middle">✦</div>
+        <div class="timeline-end mb-6">
+          <div class="text-lg font-bold">C4 · Second wave &amp; balance pass</div>
+          <p class="text-sm max-w-md"><strong>Mara, Cass, Sable (reworked), Lyra, Orin, Cassian.</strong> Adds the
+          three remaining hook needs: the <span class="cop-code">is_counter</span> flag (Mara), luck-range hooks
+          (Lyra), and enemy-targeting power effects (Signal Jam). Then a balance pass over
+          <span class="cop-code">data/commanders/</span> — numbers only, no code.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ============ 7 AI ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">7 · The AI</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Doctrine awareness: free</h3>
+          <p class="text-sm">The AI already scores attacks through <span class="cop-code">CombatResolver.forecast()</span>
+          (<span class="cop-code">ai_controller.gd:102</span>). Since doctrines land inside
+          <span class="cop-code">_damage_pct</span>, the AI's damage estimates, counter-risk math, and target choice
+          adjust to any commander automatically — no AI change needed for passives.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Power firing: deliberately simple v1</h3>
+          <p class="text-sm">In <span class="cop-code">plan_next_command</span>, before per-unit planning: if the meter is
+          full and at least one enemy is inside any unit's threat range, issue
+          <span class="cop-code">PowerCommand</span>. Deterministic, credible, and correct-by-construction for
+          <span class="cop-code">OWNER_TURN</span> powers since they only help this turn's actions. C4 stretch:
+          per-commander gating (Uprising waits for a reachable capture; Hold the Line fires on the
+          defensive), still rule-based, no lookahead.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 8 PRESENTATION ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">8 · Presentation layer</h2>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Main menu</h3>
+          <p class="text-sm">One commander dropdown per side next to the existing map/fog options
+          ("No Commander" default keeps the current experience). Selection rides in
+          <span class="cop-code">MatchConfig.commanders</span> exactly like <span class="cop-code">ai_teams</span> and
+          <span class="cop-code">fog_enabled</span> do today; a <span class="cop-code">--co</span> CLI flag keeps headless demos
+          working.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Battle HUD</h3>
+          <p class="text-sm">Charge meter (progress bar, <span class="cop-code">charge / power_cost</span>) beside the
+          funds display, with a Power button that enables when full — it issues PowerCommand like any
+          other input. Active power = tinted banner strip + meter glow. <span class="cop-code">EventBus</span> gains
+          <span class="cop-code">power_activated(team, commander)</span> for a short banner animation and an
+          <span class="cop-code">Sfx</span> sting.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body space-y-1">
+          <h3 class="card-title text-base">Faction identity (later)</h3>
+          <p class="text-sm">Faction palettes (navy/gold, red/black, green/tan, white/violet) can start as
+          unit tint variations on the existing atlas rows; portraits and faction-skinned UI are
+          content work, deliberately outside these milestones. Any sourced art gets tracked in
+          <span class="cop-code">assets/LICENSES.md</span>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 9 RISKS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">9 · Risks &amp; failure modes</h2>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm">
+        <thead><tr><th>#</th><th>Risk</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>R1</td>
+            <td><strong>Silent balance drift</strong> — reordering multipliers or rounding twice changes damage everywhere.</td>
+            <td>The formula in §3 is normative: one multiplier chain, one final <span class="cop-code">roundi</span>. A golden-value test pins a matrix of hand-computed damages for neutral + each wave-1 commander.</td>
+          </tr>
+          <tr>
+            <td>R2</td>
+            <td><strong>Determinism breaks</strong> — a power effect or charge calc using floats or global RNG desyncs replays.</td>
+            <td>Charge is integer math; luck stays on <span class="cop-code">state.rng</span>; PowerCommand lives in the command log. Existing seeded-replay tests extended to a match with powers.</td>
+          </tr>
+          <tr>
+            <td>R3</td>
+            <td><strong>Range duplication</strong> — min/max range is checked in <span class="cop-code">attack_command.gd:36</span>, <span class="cop-code">ai_controller.gd:98</span>, and the counter check. Adding Rhea's bonus to only some of them makes the UI, AI and rules disagree.</td>
+            <td>C3 introduces one shared <span class="cop-code">attack_range(state, unit)</span> helper first, migrates all three call sites with the hook returning 0, <em>then</em> ships Rhea.</td>
+          </tr>
+          <tr>
+            <td>R4</td>
+            <td><strong>Save compatibility</strong> — v1 saves have no commander block.</td>
+            <td>Missing keys default to the neutral commander with 0 charge; a v1-fixture load test guards it.</td>
+          </tr>
+          <tr>
+            <td>R5</td>
+            <td><strong>Charge farming</strong> — feeding cheap units to charge the meter.</td>
+            <td>The value-weighted formula already caps an Infantry sacrifice at 1 000 points vs an 8 000+ power. The asymmetric split (D2) further favours the side actually taking valuable losses. Watch it in playtesting, tune costs in data.</td>
+          </tr>
+          <tr>
+            <td>R6</td>
+            <td><strong>Scope creep</strong> — the plan's named top risk. Twelve generals, portraits, super powers, per-CO music…</td>
+            <td>Wave 1 is six generals with zero new art. Super Powers explicitly out of scope. Faction skins deferred. Every milestone ships a playable, testable increment.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 10 DECISIONS (LOCKED) ============ -->
+  <section class="space-y-4">
+    <h2 class="text-3xl font-bold">10 · Decisions — locked 2026-07-19</h2>
+    <p class="max-w-3xl text-sm">All four pre-C1 decisions are resolved and folded into the sections
+    above. Recorded here so the rationale survives.</p>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm">
+        <thead><tr><th>#</th><th>Decision</th><th>Locked choice</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>D1</td>
+            <td>How doctrines are expressed</td>
+            <td><strong>Subclassed CommanderType resources</strong> — hook methods per general, balance
+            numbers as <span class="cop-code">@export</span> in <span class="cop-code">.tres</span></td>
+            <td>Behaviour in small typed classes (repo convention), numbers in data. Handles conditional
+            effects (adjacency, HP thresholds, luck) without inventing a rules mini-language.</td>
+          </tr>
+          <tr>
+            <td>D2</td>
+            <td>Charge accrual split</td>
+            <td><strong>Asymmetric</strong> — HP lost charges 100%, HP dealt charges 50%</td>
+            <td>Comeback pressure; the aggressor can't out-charge the defender with the same exchange.</td>
+          </tr>
+          <tr>
+            <td>D3</td>
+            <td>C1 scope</td>
+            <td><strong>Alina + Viktor first</strong>, then two generals per milestone</td>
+            <td>The two pure-stat generals prove meter, PowerCommand, save, menu and HUD end-to-end with
+            the fewest moving parts, and give a real faction matchup immediately.</td>
+          </tr>
+          <tr>
+            <td>D4</td>
+            <td>Sable Wren's "Vanish" rework</td>
+            <td><strong>True invisibility</strong> — woods units hidden even from adjacent tiles during the
+            power, revealed only by an enemy trying to enter their cell; +40% first strike kept</td>
+            <td>Closest to the written intent, one clean change in <span class="cop-code">vision.gd</span>,
+            keeps the ambush fantasy. Ships in C4 with the rest of wave 2.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="text-center text-sm text-base-content/60 pb-6">
+    Commanders &amp; Command Powers plan · builds on the M0–M7 architecture ·
+    companion to <em>Advance Wars Clone — Godot Implementation Plan</em>
+  </footer>
+</main>
+</body>
+</html>

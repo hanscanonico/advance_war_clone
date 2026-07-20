@@ -1,8 +1,9 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. See `.lavish/advance-wars-clone-plan.html` for the full implementation
-plan (architecture, mechanics, milestones M0–M7).
+typed GDScript. Two plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
+game (architecture, mechanics, milestones M0–M7) and `.lavish/commanders-plan.html` for
+Commanders and Command Powers (milestones C1–C4).
 
 ## Running
 
@@ -24,7 +25,7 @@ target fails with "Godot binary not found". Symlink the one you already have:
 Then:
 
 ```sh
-make run             # boot the game — the main menu (map, fog, 1P / 2P / Continue)
+make run             # boot the game — the main menu (map, commanders, fog, 1P / 2P / Continue)
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
 make verify          # the merge gate: check + lint + format-check + test, in one command
 make smoke           # drive the battle scene's demo scenarios; prove each still renders
@@ -53,22 +54,32 @@ a player's input reaches and must still produce a frame. It renders, so it needs
 a local gate, not a headless-CI one. Narrow it with `make smoke MODES="attack capture"`, and keep
 the captures to look at with `SMOKE_KEEP=1 make smoke`.
 
+A mode may carry a `+fog` suffix (`make smoke MODES="victory+fog"`) to rerun that scenario with fog
+of war on. Fog is the only setting under which the scene hides units rather than just drawing them,
+so two scenarios run both ways by default.
+
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
 Two maps ship: `first_steps` (the default) and `crossfire`. The main menu lists every map in
 `maps/`, but command-line flags still override the menu so demos and tools can skip it:
-`--map=crossfire`, `--hotseat`, and `--fog` — e.g.
+`--map=crossfire`, `--hotseat`, `--fog`, and `--co=alina_ward,viktor_draeg` (red first, blue
+second; either side may be left blank for no commander) — e.g.
 `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn -- --map=crossfire --fog`.
 
 Any Godot 4.7+ works too — open the project folder in the editor.
 
 ## Main menu
 
-The game boots to the menu: pick a map, toggle **Fog of war**, then start a **1 Player** match
-against the Blue AI or a **2 Player** hot-seat game. **Continue** appears only when a save exists
-and resumes it (with the save's own map, fog setting, and AI sides). **Quit** exits.
+The game boots to the menu: pick a map, pick a commander for **Red** and for **Blue**, toggle
+**Fog of war**, then start a **1 Player** match against the Blue AI or a **2 Player** hot-seat
+game. **Continue** appears only when a save exists and resumes it (with the save's own map, fog
+setting, commanders, and AI sides). **Quit** exits.
 
-## Controls (M7)
+Both CO dropdowns default to **No Commander**, which plays the plain rules. Hover one to read the
+general's doctrine and Command Power in its tooltip — the 640x360 design viewport has no room to
+print that for two sides on the menu itself.
+
+## Controls
 
 You play Red; Blue is the computer. Blue's turn plays itself — input is blocked while the AI
 moves, attacks, captures, and builds, and the cursor follows each of its actions so you can
@@ -94,23 +105,57 @@ jumps to that team's first property.
   ammo). Cancel snaps the mover back, as with any uncommitted move
 - A loaded APC offers **Drop**, which enters a cell picker: the legal unload cells get the blue
   overlay, and confirming on one puts the passenger out there, exhausted for the turn. **Supply**
-  refills every friendly unit standing next to the APC
-- Moving spends fuel equal to the terrain cost of each step; attacking spends one ammo, and so
-  does each counter-attack, so a dry unit can neither fire nor counter. At the start of your turn
-  every unit standing on one of your properties or next to one of your APCs is refilled
+  refills every friendly unit within the APC's supply reach — normally the adjacent tiles, further
+  under a commander who says so
+- Moving spends fuel equal to the terrain cost of each step, discounted by any doctrine that makes
+  that step cheaper, so you are never billed more than the range overlay showed; attacking spends
+  one ammo, and so does each counter-attack, so a dry unit can neither fire nor counter. At the
+  start of your turn every unit standing on one of your properties or in reach of one of your APCs
+  is refilled
 - Confirm on one of your empty bases: the build menu lists units cheapest first, each row drawing
   the unit's artwork in your team's colours beside its name and cost; rows you can't afford are
   greyed out. A bought unit spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
   team (the day counter advances when the rotation wraps back to Red), and **Save**, which writes
-  the whole match — map, day, funds, ownership, every unit, and the RNG stream — over the single
-  save slot. Resume it later with **Continue** on the main menu
-- The HUD shows the current day, team, and funds; the corner panel shows the hovered tile's
-  terrain, defense stars, move costs, owner (with `capture: N left` while a capture is in
-  progress), and the unit standing there, if any — with its fuel, its ammo when the unit needs
-  any, and `[+Infantry]` when it is carrying a passenger
+  the whole match — map, day, funds, ownership, every unit, both commanders, and the RNG stream —
+  over the single save slot. Resume it later with **Continue** on the main menu. When your Command
+  Power is charged the menu lists it first, so it is reachable from the keyboard as well as from
+  the HUD button
+- The HUD shows the current day, team, and funds — plus, for a side playing a commander, that
+  side's charge meter and a **Power** button (see Commanders below); the corner panel shows the
+  hovered tile's terrain, defense stars, move costs, owner (with `capture: N left` while a
+  capture is in progress), and the unit standing there, if any — with its fuel, its ammo when the
+  unit needs any, and `[+Infantry]` when it is carrying a passenger
 - Taking the enemy HQ or destroying every enemy unit ends the match on a victory screen naming
-  the winner and the day, with **Rematch** (same map, fog, and sides) and **Main Menu**
+  the winner and the day, with **Rematch** (same map, fog, commanders, and sides) and **Main Menu**
+
+## Commanders
+
+Each side may field a general whose *doctrine* bends the rules for their whole army — attack and
+defence, movement, vision, supply, capture — and who charges toward one **Command Power** that
+bends them further for a turn.
+
+Twelve ship, three to each of four factions (Meridian Coalition, Iron Dominion, Aurora Compact,
+Verdant League). `data/commanders/` is the roster: one `.tres` per general, carrying their
+doctrine line, power name and description, and every balance number. Read it — or the menu
+tooltips — rather than a list here, so the numbers have one home.
+
+Picking **No Commander** on either side gives that side no doctrine, no meter and no power: a
+match with neither plays exactly as the game did before commanders existed.
+
+**Charging.** Both sides bank charge from HP destroyed, valued at the victim's cost prorated by
+the damage — halving a 7 000 Tank is worth 3 500 points. The side that *loses* the HP banks all
+of it; the side that dealt it banks half, so winning the field does not run away with the meter
+as well. The meter is capped at what that general's power costs, so it never holds a second
+power's worth.
+
+**Firing.** When the meter fills, the HUD **Power** button lights up and the map menu (confirm on
+an empty tile) lists the power as its first entry. Firing spends the whole cost and raises the
+power immediately. Most powers last until you end that turn; a few — Hold the Line, Vanish,
+Signal Jam — exist to bother the opponent and so survive their turn, ending as yours begins.
+
+The AI charges and fires powers too, on its own commander's judgement of the right moment. Its
+meter is shown while it plays, but the button stays disabled — it is not yours to press.
 
 ## Fog of war
 
@@ -118,11 +163,15 @@ Off by default; turn it on in the menu or with `--fog`. Fogged cells are darkene
 in them are hidden — you can neither target nor inspect an enemy you cannot see. You see through
 your own units (each unit type has its own vision range) and out to two tiles around every
 property you own. Woods only give themselves up from an adjacent tile, and units riding a
-transport see nothing. Vision is recomputed after each committed action and turn change, not as
-the cursor moves.
+transport see nothing. A commander can bend all of that: lengthen their own units' sight, see
+into woods at range, jam the enemy's sight shorter, or hide their units outright on a tile you
+can otherwise see. Vision is recomputed after each committed action and turn change, not as the
+cursor moves.
 
 The view is always *your* team's, including while the AI plays. The AI itself sees the whole
-board — an openly cheating opponent, not a guessing one. In a fogged hot-seat match a handoff
+board — an openly cheating opponent, not a guessing one — with one deliberate exception: a unit a
+doctrine has hidden is hidden from it too, so an invisibility power is not inert against it.
+In a fogged hot-seat match a handoff
 screen blanks the board between turns so the incoming player never sees the outgoing one's
 vision.
 
@@ -133,9 +182,9 @@ vision.
 - `ai/` — the computer opponent (`AIController`). Also pure simulation: it plans one `Command`
   at a time, the exact same command objects player input produces, and the battle scene applies
   and animates them.
-- `data/` — game data as `Resource` files (terrain, units, the damage chart, and the AI
-  profile in `data/ai/default.tres` — every weight the opponent scores with, so tuning its
-  behaviour is a data edit rather than a code change).
+- `data/` — game data as `Resource` files (terrain, units, the damage chart, the commander
+  roster in `data/commanders/`, and the AI profile in `data/ai/default.tres` — every weight the
+  opponent scores with, so tuning its behaviour is a data edit rather than a code change).
 - `maps/` — plain-text maps: an ASCII terrain grid, a *starting* property-ownership section, and
   a starting-units section. `MapData` (core) is authoritative for terrain and is never mutated by
   play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.

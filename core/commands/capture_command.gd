@@ -1,8 +1,7 @@
 class_name CaptureCommand
 extends Command
 ## Moves a capture-capable unit onto a property and chips at its capture
-## points by the unit's displayed HP. Reaching zero flips ownership; taking
-## the enemy HQ wins the match.
+## points. Reaching zero flips ownership; taking the enemy HQ wins the match.
 
 var unit: Unit
 var path: Array[Vector2i]
@@ -32,7 +31,7 @@ func apply(state: GameState) -> void:
 	state.advance_unit(unit, path)
 	var dest: Vector2i = path[path.size() - 1]
 	var points: int = state.capture_progress.get(dest, GameState.CAPTURE_POINTS)
-	points -= unit.displayed_hp()
+	points -= capture_strength(state, unit)
 	if points > 0:
 		state.capture_progress[dest] = points
 		return
@@ -40,3 +39,11 @@ func apply(state: GameState) -> void:
 	state.set_owner(dest, unit.team)
 	if state.map.terrain_at(dest).id == &"hq":
 		state.winner = unit.team
+
+
+## Capture points chipped off per turn: the unit's displayed HP, adjusted by its
+## commander's doctrine and rounded down. Floored at 1 so no doctrine can ever
+## stall a capture outright, and public so the UI can show what a turn is worth.
+static func capture_strength(state: GameState, unit: Unit) -> int:
+	var bonus := state.commander_of(unit.team).capture_bonus_pct(state, unit)
+	return maxi(1, unit.displayed_hp() * (100 + bonus) / 100)

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="OrinFlux" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/orin_flux.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"orin_flux"
+display_name = "Orin Flux"
+faction = "Aurora Compact"
+doctrine_text = "Recon and APC +1 vision."
+power_name = "Signal Jam"
+power_text = "Enemies lose 10 fuel and 1 ammo, and -1 vision until your next turn."
+power_cost = 9000
+power_duration = 1
+scout_ids = Array[StringName]([&"recon", &"apc"])
+scout_vision_bonus = 1
+jam_vision_penalty = -1
+jam_fuel_loss = 10
+jam_ammo_loss = 1

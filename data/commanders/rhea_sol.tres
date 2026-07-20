@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="RheaSol" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/rhea_sol.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"rhea_sol"
+display_name = "Rhea Sol"
+faction = "Meridian Coalition"
+doctrine_text = "Artillery and Rockets +10% attack, -10% defence."
+power_name = "Grid Saturation"
+power_text = "Indirect units +1 maximum range and +20% attack this turn."
+power_cost = 12000
+power_duration = 0
+indirect_attack_pct = 10
+indirect_defense_pct = -10
+saturation_attack_pct = 20
+saturation_range_bonus = 1

@@ -93,3 +93,31 @@ func test_path_to_unreachable_is_empty() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 i 0 0")
 	var result := MovementResolver.reachable(state, state.units[0])
 	assert_eq(result.path_to(Vector2i(9, 9)), [] as Array[Vector2i])
+
+
+# --- the hypothetical allowance ----------------------------------------------
+
+
+## Lets a caller ask "how far with one more point?" without touching state. The
+## AI weighs a power that grants movement with it, since such a power has to be
+## judged by the reach it would create rather than the reach without it.
+func test_an_extra_allowance_widens_the_fill() -> void:
+	var state := _state("[terrain]\n.....\n[units]\n1 i 0 0")
+	var plain := MovementResolver.reachable(state, state.units[0])
+	assert_false(plain.has(Vector2i(4, 0)), "three movement stops short")
+	assert_true(MovementResolver.reachable(state, state.units[0], 1).has(Vector2i(4, 0)))
+
+
+func test_the_allowance_defaults_to_nothing() -> void:
+	var state := _state("[terrain]\n.....\n[units]\n1 i 0 0")
+	var infantry := state.units[0]
+	assert_eq(MovementResolver.move_budget(state, infantry), infantry.type.move_points)
+	assert_eq(MovementResolver.move_budget(state, infantry, 2), infantry.type.move_points + 2)
+
+
+## Fuel caps the total, so the allowance cannot move a unit that has nothing
+## left to burn — the same rule the doctrine bonus already answers to.
+func test_fuel_still_caps_the_allowance() -> void:
+	var state := _state("[terrain]\n.....\n[units]\n1 i 0 0")
+	state.units[0].fuel = 1
+	assert_eq(MovementResolver.move_budget(state, state.units[0], 5), 1)

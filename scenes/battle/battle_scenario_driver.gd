@@ -58,8 +58,33 @@ func run() -> void:
 		await _run_demo(_demo)
 	elif _select_cell.x >= 0:
 		_demo_select(_select_cell)
+	if not _fog_hides_unseen():
+		_battle.get_tree().quit(1)
+		return
 	if _shot_path != "":
 		await _save_screenshot_and_quit(_shot_path)
+
+
+## Every unit still on screen is one the viewing team is allowed to see.
+##
+## Checked here because a fog leak is silent: the frame renders either way, so a
+## scenario that only proves it produced one would pass straight through the
+## bug. Quitting non-zero is what turns that into a failed smoke run. With fog
+## off there is nothing to hide and the whole check is skipped.
+func _fog_hides_unseen() -> bool:
+	if not _battle.game.fog_enabled:
+		return true
+	for unit in _battle.game.units:
+		var sprite := _battle.view.sprite_for(unit)
+		if sprite != null and sprite.visible and not _battle.view.can_see_unit(unit):
+			push_error(
+				(
+					"fog leak: %s at %s is drawn but team %d cannot see it"
+					% [unit.type.id, unit.cell, _battle.game.current_team]
+				)
+			)
+			return false
+	return true
 
 
 ## Drives real flows through the same handlers a player's input reaches:
@@ -71,7 +96,9 @@ func run() -> void:
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
 ## picker; supply holds the APC next to its infantry so Supply is offered;
-## mapmenu stops at the map menu (End Turn / Save); victory routs Blue through
+## mapmenu stops at the map menu (End Turn / Save); powermenu fires a Command
+## Power from the HUD over an open action menu; ambush and vanish are the same
+## staged board with Sable Wren's power down and up; victory routs Blue through
 ## a real attack so the victory screen comes up.
 ##
 ## Modes that stop early return without falling through to the rest of the
@@ -120,6 +147,10 @@ func _run_demo(mode: String) -> void:
 		"mapmenu":
 			_battle.confirm_at(Vector2i(10, 5))  # empty road tile -> End Turn / Save
 			await _until_state(Battle.State.MENU)
+		"powermenu":
+			await _run_power_menu_demo()
+		"ambush", "vanish":
+			_run_vanish_demo(mode)
 		"victory":
 			await _run_victory_demo()
 		"aiturn":
@@ -158,6 +189,64 @@ func _run_transport_demo(mode: String) -> void:
 	_battle.set_cursor_cell(Vector2i(3, 5))  # show the APC in the panel
 
 
+## Fires a Command Power from the HUD button with a unit's action menu already
+## open — the one route that reaches the power in State.MENU, since the map menu
+## closes itself on the way. The power abandons the move the menu belonged to, so
+## the menu has to go with it: a row chosen afterwards used to run against a
+## selection that was already cleared and take the scene down with it.
+func _run_power_menu_demo() -> void:
+	var co := _battle.commander_db.by_id(&"alina_ward")
+	_battle.game.set_commander(1, co)
+	_battle.game.commander_state(1).charge = co.power_cost
+	_battle.view.refresh_hud()  # the meter now reads full, so the button is live
+	_battle.confirm_at(Vector2i(8, 8))  # select the red tank
+	_battle.confirm_at(Vector2i(8, 8))  # stay put -> its action menu
+	await _until_state(Battle.State.MENU)
+	_battle.view.power_button.pressed.emit()
+	await _until_state(Battle.State.IDLE)
+	# Waited out rather than asserted, in the same spirit as _until_state: a menu
+	# that never closes hangs the scenario and the smoke run reports the timeout.
+	while _battle.action_menu.visible:
+		await _battle.get_tree().process_frame
+	_battle.action_menu.choose(&"wait")  # the click a player can no longer make
+
+
+## Sable Wren's Vanish (decision D4), seen from Red's side of the screen.
+##
+## Two Blue units stand in Woods with a Red unit right beside each — the one
+## arrangement the plain Woods rule already reveals, since woods hide anything
+## further than a tile away from a viewer no matter whose turn it is. `ambush`
+## captures that board with the power down and `vanish` captures it with the
+## power up, and the pair is the whole point: D4 reworked Vanish *because* its
+## original wording ("revealed only from an adjacent tile") described what
+## Vision does anyway, so only a frame where an adjacent enemy stops seeing them
+## shows the rework doing something.
+##
+## Fog is turned on here rather than left to a `--fog` caller: with it off
+## nothing is hidden from anyone and both modes capture the same picture, which
+## would make the comparison silently vacuous.
+##
+## Blue's power is raised directly because PowerCommand only ever fires for the
+## team whose turn it is, and the frame under test is Red's. What the capture
+## proves is a presentation question — that the board honours `hides_unit` —
+## and the sim-side rules (who is hidden, and for how long) are pinned in
+## tests/unit/test_sable_wren.gd instead.
+func _run_vanish_demo(mode: String) -> void:
+	var game := _battle.game
+	game.fog_enabled = true
+	game.set_commander(2, _battle.commander_db.by_id(&"sable_wren"))
+	# Blue moves into the treeline on Red's flank; the Red tank comes up from the
+	# sandbox so the second wood has a viewer next to it as well.
+	game.unit_at(Vector2i(15, 10)).cell = Vector2i(4, 5)  # blue infantry -> woods
+	game.unit_at(Vector2i(17, 9)).cell = Vector2i(5, 5)  # blue mech -> woods
+	game.unit_at(Vector2i(8, 8)).cell = Vector2i(5, 4)  # red tank -> beside them
+	if mode == "vanish":
+		game.commander_state(2).power_active = true
+	_battle.view.sync_sprites()
+	_battle.view.refresh_fog(game.current_team, false)
+	_battle.set_cursor_cell(Vector2i(5, 5))  # the panel names whatever is on the tile
+
+
 ## Leaves Blue one nearly-dead unit, then wins through the ordinary
 ## select -> Fire flow so the real victory handler runs.
 func _run_victory_demo() -> void:
@@ -166,7 +255,7 @@ func _run_victory_demo() -> void:
 			_battle.game.remove_unit(unit)
 	# The sim was edited behind the scene's back, so the sprites need resyncing:
 	# drop the ones whose units are gone, then redraw the survivor.
-	_battle.view.reap_dead_sprites()
+	_battle.view.sync_sprites()
 	var last_blue := _battle.game.unit_at(Vector2i(9, 8))
 	last_blue.hp = 1
 	_battle.view.refresh_sprite(last_blue)

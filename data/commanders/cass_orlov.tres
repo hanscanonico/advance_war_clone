@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CassOrlov" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/commanders/cass_orlov.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"cass_orlov"
+display_name = "Cass Orlov"
+faction = "Iron Dominion"
+doctrine_text = "+15% attack against enemies at 5 HP or below, -10% defence."
+power_name = "No Escape"
+power_text = "+30% attack against damaged enemies; Recon and Tanks +1 movement."
+power_cost = 10000
+power_duration = 0
+finish_hp = 5
+finish_attack_pct = 15
+defense_pct = -10
+no_escape_hp = 9
+no_escape_attack_pct = 30
+no_escape_ids = Array[StringName]([&"recon", &"tank"])
+no_escape_move_bonus = 1

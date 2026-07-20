@@ -32,6 +32,8 @@ verify: check lint format-check test
 # Presentation smoke: drives the battle scene's demo scenarios and proves each
 # still produces a frame. Renders, so it needs a display — keep it out of any
 # headless CI job. `make smoke MODES="attack capture"` narrows it down;
+# a `+fog` suffix reruns a scenario with fog of war on (`victory+fog`), which is
+# the only setting where sprites are hidden rather than merely drawn;
 # SMOKE_KEEP=1 keeps the captures for eyeballing.
 MODES ?=
 smoke:

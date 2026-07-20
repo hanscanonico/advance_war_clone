@@ -24,16 +24,14 @@ func validate(state: GameState) -> String:
 		return "unit is unarmed"
 	if not unit.has_ammo():
 		return "out of ammo"
-	if unit.type.min_range > 1 and path.size() > 1:
+	if AttackRange.is_indirect(unit) and path.size() > 1:
 		return "indirect units cannot move and fire"
 	var target := state.unit_at(target_cell)
 	if target == null:
 		return "no unit at the target cell"
 	if target.team == unit.team:
 		return "cannot attack a friendly unit"
-	var dest: Vector2i = path[path.size() - 1]
-	var dist := absi(target_cell.x - dest.x) + absi(target_cell.y - dest.y)
-	if dist < unit.type.min_range or dist > unit.type.max_range:
+	if not AttackRange.covers(state, unit, path[path.size() - 1], target_cell):
 		return "target out of range"
 	if not state.damage_chart.can_attack(unit.type.id, target.type.id):
 		return "cannot damage the target"

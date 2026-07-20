@@ -8,14 +8,22 @@ extends RefCounted
 ## without a file on disk — and a storage failure is never mistaken for a
 ## malformed save.
 ##
-## Version 1 is the only format there has ever been. When a second one arrives,
-## it gets its own encode/decode pair here and SaveGame keeps choosing between
-## them; the facade and its callers do not change.
+## Version 2 adds the commander block: which general each side is playing, how
+## much charge their meter holds, and whether their Command Power is up. It is
+## purely additive, so version 1 is still read rather than rejected — a save
+## with no commander block loads with both sides neutral, which is exactly the
+## match a version-1 save recorded. New saves are always written at version 2.
+##
+## When a format arrives that *cannot* be read this way, it gets its own
+## encode/decode pair here and SaveGame keeps choosing between them; the facade
+## and its callers do not change.
 
-const VERSION := 1
+const VERSION := 2
+## Every version this codec can still read, oldest first.
+const READABLE_VERSIONS: Array[int] = [1, 2]
 
 ## Keys every save envelope must carry; optional ones (fog, winner,
-## capture_progress, carrier, ai_teams) fall back to defaults instead.
+## capture_progress, carrier, ai_teams, commanders) fall back to defaults.
 const REQUIRED_KEYS: Array = [
 	"map_path",
 	"day",
@@ -66,6 +74,14 @@ static func encode(state: GameState, ai_teams: Array[int]) -> Dictionary:
 	var progress: Array = []
 	for cell: Vector2i in state.capture_progress:
 		progress.append({"x": cell.x, "y": cell.y, "points": state.capture_progress[cell]})
+	var commanders: Dictionary = {}
+	for team in GameState.TEAMS:
+		var co_state := state.commander_state(team)
+		commanders[str(team)] = {
+			"id": String(co_state.type.id),
+			"charge": co_state.charge,
+			"active": co_state.power_active,
+		}
 	return {
 		"version": VERSION,
 		"map_path": state.map_path,
@@ -76,6 +92,7 @@ static func encode(state: GameState, ai_teams: Array[int]) -> Dictionary:
 		"funds": {"1": state.funds[1], "2": state.funds[2]},
 		"rng_state": str(state.rng.state),  # int64 as string: JSON numbers are lossy
 		"ai_teams": ai_teams,
+		"commanders": commanders,
 		"owners": owners,
 		"capture_progress": progress,
 		"units": units,
@@ -83,9 +100,17 @@ static func encode(state: GameState, ai_teams: Array[int]) -> Dictionary:
 
 
 ## Rebuilds a match from a parsed save. Returns null (with a pushed error
-## naming the problem) when the dictionary is not a valid version-1 save.
+## naming the problem) when the dictionary is not a save this codec can read.
+##
+## `commander_db` is optional so callers that have no commanders to resolve —
+## most tests — need not mention one. Left out, only the neutral commander is
+## known, which is also what every id that is not in the database resolves to.
 static func decode(
-	data: Dictionary, terrain_db: TerrainDB, unit_db: UnitDB, damage_chart: DamageChart
+	data: Dictionary,
+	terrain_db: TerrainDB,
+	unit_db: UnitDB,
+	damage_chart: DamageChart,
+	commander_db: CommanderDB = null
 ) -> LoadedMatch:
 	var error := validate(data)
 	if error != "":
@@ -111,6 +136,7 @@ static func decode(
 		state.property_owners[Vector2i(int(entry.x), int(entry.y))] = int(entry.team)
 	for entry in data.get("capture_progress", []):
 		state.capture_progress[Vector2i(int(entry.x), int(entry.y))] = int(entry.points)
+	_decode_commanders(state, data, commander_db)
 
 	var carrier_indices: Array[int] = []
 	for entry in data["units"]:
@@ -146,11 +172,36 @@ static func decode(
 	return result
 
 
-## "" when `data` is a well-formed version-1 save, else the reason it is not.
+## Restores each side's general, meter and running power. Every step falls back
+## to the neutral commander with an empty meter, which is what makes a version-1
+## save — where the whole block is missing — load as the no-commander match it
+## actually was.
+static func _decode_commanders(
+	state: GameState, data: Dictionary, commander_db: CommanderDB
+) -> void:
+	var db := commander_db if commander_db != null else CommanderDB.new()
+	var saved: Variant = data.get("commanders", {})
+	if not (saved is Dictionary):
+		return
+	for team in GameState.TEAMS:
+		var entry: Variant = (saved as Dictionary).get(str(team), {})
+		if not (entry is Dictionary):
+			continue
+		var record := entry as Dictionary
+		state.set_commander(team, db.by_id(StringName(String(record.get("id", "")))))
+		var co_state := state.commander_state(team)
+		# Through add_charge so a hand-edited meter is still capped at the cost,
+		# and so a commander who has since lost their power banks nothing.
+		state.add_charge(team, int(record.get("charge", 0)))
+		co_state.power_active = bool(record.get("active", false)) and co_state.type.has_power()
+
+
+## "" when `data` is a well-formed save this codec can read, else the reason it
+## is not.
 ## Structure only — it does not check that the map exists or that unit ids are
 ## known, because that needs the databases decode is given.
 static func validate(data: Dictionary) -> String:
-	if int(data.get("version", -1)) != VERSION:
+	if not READABLE_VERSIONS.has(int(data.get("version", -1))):
 		return "unsupported save version"
 	var missing := _missing_key(data, REQUIRED_KEYS)
 	if missing != "":
