@@ -14,6 +14,9 @@ extends RefCounted
 
 const MOVE_STEP_SECONDS := 0.06
 const BANNER_SECONDS := 1.2
+## How long the Command Power activation card holds before it slides away. Inside
+## the plan's 0.9-1.2 s window.
+const POWER_BANNER_SECONDS := 1.1
 
 ## Assigned by Battle before first use, like BattleView's nodes.
 var node: Node
@@ -22,11 +25,13 @@ var camera: Camera2D
 var cursor: Sprite2D
 var turn_banner: PanelContainer
 var banner_label: Label
+var power_banner: CommanderPowerBanner
 ## True for a run that exists to be photographed. Suppresses the two open-ended
 ## animations — see `shake_camera` and `start_cursor_pulse`.
 var capturing := false
 
 var _banner_tween: Tween
+var _power_banner_tween: Tween
 
 # --- movement ----------------------------------------------------------------
 
@@ -95,6 +100,24 @@ func hide_banner() -> void:
 	if _banner_tween != null and _banner_tween.is_valid():
 		_banner_tween.kill()
 	turn_banner.hide()
+
+
+## The Command Power activation card: portrait, power name, and exact effect text,
+## faction-tinted. Shown when a power fires (player or AI, both through Battle's
+## _announce_power) and auto-hidden after a beat. While capturing it holds, so a
+## screenshot of the same activation is the same frame — the whole reason the two
+## open-ended animations above are suppressed for captures.
+func show_power_banner(commander: CommanderType) -> void:
+	if _power_banner_tween != null and _power_banner_tween.is_valid():
+		_power_banner_tween.kill()
+	power_banner.bind(commander)
+	power_banner.show()
+	power_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	if capturing:
+		return
+	_power_banner_tween = node.create_tween()
+	_power_banner_tween.tween_interval(POWER_BANNER_SECONDS)
+	_power_banner_tween.tween_callback(power_banner.hide)
 
 
 # --- camera and cursor -------------------------------------------------------

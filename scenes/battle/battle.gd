@@ -11,10 +11,6 @@ extends Node2D
 
 const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
 const MAX_ZOOM := 5.0
-const AI_COMMAND_DELAY := 0.2
-const AI_MAX_COMMANDS_PER_TURN := 300
-## The AI opens its turn just after the turn banner has cleared.
-const AI_TURN_START_DELAY := BattleAnimator.BANNER_SECONDS + 0.1
 
 enum State {
 	IDLE,
@@ -26,6 +22,7 @@ enum State {
 	VICTORY,
 	AI_TURN,
 	HANDOFF,
+	INFO,
 }
 
 const DIR_ACTIONS: Array = [
@@ -41,6 +38,8 @@ const DIR_ACTIONS: Array = [
 @onready var camera: Camera2D = $Camera2D
 @onready var action_menu: ActionMenu = %ActionMenu
 @onready var victory_screen: PanelContainer = %VictoryScreen
+@onready var victory_portrait: TextureRect = %VictoryPortrait
+@onready var victory_faction_label: Label = %VictoryFactionLabel
 @onready var victory_label: Label = %VictoryLabel
 @onready var victory_sub_label: Label = %VictorySubLabel
 @onready var rematch_button: Button = %RematchButton
@@ -48,6 +47,7 @@ const DIR_ACTIONS: Array = [
 @onready var handoff_screen: Panel = %HandoffScreen
 @onready var handoff_label: Label = %HandoffLabel
 @onready var handoff_button: Button = %HandoffButton
+@onready var commander_info_sheet: CommanderInfoSheet = %CommanderInfoSheet
 
 var db: TerrainDB
 var unit_db: UnitDB
@@ -75,6 +75,9 @@ var view: BattleView
 ## Everything this scene animates. Hands it an outcome that is already decided;
 ## it never picks one.
 var animator: BattleAnimator
+## Plays computer turns — the AI's side of the interaction flow. Held for the
+## whole scene; `run()` is fired when a computer team's turn opens.
+var _ai_runner: BattleAiRunner
 
 var _zoom := 2.0
 var _min_zoom := 1.0
@@ -91,6 +94,7 @@ func _ready() -> void:
 	unit_db = UnitDB.load_default()
 	commander_db = CommanderDB.load_default()
 	ai = AIController.new(unit_db)
+	_ai_runner = BattleAiRunner.new(self)
 	# Which match this is, BattleSetup decides; from here the scene just runs it.
 	var built := BattleSetup.build(db, unit_db, commander_db)
 	map = built.map
@@ -100,10 +104,11 @@ func _ready() -> void:
 	view.setup()
 	animator = _build_animator()
 	action_menu.action_chosen.connect(_on_menu_action)
-	view.power_button.pressed.connect(_fire_command_power)
+	view.commander_chip.fire_button.pressed.connect(_fire_command_power)
 	rematch_button.pressed.connect(_rematch)
 	menu_button.pressed.connect(_go_to_main_menu)
 	handoff_button.pressed.connect(leave_handoff)
+	commander_info_sheet.closed.connect(_close_commander_info)
 	_setup_camera()
 	set_cursor_cell(Vector2i.ZERO)
 	# Dev-only capture flows. The driver is held for the whole scene: `run`
@@ -150,9 +155,7 @@ func _build_view() -> BattleView:
 	built.atk_label = %AtkLabel
 	built.counter_label = %CounterLabel
 	built.turn_label = %TurnLabel
-	built.charge_bar = %ChargeBar
-	built.charge_label = %ChargeLabel
-	built.power_button = %PowerButton
+	built.commander_chip = %CommanderChip
 	built.db = db
 	built.map = map
 	built.game = game
@@ -170,6 +173,7 @@ func _build_animator() -> BattleAnimator:
 	built.cursor = cursor
 	built.turn_banner = %TurnBanner
 	built.banner_label = %BannerLabel
+	built.power_banner = %CommanderBanner
 	return built
 
 
@@ -193,8 +197,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed(&"confirm") or clicked:
 			leave_handoff()
 		return
-	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN]:
-		return  # the menu handles its own input; the rest block input entirely
+	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN, State.INFO]:
+		return  # the menu and info sheet handle their own input; the rest block it
 	if event.is_action_pressed(&"zoom_in"):
 		_set_zoom(_zoom + 1.0)
 	elif event.is_action_pressed(&"zoom_out"):
@@ -464,6 +468,9 @@ func _handle_map_action(action: StringName) -> void:
 	if action == &"power":
 		_fire_command_power()
 		return
+	if action == &"commanders":
+		_open_commander_info()
+		return
 	if action == &"save":
 		if SaveGame.save(game, ai_teams):
 			animator.show_banner("Saved")
@@ -503,7 +510,7 @@ func _fire_command_power() -> void:
 ## fires powers through the same command and should look the same doing it.
 func _announce_power(fired: PowerCommand) -> void:
 	Sfx.play(&"fanfare")
-	animator.show_banner("%s  -  %s" % [fired.commander.display_name, fired.commander.power_name])
+	animator.show_power_banner(fired.commander)
 	EventBus.power_activated.emit(fired.team, fired.commander)
 
 
@@ -545,10 +552,24 @@ func _open_map_menu() -> void:
 	var co_state := game.commander_state(game.current_team)
 	if co_state.is_ready():
 		actions.append({"id": &"power", "label": co_state.type.power_name})
+	actions.append({"id": &"commanders", "label": "Commanders"})
 	actions.append({"id": &"end_turn", "label": "End Turn"})
 	actions.append({"id": &"save", "label": "Save"})
 	actions.append({"id": &"cancel", "label": "Cancel"})
 	action_menu.open(actions, view.screen_pos_for_cell(cursor_cell))
+
+
+## Opens the both-sides commander reference over the board. A modal, like the
+## victory and handoff screens: the INFO state blocks board input, and the sheet
+## takes focus and closes itself. Reached from the map menu, never from a hover.
+func _open_commander_info() -> void:
+	state = State.INFO
+	commander_info_sheet.open(game.commander_of(1), game.commander_of(2))
+
+
+func _close_commander_info() -> void:
+	if state == State.INFO:
+		state = State.IDLE
 
 
 func _on_turn_started() -> void:
@@ -584,7 +605,7 @@ func _begin_turn() -> void:
 	EventBus.turn_started.emit(game.current_team, game.day)
 	if game.winner == 0 and game.current_team in ai_teams:
 		state = State.AI_TURN
-		_run_ai_turn()
+		_ai_runner.run()
 	else:
 		state = State.IDLE
 
@@ -646,109 +667,31 @@ func _refresh_fog() -> void:
 	view.refresh_fog(_viewing_team(), state == State.HANDOFF)
 
 
-# --- AI turns ----------------------------------------------------------------
-
-
-## Plays the whole AI turn: plan one command, animate it, repeat until the AI
-## ends its turn. The command cap is a safety net so a planner bug can never
-## hang the match.
-func _run_ai_turn() -> void:
-	await get_tree().create_timer(AI_TURN_START_DELAY).timeout
-	for i in AI_MAX_COMMANDS_PER_TURN:
-		if game.winner != 0:
-			_leave_ai_turn()
-			return
-		var command := ai.plan_next_command(game)
-		var error := command.validate(game)
-		if error != "":
-			push_error("AI command rejected (%s); ending the AI turn" % error)
-			command = EndTurnCommand.new()
-			if command.validate(game) != "":
-				_leave_ai_turn()
-				return
-		var ended := command is EndTurnCommand
-		await _execute_ai_command(command)
-		if game.winner != 0:
-			_leave_ai_turn()
-			return
-		if ended:
-			return
-		await get_tree().create_timer(AI_COMMAND_DELAY).timeout
-	push_error("AI hit the per-turn command cap; forcing end of turn")
-	var end_turn := EndTurnCommand.new()
-	if end_turn.validate(game) == "":
-		await _execute_ai_command(end_turn)
-	else:
-		_leave_ai_turn()
-
-
-## Every bail-out from the AI loop lands here, so a planner bug can never leave
-## the scene stuck in AI_TURN with all input blocked and no banner.
-func _leave_ai_turn() -> void:
-	if game.winner != 0:
-		_enter_victory()
-	else:
-		state = State.IDLE
-
-
-## Applies one AI command with the same animations the player flow uses.
-## Note: Attack/Capture are checked before Move because each is its own
-## Command subclass; the cursor follows so the player can watch.
-func _execute_ai_command(command: Command) -> void:
-	if command is AttackCommand:
-		var attack := command as AttackCommand
-		var target := game.unit_at(attack.target_cell)
-		set_cursor_cell(attack.path[attack.path.size() - 1])
-		await animator.animate_path(view.sprite_for(attack.unit), attack.path)
-		set_cursor_cell(attack.target_cell)
-		command.apply(game)
-		EventBus.unit_moved.emit(attack.unit)
-		await animator.animate_combat(attack.result, attack.unit, target)
-	elif command is CaptureCommand:
-		var capture := command as CaptureCommand
-		var dest: Vector2i = capture.path[capture.path.size() - 1]
-		set_cursor_cell(dest)
-		await animator.animate_path(view.sprite_for(capture.unit), capture.path)
-		command.apply(game)
-		EventBus.unit_moved.emit(capture.unit)
-		if game.owner_at(dest) == capture.unit.team:
-			EventBus.property_captured.emit(dest, capture.unit.team)
-			view.repaint_property(dest)
-		view.refresh_sprite(capture.unit)
-	elif command is MoveCommand:
-		var move := command as MoveCommand
-		set_cursor_cell(move.path[move.path.size() - 1])
-		await animator.animate_path(view.sprite_for(move.unit), move.path)
-		command.apply(game)
-		EventBus.unit_moved.emit(move.unit)
-		view.refresh_sprite(move.unit)
-	elif command is PowerCommand:
-		command.apply(game)
-		_announce_power(command as PowerCommand)
-		view.sync_sprites()  # the one-shot half may have healed or refuelled
-	elif command is BuildCommand:
-		var build := command as BuildCommand
-		set_cursor_cell(build.cell)
-		command.apply(game)
-		view.spawn_sprite_for(build.built_unit)
-		EventBus.unit_built.emit(build.built_unit)
-	elif command is EndTurnCommand:
-		command.apply(game)
-		_on_turn_started()
-	_refresh_fog()
-	_refresh_panel()
-	_refresh_hud()
-
-
 func _enter_victory() -> void:
 	state = State.VICTORY
 	animator.hide_banner()
 	Sfx.play(&"fanfare")
 	victory_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
 	victory_sub_label.text = "Day %d" % game.day
+	_bind_victory_commander()
 	victory_screen.show()
 	victory_screen.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	rematch_button.grab_focus()
+
+
+## Fronts the victory screen with the winning commander's portrait and faction. A
+## side that played without one renders gracefully: the portrait and faction line
+## simply hide, leaving the plain "<team> wins!" lockup.
+func _bind_victory_commander() -> void:
+	var winner := game.commander_of(game.winner)
+	var has_co := winner.id != CommanderType.NEUTRAL_ID
+	victory_portrait.visible = has_co
+	victory_faction_label.visible = has_co
+	if has_co:
+		victory_portrait.texture = CommanderVisuals.portrait_for(winner)
+		var theme := CommanderVisuals.theme_for(winner)
+		victory_faction_label.text = "%s · %s" % [winner.display_name, theme.display]
+		victory_faction_label.add_theme_color_override("font_color", theme.color_light)
 
 
 func _refresh_hud() -> void:

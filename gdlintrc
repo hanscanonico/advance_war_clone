@@ -20,7 +20,9 @@ max-returns: 12
 # being split a responsibility at a time. Set at its current length so the file
 # cannot grow without tripping the lint, and lowered each time it shrinks — 1320
 # when it held the demo driver, the whole rendering layer, and every animation;
-# 920 now that BattleScenarioDriver, BattleView, BattleAnimator, and BattleSetup
-# have moved out. battle.gd sits at exactly 920: adding to it means moving
-# something else out first, which is the point.
-max-file-lines: 920
+# 920 once BattleScenarioDriver, BattleView, BattleAnimator, and BattleSetup had
+# moved out; 863 now that BattleAiRunner (the computer's side of the interaction
+# flow) has moved out too, making room for the commander battle-identity HUD.
+# battle.gd sits at exactly 863: adding to it means moving something else out
+# first, which is the point.
+max-file-lines: 863

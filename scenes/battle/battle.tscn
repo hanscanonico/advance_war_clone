@@ -1,9 +1,12 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/battle/battle.gd" id="1"]
 [ext_resource type="Script" path="res://scenes/ui/terrain_panel.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/ui/cursor.png" id="3"]
 [ext_resource type="Script" path="res://scenes/ui/action_menu.gd" id="4"]
+[ext_resource type="Script" path="res://scenes/ui/commander_hud_chip.gd" id="5"]
+[ext_resource type="Script" path="res://scenes/ui/commander_power_banner.gd" id="6"]
+[ext_resource type="Script" path="res://scenes/ui/commander_info_sheet.gd" id="7"]
 
 [node name="Battle" type="Node2D"]
 script = ExtResource("1")
@@ -199,53 +202,37 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Counter 45%"
 
-[node name="TurnHud" type="PanelContainer" parent="UI"]
+[node name="CommanderChip" type="PanelContainer" parent="UI"]
+unique_name_in_owner = true
+visible = false
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 8.0
 offset_bottom = 8.0
+script = ExtResource("5")
 
-[node name="HudMargin" type="MarginContainer" parent="UI/TurnHud"]
+[node name="DayPanel" type="PanelContainer" parent="UI"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 8.0
+grow_horizontal = 0
+
+[node name="DayMargin" type="MarginContainer" parent="UI/DayPanel"]
 layout_mode = 2
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_top = 3
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 3
 
-[node name="HudRow" type="HBoxContainer" parent="UI/TurnHud/HudMargin"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="TurnLabel" type="Label" parent="UI/TurnHud/HudMargin/HudRow"]
+[node name="TurnLabel" type="Label" parent="UI/DayPanel/DayMargin"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Day 1  -  Red Army  -  Funds 0"
-
-[node name="ChargeBar" type="ProgressBar" parent="UI/TurnHud/HudMargin/HudRow"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-custom_minimum_size = Vector2(90, 14)
-max_value = 1.0
-step = 0.001
-show_percentage = false
-
-[node name="ChargeLabel" type="Label" parent="UI/TurnHud/HudMargin/HudRow"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_font_sizes/font_size = 10
-text = "Power"
-
-[node name="PowerButton" type="Button" parent="UI/TurnHud/HudMargin/HudRow"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-focus_mode = 0
-disabled = true
-theme_override_font_sizes/font_size = 10
-text = "Power"
 
 [node name="TurnBanner" type="PanelContainer" parent="UI"]
 unique_name_in_owner = true
@@ -271,6 +258,18 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Day 1 - Red Army"
 
+[node name="CommanderBanner" type="PanelContainer" parent="UI"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6")
+
 [node name="VictoryScreen" type="PanelContainer" parent="UI"]
 unique_name_in_owner = true
 visible = false
@@ -292,6 +291,24 @@ theme_override_constants/margin_bottom = 14
 [node name="VictoryRows" type="VBoxContainer" parent="UI/VictoryScreen/VictoryMargin"]
 layout_mode = 2
 theme_override_constants/separation = 6
+
+[node name="VictoryPortrait" type="TextureRect" parent="UI/VictoryScreen/VictoryMargin/VictoryRows"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(76, 76)
+texture_filter = 1
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 6
+
+[node name="VictoryFactionLabel" type="Label" parent="UI/VictoryScreen/VictoryMargin/VictoryRows"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 1
+text = "Meridian Coalition"
 
 [node name="VictoryLabel" type="Label" parent="UI/VictoryScreen/VictoryMargin/VictoryRows"]
 unique_name_in_owner = true
@@ -368,3 +385,14 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Ready"
+
+[node name="CommanderInfoSheet" type="Control" parent="UI"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7")

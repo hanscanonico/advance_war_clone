@@ -38,9 +38,9 @@ var damage_preview: PanelContainer
 var atk_label: Label
 var counter_label: Label
 var turn_label: Label
-var charge_bar: ProgressBar
-var charge_label: Label
-var power_button: Button
+## The current side's portrait identity and charge meter. Hides itself for a side
+## with no Command Power, so a commander-less match keeps the pre-commander HUD.
+var commander_chip: CommanderHudChip
 
 var db: TerrainDB
 var map: MapData
@@ -289,34 +289,12 @@ func refresh_hud() -> void:
 			game.funds[game.current_team],
 		]
 	)
-	_refresh_charge_meter()
-
-
-## The meter, the label and the button belong to whoever's turn it is. A side
-## playing without a commander has no meter at all, so the whole group hides and
-## the HUD looks exactly as it did before commanders existed.
-func _refresh_charge_meter() -> void:
-	var co_state := game.commander_state(game.current_team)
-	var showing := co_state.type.has_power()
-	charge_bar.visible = showing
-	charge_label.visible = showing
-	power_button.visible = showing
-	if not showing:
-		return
-	charge_bar.value = co_state.charge_ratio()
-	# An active power reads off the meter alone, which is empty either way while
-	# it runs — so say so rather than leaving the player guessing.
-	if co_state.power_active:
-		charge_label.text = "%s  ACTIVE" % co_state.type.power_name
-	else:
-		charge_label.text = (
-			"%s  %d/%d" % [co_state.type.display_name, co_state.charge, co_state.type.power_cost]
-		)
-	power_button.text = co_state.type.power_name
-	# A charged computer opponent that chose not to spend still fills the meter,
-	# and the click would be refused anyway — so the button says so up front
-	# rather than looking live and doing nothing.
-	power_button.disabled = not co_state.is_ready() or game.current_team in ai_teams
+	# The chip belongs to whoever's turn it is. It hides itself for a side with no
+	# power, and greys its Fire button for a computer commander — a charged AI
+	# still fills the meter, but the click would be refused.
+	commander_chip.update_state(
+		game.commander_state(game.current_team), game.current_team in ai_teams
+	)
 
 
 func refresh_panel(cell: Vector2i) -> void:

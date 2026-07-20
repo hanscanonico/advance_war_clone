@@ -134,7 +134,7 @@ func _build() -> void:
 	var footer := Label.new()
 	footer.add_theme_font_size_override("font_size", 9)
 	footer.add_theme_color_override("font_color", Color(0.678, 0.706, 0.722))
-	footer.text = ("Arrows / Tab  Browse      Enter  Select & Confirm      Esc  Back      Mouse fully supported")
+	footer.text = "Arrows / Tab  Browse      Enter  Confirm      Esc  Back      Mouse supported"
 	main.add_child(footer)
 
 
