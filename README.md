@@ -36,9 +36,12 @@ make format          # gdformat — reformat in place; format-check only reports
 make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
 make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
+make portraits       # regenerate the placeholder commander portraits + faction emblems
 make import          # (re)import assets headless
 make screenshot      # boot the battle scene, save screenshot.png, quit
 make menu-screenshot # the same, for the main menu
+make gallery-screenshot   # render all thirteen commander cards (the G1 gate)
+make commander-balance    # offline AI-vs-AI balance matrix -> reports/ (a release task)
 ```
 
 `make verify` is the one command to run before merging: it parse-checks, lints, checks formatting,
@@ -77,14 +80,20 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 
 ## Main menu
 
-The game boots to the menu: pick a map, pick a commander for **Red** and for **Blue**, toggle
-**Fog of war**, then start a **1 Player** match against the Blue AI or a **2 Player** hot-seat
-game. **Continue** appears only when a save exists and resumes it (with the save's own map, fog
-setting, commanders, and AI sides). **Quit** exits.
+The game boots to the menu: pick a map, toggle **Fog of war**, then start a **1 Player** match
+against the Blue AI or a **2 Player** hot-seat game. Either opens the **commander selection page**;
+**Continue** appears only when a save exists and skips selection, resuming the save with its own
+map, fog setting, commanders, and AI sides. **Quit** exits.
 
-Both CO dropdowns default to **No Commander**, which plays the plain rules. Hover one to read the
-general's doctrine and Command Power in its tooltip — the 640x360 design viewport has no room to
-print that for two sides on the menu itself.
+On the selection page you edit **Red**, confirm, then edit **Blue**, confirm. Four faction tabs and
+three peer portraits let you browse; one focused card shows the highlighted general's doctrine and
+Command Power in full (no hover tooltips), and a deliberate **No Commander** plays the plain rules.
+Mouse, keyboard, and controller all navigate it, and **Back** returns to the menu without discarding
+the map or fog choice. Nothing is committed until both sides are locked.
+
+In battle each side's commander gets a portrait HUD chip with a charge meter (charging / ready /
+active), a faction-tinted activation card when a power fires, a both-sides reference sheet from the
+map menu, and a portrait on the victory screen.
 
 ## Controls
 
@@ -147,8 +156,8 @@ bends them further for a turn.
 
 Twelve ship, three to each of four factions (Meridian Coalition, Iron Dominion, Aurora Compact,
 Verdant League). `data/commanders/` is the roster: one `.tres` per general, carrying their
-doctrine line, power name and description, and every balance number. Read it — or the menu
-tooltips — rather than a list here, so the numbers have one home.
+doctrine line, power name and description, and every balance number. Read it — or the selection
+page's card, which binds the same fields — rather than a list here, so the numbers have one home.
 
 Picking **No Commander** on either side gives that side no doctrine, no meter and no power: a
 match with neither plays exactly as the game did before commanders existed.
@@ -210,9 +219,11 @@ vision.
 
 Units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
 Sprites](https://opengameart.org/content/pixvoxel-revised-isometric-wargame-sprites); the ground
-tiles are still generated programmer art. All sound is generated placeholder chiptune (`make sfx`).
-There is no music yet — it needs licensed tracks. Third-party asset licenses must be tracked in
-`assets/LICENSES.md`. No Nintendo assets or names may ever be used.
+tiles are still generated programmer art. The commander portraits and faction emblems are generated
+placeholder art too (`make portraits`) — project-original, no third-party pixels — until the final
+portrait pass. All sound is generated placeholder chiptune (`make sfx`). There is no music yet — it
+needs licensed tracks. Third-party asset licenses must be tracked in `assets/LICENSES.md`. No
+Nintendo assets or names may ever be used.
 
 `make tiles` rebuilds the art in four ordered steps: `sprites-check` verifies the build inputs,
 `ground` draws the terrain headless, `sprites` composites the PixVoxel art over it, and `import`
