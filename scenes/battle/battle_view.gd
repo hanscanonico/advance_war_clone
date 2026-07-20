@@ -320,9 +320,6 @@ func _refresh_charge_meter() -> void:
 
 
 func refresh_panel(cell: Vector2i) -> void:
-	terrain_panel.show_terrain(
-		map.terrain_at(cell), game.owner_at(cell), game.capture_progress.get(cell, -1)
-	)
 	var hovered := game.unit_at(cell)
 	if hovered != null and not can_see_unit(hovered):
 		hovered = null  # hidden enemies stay hidden in the panel too
@@ -331,7 +328,13 @@ func refresh_panel(cell: Vector2i) -> void:
 		var cargo := game.cargo_of(hovered)
 		if not cargo.is_empty():
 			carrying = cargo[0].type.display_name
-	terrain_panel.show_unit(hovered, carrying)
+	terrain_panel.show_tile(
+		map.terrain_at(cell),
+		game.owner_at(cell),
+		game.capture_progress.get(cell, -1),
+		hovered,
+		carrying
+	)
 	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
 
 

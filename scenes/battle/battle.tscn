@@ -61,17 +61,92 @@ theme_override_constants/margin_bottom = 6
 [node name="Rows" type="VBoxContainer" parent="UI/TerrainPanel/Margin"]
 layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
+[node name="UnitRows" type="VBoxContainer" parent="UI/TerrainPanel/Margin/Rows"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="UnitHeader" type="HBoxContainer" parent="UI/TerrainPanel/Margin/Rows/UnitRows"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="UnitIcon" type="TextureRect" parent="UI/TerrainPanel/Margin/Rows/UnitRows/UnitHeader"]
+unique_name_in_owner = true
+texture_filter = 1
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="UnitNameLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/UnitRows/UnitHeader"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
 theme_override_font_sizes/font_size = 13
-text = "Plains"
+text = "Tank"
 
-[node name="DefLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
+[node name="UnitTeamLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/UnitRows/UnitHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 10
+text = "Red Army"
+horizontal_alignment = 2
+
+[node name="UnitHpLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/UnitRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "HP 10/10"
+
+[node name="UnitSupplyLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/UnitRows"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
+text = "Fuel 70/70   Ammo 9/9"
+
+[node name="UnitExtraLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/UnitRows"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Rng 2-3"
+
+[node name="Separator" type="HSeparator" parent="UI/TerrainPanel/Margin/Rows"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="TerrainHeader" type="HBoxContainer" parent="UI/TerrainPanel/Margin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TerrainIcon" type="TextureRect" parent="UI/TerrainPanel/Margin/Rows/TerrainHeader"]
+unique_name_in_owner = true
+texture_filter = 1
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/TerrainHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 13
+text = "Plains"
+
+[node name="DefLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/TerrainHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_font_sizes/font_size = 10
 text = "DEF 1"
+horizontal_alignment = 2
 
 [node name="MoveLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
 unique_name_in_owner = true
@@ -84,13 +159,6 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Neutral"
-
-[node name="UnitLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_font_sizes/font_size = 10
-text = "Infantry - HP 10 - Red Army"
 
 [node name="ActionMenu" type="PanelContainer" parent="UI"]
 unique_name_in_owner = true
