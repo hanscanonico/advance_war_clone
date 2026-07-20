@@ -1,9 +1,17 @@
 class_name TerrainPanel
 extends PanelContainer
-## AW-style corner panel showing the hovered tile's terrain stats.
+## AW-style corner panel for the hovered tile. A unit on the tile is the
+## headline card; terrain drops to a compact card below it.
 ## Flips to the other bottom corner when the cursor gets close (set_side).
 
 const TEAM_NAMES := {0: "Neutral", 1: "Red Army", 2: "Blue Army"}
+const TEAM_COLORS := {1: Color(1.0, 0.61, 0.55), 2: Color(0.61, 0.78, 1.0)}
+const ACTED_TINT := Color(0.62, 0.62, 0.62)
+const MAX_DEFENSE_STARS := 4
+const TERRAIN_ATLAS_PATH := "res://assets/tiles/terrain_atlas.png"
+## Terrain atlas cell size; mirrors BattleView.TERRAIN_PX rather than
+## coupling the UI panel to the battle scene for one constant.
+const TERRAIN_PX := 64
 const CLASS_LABELS: Array = [
 	[TerrainType.FOOT, "Foot"],
 	[TerrainType.BOOT, "Boot"],
@@ -11,21 +19,74 @@ const CLASS_LABELS: Array = [
 	[TerrainType.TREADS, "Treads"],
 ]
 
+@onready var unit_rows: VBoxContainer = %UnitRows
+@onready var unit_icon: TextureRect = %UnitIcon
+@onready var unit_name_label: Label = %UnitNameLabel
+@onready var unit_team_label: Label = %UnitTeamLabel
+@onready var unit_hp_label: Label = %UnitHpLabel
+@onready var unit_supply_label: Label = %UnitSupplyLabel
+@onready var unit_extra_label: Label = %UnitExtraLabel
+@onready var separator: HSeparator = %Separator
+@onready var terrain_icon: TextureRect = %TerrainIcon
 @onready var name_label: Label = %NameLabel
 @onready var def_label: Label = %DefLabel
 @onready var move_label: Label = %MoveLabel
 @onready var owner_label: Label = %OwnerLabel
-@onready var unit_label: Label = %UnitLabel
 
 
-func show_terrain(terrain: TerrainType, owner_team: int, capture_left: int = -1) -> void:
+func _ready() -> void:
+	set_side(false)  # apply the min-size preset before the first hover
+
+
+## Single entry point per hovered tile; unit is null on empty or fogged tiles.
+## `carrying` names the cargo when the unit is a loaded transport. The acted
+## dim and "Waited" badge apply only to `active_team`'s own units, matching
+## the map sprite's tint.
+func show_tile(
+	terrain: TerrainType,
+	owner_team: int,
+	active_team: int,
+	capture_left: int = -1,
+	unit: Unit = null,
+	carrying: String = ""
+) -> void:
+	_show_unit(unit, carrying, active_team)
+	_show_terrain(terrain, owner_team, capture_left, unit)
+
+
+func _show_unit(unit: Unit, carrying: String, active_team: int) -> void:
+	unit_rows.visible = unit != null
+	separator.visible = unit != null
+	if unit == null:
+		return
+	unit_icon.texture = UnitSprite.texture_for(unit.type, unit.team)
+	unit_name_label.text = unit.type.display_name
+	unit_team_label.text = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
+	var team_color: Color = TEAM_COLORS.get(unit.team, Color.WHITE)
+	unit_team_label.add_theme_color_override("font_color", team_color)
+	unit_hp_label.text = "HP %d/10" % unit.displayed_hp()
+	var supply := "Fuel %d/%d" % [unit.fuel, unit.type.max_fuel]
+	if unit.type.max_ammo > 0:
+		supply += "   Ammo %d/%d" % [unit.ammo, unit.type.max_ammo]
+	unit_supply_label.text = supply
+	var waited := unit.acted and unit.team == active_team
+	var extras := PackedStringArray()
+	if unit.type.min_range > 1:
+		extras.append("Rng %d-%d" % [unit.type.min_range, unit.type.max_range])
+	if carrying != "":
+		extras.append("Carrying %s" % carrying)
+	if waited:
+		extras.append("Waited")
+	unit_extra_label.visible = not extras.is_empty()
+	unit_extra_label.text = "  ".join(extras)
+	unit_rows.modulate = ACTED_TINT if waited else Color.WHITE
+
+
+func _show_terrain(terrain: TerrainType, owner_team: int, capture_left: int, unit: Unit) -> void:
+	terrain_icon.texture = _terrain_texture(terrain, owner_team)
 	name_label.text = terrain.display_name
-	def_label.text = "DEF %d" % terrain.defense_stars
-	var parts := PackedStringArray()
-	for pair: Array in CLASS_LABELS:
-		var cost: int = terrain.move_cost(pair[0])
-		parts.append("%s %s" % [pair[1], "-" if cost == TerrainType.IMPASSABLE else str(cost)])
-	move_label.text = "  ".join(parts)
+	def_label.text = "DEF %s" % _stars(terrain.defense_stars)
+	move_label.text = _move_costs(terrain, unit)
 	owner_label.visible = terrain.is_property
 	var owner_text: String = TEAM_NAMES.get(owner_team, "Team %d" % owner_team)
 	if capture_left >= 0:
@@ -33,23 +94,33 @@ func show_terrain(terrain: TerrainType, owner_team: int, capture_left: int = -1)
 	owner_label.text = owner_text
 
 
-## Shows the hovered unit's line, or hides it when unit is null.
-## `carrying` names the cargo when the unit is a loaded transport.
-func show_unit(unit: Unit, carrying: String = "") -> void:
-	unit_label.visible = unit != null
-	if unit == null:
-		return
-	var team_name: String = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
-	var stats := "%s - HP %d" % [unit.type.display_name, unit.displayed_hp()]
-	stats += " - F %d" % unit.fuel
-	if unit.type.max_ammo > 0:
-		stats += " - A %d" % unit.ammo
-	stats += " - " + team_name
-	if unit.acted:
-		stats += " (acted)"
-	if carrying != "":
-		stats += " [+%s]" % carrying
-	unit_label.text = stats
+## Occupied tile: only the occupant's move class matters. Empty tile: keep
+## the full four-class planning row.
+func _move_costs(terrain: TerrainType, unit: Unit) -> String:
+	var parts := PackedStringArray()
+	for pair: Array in CLASS_LABELS:
+		if unit != null and unit.type.move_class != pair[0]:
+			continue
+		var cost: int = terrain.move_cost(pair[0])
+		parts.append("%s %s" % [pair[1], "-" if cost == TerrainType.IMPASSABLE else str(cost)])
+	return "  ".join(parts)
+
+
+func _stars(count: int) -> String:
+	if count <= 0:
+		return "0"
+	var filled := mini(count, MAX_DEFENSE_STARS)
+	return "★".repeat(filled) + "☆".repeat(MAX_DEFENSE_STARS - filled)
+
+
+## The same artwork the board draws: one cell of the terrain atlas, with the
+## owner-coloured row for properties (rows 1+ exist only when team_tinted).
+func _terrain_texture(terrain: TerrainType, owner_team: int) -> AtlasTexture:
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load(TERRAIN_ATLAS_PATH)
+	var row: int = owner_team if terrain.team_tinted and owner_team > 0 else 0
+	atlas.region = Rect2(terrain.atlas_col * TERRAIN_PX, row * TERRAIN_PX, TERRAIN_PX, TERRAIN_PX)
+	return atlas
 
 
 func set_side(on_right: bool) -> void:
