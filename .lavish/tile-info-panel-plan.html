@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Tile Info Panel: Unit-First Redesign</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-choice:has(input:checked) { border-color: var(--gc-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-blue) 28%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+
+    /* --- in-game panel mocks ------------------------------------------------ */
+    .aw-fill { display: flex; flex-direction: column; }
+    .aw-fill > .aw-stage { flex: 1 1 auto; }
+    .aw-stage {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 1.1rem;
+      border-radius: .75rem;
+      background:
+        linear-gradient(rgba(255,255,255,.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.10) 1px, transparent 1px),
+        var(--gc-grass);
+      background-size: 26px 26px;
+      border: 2px solid var(--gc-grass-dark);
+    }
+    .aw-panel {
+      font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+      color: #fff;
+      background: rgba(13, 24, 18, .78);
+      border-radius: 12px;
+      padding: .8rem 1rem .85rem;
+      min-width: min(15.5rem, 100%);
+      max-width: 100%;
+      box-shadow: 0 10px 30px rgba(7, 34, 55, .35);
+    }
+    .aw-panel, .aw-panel * { min-width: 0; }
+    .aw-panel div { overflow-wrap: anywhere; }
+    .aw-panel .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .1rem .9rem; }
+    .aw-id { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+    .aw-icon {
+      flex: none;
+      border-radius: 5px;
+      background-image: url(tile-panel-current.png);
+      background-repeat: no-repeat;
+      image-rendering: pixelated;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+    }
+    .aw-icon-unit { width: 34px; height: 34px; background-size: 755px auto; }
+    .aw-icon-terrain { width: 26px; height: 26px; background-size: 486px auto; }
+    .aw-blue { filter: hue-rotate(175deg) saturate(.9); }
+    .aw-name { font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
+    .aw-team { font-size: .74rem; font-weight: 700; }
+    .aw-team-red { color: #ff9c8d; }
+    .aw-team-blue { color: #9cc6ff; }
+    .aw-hp { font-size: .95rem; font-weight: 600; margin-top: .1rem; }
+    .aw-sub { font-size: .76rem; opacity: .92; margin-top: .15rem; }
+    .aw-dim { opacity: .78; }
+    .aw-sep { border: 0; border-top: 1px solid rgba(255,255,255,.28); margin: .55rem 0 .5rem; }
+    .aw-terrain-name { font-size: .92rem; font-weight: 700; }
+    .aw-def { font-size: .76rem; letter-spacing: .06em; }
+    .aw-stars { color: #ffd66e; }
+    .aw-move { font-size: .72rem; opacity: .8; margin-top: .12rem; }
+    .aw-owner { font-size: .72rem; opacity: .85; margin-top: .12rem; }
+    .aw-acted { filter: grayscale(.55) brightness(.82); }
+    .aw-badge {
+      display: inline-block;
+      font-size: .62rem;
+      font-weight: 800;
+      letter-spacing: .1em;
+      padding: .1rem .4rem;
+      border-radius: .3rem;
+      background: rgba(255,255,255,.22);
+      vertical-align: 1px;
+    }
+    .aw-old-line { font-size: .74rem; opacity: .95; margin-top: .12rem; }
+
+    .gc-problem {
+      display: inline-grid;
+      place-items: center;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 999px;
+      background: var(--gc-red);
+      color: #fff;
+      font: 800 .7rem ui-monospace, monospace;
+      flex: none;
+    }
+    .gc-shot { position: relative; border-radius: .75rem; overflow: hidden; border: 2px solid var(--gc-water-dark); }
+    .gc-shot img { display: block; width: 100%; }
+    .gc-shot-ring {
+      position: absolute;
+      left: 66.9%; top: 70.6%; width: 32%; height: 27.4%;
+      border: 3px solid var(--gc-red);
+      border-radius: .6rem;
+      box-shadow: 0 0 0 2000px rgba(10, 25, 40, .28);
+      pointer-events: none;
+    }
+    .diff-holder { border: 1px solid color-mix(in srgb, var(--gc-ink) 14%, transparent); border-radius: .6rem; overflow: hidden; background: #fff; }
+    .diff-holder > * { max-width: 100%; }
+    @media (max-width: 640px) {
+      .gc-shell { width: 100%; border-inline-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="gc-shell min-h-screen">
+
+    <header class="gc-hero px-5 py-10 sm:px-9 sm:py-12 lg:px-14">
+      <div class="gc-kicker mb-4 text-sky-200">Grid Commander · UI plan · 2026-07-20</div>
+      <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,.42fr)] lg:items-end">
+        <div>
+          <h1 class="max-w-4xl pr-1 pb-1 text-4xl font-black leading-[1.12] sm:text-5xl">Make the unit the headline of the tile panel</h1>
+          <p class="mt-5 max-w-3xl text-base text-slate-100/85 sm:text-lg">When the cursor sits on an occupied tile, the corner panel still leads with terrain and crams the unit into one dash-separated line. Flip the hierarchy: unit card on top with readable <em>current/max</em> stats, terrain demoted to a compact card below — the classic AW layout.</p>
+        </div>
+        <div class="rounded-box border border-white/20 bg-black/20 p-5 backdrop-blur-sm">
+          <div class="text-sm font-bold uppercase tracking-widest text-sky-200">Scope</div>
+          <p class="mt-2 text-lg font-bold">Presentation-only. Three files, ~120 lines, one afternoon.</p>
+          <p class="mt-3 text-sm text-white/75">No <code>core/</code> or <code>ai/</code> changes, no new GUT tests (per testing policy), fog & doctrine hiding preserved.</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="space-y-14 px-5 py-10 sm:px-9 lg:px-14 lg:py-14">
+
+      <!-- ============================================================ 01 -->
+      <section class="space-y-5" aria-labelledby="current-title">
+        <div class="flex items-center gap-3"><span class="gc-section-number">01</span><h2 id="current-title" class="text-3xl font-black">Current state</h2></div>
+        <p class="max-w-4xl text-base-content/75">In-game today (cursor on the Tank): the panel is <span class="gc-file">scenes/ui/terrain_panel.gd</span>, five stacked labels in <span class="gc-file">battle.tscn</span>, fed by <span class="gc-file">battle_view.gd:refresh_panel()</span>.</p>
+        <div class="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <figure class="gc-shot">
+            <img src="tile-panel-current.png" alt="Current battle screen; the tile panel bottom-right leads with Road and ends with the Tank line">
+            <div class="gc-shot-ring"></div>
+            <figcaption class="bg-base-100 px-4 py-2 text-sm text-base-content/70">The selected square holds a Tank — but the panel's headline is the road it parks on.</figcaption>
+          </figure>
+          <div class="space-y-4">
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="aw-name">Road</div>
+                <div class="aw-old-line">DEF 0</div>
+                <div class="aw-old-line">Foot&nbsp;1&ensp;Boot&nbsp;1&ensp;Tires&nbsp;1&ensp;Treads&nbsp;1</div>
+                <div class="aw-old-line">Tank - HP 10 - F 70 - A 9 - Red Army</div>
+              </div>
+            </div>
+            <ul class="space-y-2.5 text-sm">
+              <li class="flex gap-2.5"><span class="gc-problem">1</span><span><strong>Wrong headline.</strong> Inspecting a unit reads terrain first; the unit is the last line at the smallest size.</span></li>
+              <li class="flex gap-2.5"><span class="gc-problem">2</span><span><strong>Cryptic, capped-out stats.</strong> <code>F 70</code> / <code>A 9</code> — no way to tell full tank from running on fumes without knowing every unit's maximums.</span></li>
+              <li class="flex gap-2.5"><span class="gc-problem">3</span><span><strong>Irrelevant move row.</strong> All four move classes are listed while a treads unit occupies the tile; only <code>Treads 1</code> matters here.</span></li>
+              <li class="flex gap-2.5"><span class="gc-problem">4</span><span><strong>Buried state.</strong> Team is trailing text; <code>(acted)</code> and cargo <code>[+Infantry]</code> extend an already long line.</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 02 -->
+      <section class="space-y-5" aria-labelledby="proposed-title">
+        <div class="flex items-center gap-3"><span class="gc-section-number">02</span><h2 id="proposed-title" class="text-3xl font-black">Proposed panel</h2></div>
+        <p class="max-w-4xl text-base-content/75">Same tile, same data — reordered and reformatted, with the unit's sprite and the terrain tile as icons (the exact artwork the board draws, pulled from the existing atlases). All values below are real: Tank is <span class="gc-file">data/units/tank.tres</span> (70 fuel, 9 ammo, treads), Road is DEF 0 with cost 1 for every class. Icons in these mocks are cropped from the screenshot; in-game they come from the atlas textures, so properties even keep their owner's colours.</p>
+
+        <div class="grid gap-5 md:grid-cols-2">
+          <div class="aw-fill">
+            <div class="mb-2 flex items-center gap-2"><span class="badge badge-ghost">Before</span><span class="text-sm text-base-content/60">terrain leads, unit trails</span></div>
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="aw-name">Road</div>
+                <div class="aw-old-line">DEF 0</div>
+                <div class="aw-old-line">Foot&nbsp;1&ensp;Boot&nbsp;1&ensp;Tires&nbsp;1&ensp;Treads&nbsp;1</div>
+                <div class="aw-old-line">Tank - HP 10 - F 70 - A 9 - Red Army</div>
+              </div>
+            </div>
+          </div>
+          <div class="aw-fill">
+            <div class="mb-2 flex items-center gap-2"><span class="badge badge-primary">After</span><span class="text-sm text-base-content/60">unit card first, terrain demoted</span></div>
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-unit" style="background-position:-100px -40px"></span><span class="aw-name">Tank</span></span><span class="aw-team aw-team-red">Red Army</span></div>
+                <div class="aw-hp">HP 10/10</div>
+                <div class="aw-sub">Fuel&nbsp;70/70&ensp;Ammo&nbsp;9/9</div>
+                <hr class="aw-sep">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-terrain" style="background-position:-139px -23px"></span><span class="aw-terrain-name">Road</span></span><span class="aw-def">DEF 0</span></div>
+                <div class="aw-move">Treads 1</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="pt-2 text-xl font-bold">The four states that matter</h3>
+        <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="aw-fill">
+            <div class="mb-2 text-sm font-semibold text-base-content/70">Empty tile — unchanged</div>
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-terrain" style="background-position:-141px -55px"></span><span class="aw-terrain-name" style="font-size:1.05rem">Plains</span></span><span class="aw-def">DEF <span class="aw-stars">★</span>☆☆☆</span></div>
+                <div class="aw-move">Foot&nbsp;1&ensp;Boot&nbsp;1&ensp;Tires&nbsp;2&ensp;Treads&nbsp;1</div>
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-base-content/60">No unit card, no separator; the full four-class row stays — that's the planning view.</p>
+          </div>
+          <div class="aw-fill">
+            <div class="mb-2 text-sm font-semibold text-base-content/70">Enemy indirect on a city</div>
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-unit aw-blue" style="background-position:-100px -40px"></span><span class="aw-name">Artillery</span></span><span class="aw-team aw-team-blue">Blue Army</span></div>
+                <div class="aw-hp">HP 7/10</div>
+                <div class="aw-sub">Fuel&nbsp;32/50&ensp;Ammo&nbsp;4/9</div>
+                <div class="aw-sub">Rng 2–3</div>
+                <hr class="aw-sep">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-terrain" style="background-position:-219px -74px"></span><span class="aw-terrain-name">City</span></span><span class="aw-def">DEF <span class="aw-stars">★★★</span>☆</span></div>
+                <div class="aw-move">Treads 1</div>
+                <div class="aw-owner">Blue Army</div>
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-base-content/60"><code>Rng 2–3</code> appears only for indirects (<code>min_range &gt; 1</code>) — the number you check before walking into artillery.</p>
+          </div>
+          <div class="aw-fill">
+            <div class="mb-2 text-sm font-semibold text-base-content/70">Acted transport, loaded</div>
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="aw-acted">
+                  <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-unit" style="background-position:-57px -39px"></span><span class="aw-name">APC</span></span><span class="aw-team aw-team-red">Red Army</span></div>
+                  <div class="aw-hp">HP 10/10</div>
+                  <div class="aw-sub">Fuel 61/70</div>
+                  <div class="aw-sub">Carrying&nbsp;Infantry&ensp;<span class="aw-badge">Waited</span></div>
+                </div>
+                <hr class="aw-sep">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-terrain" style="background-position:-139px -23px"></span><span class="aw-terrain-name">Road</span></span><span class="aw-def">DEF 0</span></div>
+                <div class="aw-move">Treads 1</div>
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-base-content/60">Unit card dims (like the map sprite's acted tint) + a <em>Waited</em> badge. No ammo row — the APC is unarmed (<code>max_ammo 0</code>).</p>
+          </div>
+          <div class="aw-fill">
+            <div class="mb-2 text-sm font-semibold text-base-content/70">Fog / doctrine-hidden enemy</div>
+            <div class="aw-stage">
+              <div class="aw-panel">
+                <div class="row"><span class="aw-id"><span class="aw-icon aw-icon-terrain" style="background-position:-190px -50px"></span><span class="aw-terrain-name" style="font-size:1.05rem">Woods</span></span><span class="aw-def">DEF <span class="aw-stars">★★</span>☆☆</span></div>
+                <div class="aw-move">Foot&nbsp;1&ensp;Boot&nbsp;1&ensp;Tires&nbsp;3&ensp;Treads&nbsp;2</div>
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-base-content/60">Behavior preserved: <code>refresh_panel</code> nulls units failing <code>can_see_unit()</code> (fog <em>and</em> Vanish-style doctrines) before the panel ever sees them — the panel renders an empty tile.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 03 -->
+      <section class="space-y-6" aria-labelledby="impl-title">
+        <div class="flex items-center gap-3"><span class="gc-section-number">03</span><h2 id="impl-title" class="text-3xl font-black">Implementation</h2></div>
+        <p class="max-w-4xl text-base-content/75">Three steps, in order. The two <code>show_*</code> methods merge into one <code>show_tile()</code> because terrain rendering now depends on whether a unit is present (which move classes to list). Only <span class="gc-file">battle_view.gd:322</span> calls the panel, so the API break is contained.</p>
+
+        <article class="space-y-3">
+          <h3 class="text-xl font-bold">Step 1 — <span class="gc-file">scenes/ui/terrain_panel.gd</span>: merge into <code>show_tile()</code></h3>
+          <p class="max-w-4xl text-sm text-base-content/70">Unit card first (icon + name + team, <code>HP x/10</code>, <code>Fuel x/max</code> · <code>Ammo x/max</code>, extras line), then the terrain card with its tile icon. Defense as stars, move costs filtered to the occupant's class. The unit icon reuses <code>UnitSprite.texture_for()</code> — the static helper that exists precisely so menus can show board artwork; the terrain icon is one cell of the terrain atlas, team-tinted row for owned properties (the 64px cell size is duplicated as a const rather than reaching into <code>BattleView</code>). The diff below is the complete old → new file.</p>
+          <div id="diff-panel" class="diff-holder"></div>
+        </article>
+
+        <article class="space-y-3">
+          <h3 class="text-xl font-bold">Step 2 — <span class="gc-file">scenes/battle/battle.tscn</span>: rebuild the panel's rows (in the editor)</h3>
+          <p class="max-w-4xl text-sm text-base-content/70">Per repo rules, scene surgery happens in the Godot editor, kept minimal. <code>UnitLabel</code> is deleted; <code>NameLabel</code>+<code>DefLabel</code> merge onto one <code>HBoxContainer</code> row; a hidden-by-default unit block and separator go on top. Target tree:</p>
+          <div id="file-tscn" class="diff-holder"></div>
+        </article>
+
+        <article class="space-y-3">
+          <h3 class="text-xl font-bold">Step 3 — <span class="gc-file">scenes/battle/battle_view.gd</span>: one panel call in <code>refresh_panel()</code></h3>
+          <p class="max-w-4xl text-sm text-base-content/70">The fog/doctrine gate (<code>can_see_unit</code>, added in the Commanders merge) stays exactly where it is — the panel keeps receiving <code>null</code> for units the viewer must not see.</p>
+          <div id="diff-view" class="diff-holder"></div>
+        </article>
+      </section>
+
+      <!-- ============================================================ 04 -->
+      <section class="space-y-6" aria-labelledby="decisions-title">
+        <div class="flex items-center gap-3"><span class="gc-section-number">04</span><h2 id="decisions-title" class="text-3xl font-black">Decisions</h2></div>
+        <p class="max-w-4xl text-base-content/75">The plan above uses the recommended option for each. Pick, then <em>Queue answer</em> — nothing is sent until you press <strong>Send to Agent</strong>. Or skip straight to the approve button at the bottom.</p>
+
+        <div class="grid gap-5 lg:grid-cols-2">
+          <form class="card border border-base-content/10 bg-base-100" data-lavish-question="def-display"
+                onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('def'); if (c) window.lavish.queuePrompt('Tile panel: render terrain defense as ' + c + '.', { tag: 'choice', text: 'DEF display: ' + c, element: event.currentTarget, queueKey: 'def-display', data: { question: 'def-display', answer: c } });">
+            <div class="card-body gap-3">
+              <h3 class="card-title text-lg">Defense display</h3>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="def" value="stars (★★★☆ out of 4, plain 'DEF 0' for zero)" class="radio radio-sm mt-0.5" checked><span class="text-sm"><strong>Stars — DEF ★★★☆</strong> (recommended)<br><span class="text-base-content/60">Genre convention, reads at a glance. Max is 4 (HQ, Mountain).</span></span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="def" value="a plain number (DEF 3), as today" class="radio radio-sm mt-0.5"><span class="text-sm"><strong>Number — DEF 3</strong><br><span class="text-base-content/60">Zero font-glyph risk, zero change.</span></span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="def" value="both (DEF 3 ★★★)" class="radio radio-sm mt-0.5"><span class="text-sm"><strong>Both — DEF 3 ★★★</strong><br><span class="text-base-content/60">Belt and suspenders; widest row.</span></span></label>
+              <button type="submit" class="btn btn-primary btn-sm self-start">Queue answer</button>
+            </div>
+          </form>
+
+          <form class="card border border-base-content/10 bg-base-100" data-lavish-question="move-row"
+                onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('move'); if (c) window.lavish.queuePrompt('Tile panel: when a unit occupies the tile, ' + c + '.', { tag: 'choice', text: 'Move row: ' + c, element: event.currentTarget, queueKey: 'move-row', data: { question: 'move-row', answer: c } });">
+            <div class="card-body gap-3">
+              <h3 class="card-title text-lg">Move-cost row when a unit is on the tile</h3>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="move" value="show only the occupant's move class (e.g. 'Treads 1')" class="radio radio-sm mt-0.5" checked><span class="text-sm"><strong>Occupant's class only — <code>Treads 1</code></strong> (recommended)<br><span class="text-base-content/60">The one cost that matters for the unit you're inspecting.</span></span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="move" value="hide the move-cost row entirely" class="radio radio-sm mt-0.5"><span class="text-sm"><strong>Hide the row</strong><br><span class="text-base-content/60">Shortest panel; costs still visible on any empty tile.</span></span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="move" value="keep showing all four move classes" class="radio radio-sm mt-0.5"><span class="text-sm"><strong>Keep all four classes</strong><br><span class="text-base-content/60">No information ever hidden; noisiest option.</span></span></label>
+              <button type="submit" class="btn btn-primary btn-sm self-start">Queue answer</button>
+            </div>
+          </form>
+
+          <form class="card border border-base-content/10 bg-base-100" data-lavish-question="unit-extras"
+                onsubmit="event.preventDefault(); const picked = [...new FormData(event.currentTarget).getAll('extra')]; window.lavish.queuePrompt('Tile panel unit card extras — include exactly: ' + (picked.length ? picked.join('; ') : 'none of the optional extras') + '.', { tag: 'choice', text: 'Unit extras: ' + (picked.length ? picked.join(', ') : 'none'), element: event.currentTarget, queueKey: 'unit-extras', data: { question: 'unit-extras', answer: picked } });">
+            <div class="card-body gap-3">
+              <h3 class="card-title text-lg">Unit card extras <span class="badge badge-ghost badge-sm">multi-select</span></h3>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="checkbox" name="extra" value="attack range for indirect units (Rng 2-3 when min_range > 1)" class="checkbox checkbox-sm mt-0.5" checked><span class="text-sm"><strong>Range for indirects</strong> (recommended) — <code>Rng 2–3</code> on artillery/rockets only.</span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="checkbox" name="extra" value="dim the unit card and show a Waited badge when the unit has acted" class="checkbox checkbox-sm mt-0.5" checked><span class="text-sm"><strong>Dim + “Waited” badge when acted</strong> (recommended) — mirrors the sprite tint.</span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="checkbox" name="extra" value="tint the team name in the team's color" class="checkbox checkbox-sm mt-0.5" checked><span class="text-sm"><strong>Team-colored team label</strong> (recommended) — red/blue tint on “Red Army”.</span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="checkbox" name="extra" value="show the unit's build cost" class="checkbox checkbox-sm mt-0.5"><span class="text-sm"><strong>Build cost</strong> — useful for value trades; one more row.</span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="checkbox" name="extra" value="show the unit's vision stat" class="checkbox checkbox-sm mt-0.5"><span class="text-sm"><strong>Vision stat</strong> — mostly matters in fog matches.</span></label>
+              <button type="submit" class="btn btn-primary btn-sm self-start">Queue answer</button>
+            </div>
+          </form>
+
+          <form class="card border border-base-content/10 bg-base-100" data-lavish-question="rename"
+                onsubmit="event.preventDefault(); const c = new FormData(event.currentTarget).get('rename'); if (c) window.lavish.queuePrompt('Tile panel: ' + c + '.', { tag: 'choice', text: 'Rename: ' + c, element: event.currentTarget, queueKey: 'rename', data: { question: 'rename', answer: c } });">
+            <div class="card-body gap-3">
+              <h3 class="card-title text-lg">Rename <code>TerrainPanel</code>?</h3>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="rename" value="keep the TerrainPanel class name" class="radio radio-sm mt-0.5" checked><span class="text-sm"><strong>Keep <code>TerrainPanel</code></strong> (recommended)<br><span class="text-base-content/60"><code>TEAM_NAMES</code> is referenced from 5 call sites in <code>battle.gd</code>/<code>battle_view.gd</code>; renaming is churn with no behavior change.</span></span></label>
+              <label class="gc-choice flex cursor-pointer items-start gap-3 rounded-box border border-base-content/15 p-3"><input type="radio" name="rename" value="rename it to TileInfoPanel (class, file, scene node) and update all references" class="radio radio-sm mt-0.5"><span class="text-sm"><strong>Rename to <code>TileInfoPanel</code></strong><br><span class="text-base-content/60">Honest name for what it now shows; touches scene + 2 scripts.</span></span></label>
+              <button type="submit" class="btn btn-primary btn-sm self-start">Queue answer</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="rounded-box border-2 border-dashed border-base-content/20 bg-base-100 p-5 text-center">
+          <p class="mb-3 text-sm text-base-content/70">Happy with the recommended defaults as shown in section 02?</p>
+          <button type="button" class="btn btn-success"
+                  onclick="window.lavish.queuePrompt('Approved: implement the tile info panel redesign exactly as planned in tile-info-panel-plan.html, using the recommended option for every decision I did not answer separately.', { tag: 'approve', text: 'Approve plan — implement with recommended defaults', element: this })">
+            Approve plan — implement it
+          </button>
+        </div>
+      </section>
+
+      <!-- ============================================================ 05 -->
+      <section class="space-y-5" aria-labelledby="risks-title">
+        <div class="flex items-center gap-3"><span class="gc-section-number">05</span><h2 id="risks-title" class="text-3xl font-black">Risks & verification</h2></div>
+        <div class="grid gap-4 md:grid-cols-3">
+          <article class="card gc-risk-medium border border-base-content/10 bg-base-100"><div class="card-body"><span class="badge badge-warning badge-soft">Layout</span><h3 class="card-title text-base">First-frame clipping</h3><p class="text-sm"><code>battle.tscn</code> pins the panel with fixed offsets (80&nbsp;px tall); the unit card can double its height. <code>set_side()</code> already re-applies a min-size preset on every cursor move — additionally call it once in <code>_ready()</code> so the very first frame is sized right.</p></div></article>
+          <article class="card gc-risk-medium border border-base-content/10 bg-base-100"><div class="card-body"><span class="badge badge-warning badge-soft">Font</span><h3 class="card-title text-base">Star glyphs</h3><p class="text-sm">DEF stars assume <code>★/☆</code> exist in Godot's default UI font. Verify in-game on first run; the fallback is the plain-number option in Decisions, a one-line change.</p></div></article>
+          <article class="card gc-risk-good border border-base-content/10 bg-base-100"><div class="card-body"><span class="badge badge-success badge-soft">Preserved</span><h3 class="card-title text-base">Fog & doctrines</h3><p class="text-sm">Hidden units never reach the panel — <code>refresh_panel</code> nulls anything failing <code>can_see_unit()</code> (fog and Vanish-style doctrine hiding, via the Vision authority). The redesign doesn't touch that gate.</p></div></article>
+        </div>
+        <ul class="gc-checks max-w-3xl space-y-1.5 text-sm">
+          <li><code>make run</code> — hover each state: empty tile, own unit, enemy indirect, acted loaded APC, property under capture, fogged enemy.</li>
+          <li><code>make screenshot</code> — visual spot-check of the default battle boot.</li>
+          <li><code>make test</code> — must stay green untouched; this change adds no GUT tests (presentation layer is verified by playing, per repo policy).</li>
+          <li><code>gdlint</code> / <code>gdformat</code> — style gates on the two edited scripts.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= GDScript sources for the diff renders ================= -->
+  <script type="text/plain" id="src-panel-old">class_name TerrainPanel
+extends PanelContainer
+## AW-style corner panel showing the hovered tile's terrain stats.
+## Flips to the other bottom corner when the cursor gets close (set_side).
+
+const TEAM_NAMES := {0: "Neutral", 1: "Red Army", 2: "Blue Army"}
+const CLASS_LABELS: Array = [
+	[TerrainType.FOOT, "Foot"],
+	[TerrainType.BOOT, "Boot"],
+	[TerrainType.TIRES, "Tires"],
+	[TerrainType.TREADS, "Treads"],
+]
+
+@onready var name_label: Label = %NameLabel
+@onready var def_label: Label = %DefLabel
+@onready var move_label: Label = %MoveLabel
+@onready var owner_label: Label = %OwnerLabel
+@onready var unit_label: Label = %UnitLabel
+
+
+func show_terrain(terrain: TerrainType, owner_team: int, capture_left: int = -1) -> void:
+	name_label.text = terrain.display_name
+	def_label.text = "DEF %d" % terrain.defense_stars
+	var parts := PackedStringArray()
+	for pair: Array in CLASS_LABELS:
+		var cost: int = terrain.move_cost(pair[0])
+		parts.append("%s %s" % [pair[1], "-" if cost == TerrainType.IMPASSABLE else str(cost)])
+	move_label.text = "  ".join(parts)
+	owner_label.visible = terrain.is_property
+	var owner_text: String = TEAM_NAMES.get(owner_team, "Team %d" % owner_team)
+	if capture_left >= 0:
+		owner_text += "  (capture: %d left)" % capture_left
+	owner_label.text = owner_text
+
+
+## Shows the hovered unit's line, or hides it when unit is null.
+## `carrying` names the cargo when the unit is a loaded transport.
+func show_unit(unit: Unit, carrying: String = "") -> void:
+	unit_label.visible = unit != null
+	if unit == null:
+		return
+	var team_name: String = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
+	var stats := "%s - HP %d" % [unit.type.display_name, unit.displayed_hp()]
+	stats += " - F %d" % unit.fuel
+	if unit.type.max_ammo > 0:
+		stats += " - A %d" % unit.ammo
+	stats += " - " + team_name
+	if unit.acted:
+		stats += " (acted)"
+	if carrying != "":
+		stats += " [+%s]" % carrying
+	unit_label.text = stats
+
+
+func set_side(on_right: bool) -> void:
+	var preset := Control.PRESET_BOTTOM_RIGHT if on_right else Control.PRESET_BOTTOM_LEFT
+	set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, 8)
+</script>
+
+  <script type="text/plain" id="src-panel-new">class_name TerrainPanel
+extends PanelContainer
+## AW-style corner panel for the hovered tile. A unit on the tile is the
+## headline card; terrain drops to a compact card below it.
+## Flips to the other bottom corner when the cursor gets close (set_side).
+
+const TEAM_NAMES := {0: "Neutral", 1: "Red Army", 2: "Blue Army"}
+const TEAM_COLORS := {1: Color(1.0, 0.61, 0.55), 2: Color(0.61, 0.78, 1.0)}
+const ACTED_TINT := Color(0.62, 0.62, 0.62)
+const MAX_DEFENSE_STARS := 4
+const TERRAIN_ATLAS_PATH := "res://assets/tiles/terrain_atlas.png"
+## Terrain atlas cell size; mirrors BattleView.TERRAIN_PX rather than
+## coupling the UI panel to the battle scene for one constant.
+const TERRAIN_PX := 64
+const CLASS_LABELS: Array = [
+	[TerrainType.FOOT, "Foot"],
+	[TerrainType.BOOT, "Boot"],
+	[TerrainType.TIRES, "Tires"],
+	[TerrainType.TREADS, "Treads"],
+]
+
+@onready var unit_rows: VBoxContainer = %UnitRows
+@onready var unit_icon: TextureRect = %UnitIcon
+@onready var unit_name_label: Label = %UnitNameLabel
+@onready var unit_team_label: Label = %UnitTeamLabel
+@onready var unit_hp_label: Label = %UnitHpLabel
+@onready var unit_supply_label: Label = %UnitSupplyLabel
+@onready var unit_extra_label: Label = %UnitExtraLabel
+@onready var separator: HSeparator = %Separator
+@onready var terrain_icon: TextureRect = %TerrainIcon
+@onready var name_label: Label = %NameLabel
+@onready var def_label: Label = %DefLabel
+@onready var move_label: Label = %MoveLabel
+@onready var owner_label: Label = %OwnerLabel
+
+
+func _ready() -> void:
+	set_side(false)  # apply the min-size preset before the first hover
+
+
+## Single entry point per hovered tile; unit is null on empty or fogged tiles.
+## `carrying` names the cargo when the unit is a loaded transport.
+func show_tile(
+	terrain: TerrainType,
+	owner_team: int,
+	capture_left: int = -1,
+	unit: Unit = null,
+	carrying: String = ""
+) -> void:
+	_show_unit(unit, carrying)
+	_show_terrain(terrain, owner_team, capture_left, unit)
+
+
+func _show_unit(unit: Unit, carrying: String) -> void:
+	unit_rows.visible = unit != null
+	separator.visible = unit != null
+	if unit == null:
+		return
+	unit_icon.texture = UnitSprite.texture_for(unit.type, unit.team)
+	unit_name_label.text = unit.type.display_name
+	unit_team_label.text = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
+	var team_color: Color = TEAM_COLORS.get(unit.team, Color.WHITE)
+	unit_team_label.add_theme_color_override("font_color", team_color)
+	unit_hp_label.text = "HP %d/10" % unit.displayed_hp()
+	var supply := "Fuel %d/%d" % [unit.fuel, unit.type.max_fuel]
+	if unit.type.max_ammo > 0:
+		supply += "   Ammo %d/%d" % [unit.ammo, unit.type.max_ammo]
+	unit_supply_label.text = supply
+	var extras := PackedStringArray()
+	if unit.type.min_range > 1:
+		extras.append("Rng %d-%d" % [unit.type.min_range, unit.type.max_range])
+	if carrying != "":
+		extras.append("Carrying %s" % carrying)
+	if unit.acted:
+		extras.append("Waited")
+	unit_extra_label.visible = not extras.is_empty()
+	unit_extra_label.text = "  ".join(extras)
+	unit_rows.modulate = ACTED_TINT if unit.acted else Color.WHITE
+
+
+func _show_terrain(
+	terrain: TerrainType, owner_team: int, capture_left: int, unit: Unit
+) -> void:
+	terrain_icon.texture = _terrain_texture(terrain, owner_team)
+	name_label.text = terrain.display_name
+	def_label.text = "DEF %s" % _stars(terrain.defense_stars)
+	move_label.text = _move_costs(terrain, unit)
+	owner_label.visible = terrain.is_property
+	var owner_text: String = TEAM_NAMES.get(owner_team, "Team %d" % owner_team)
+	if capture_left >= 0:
+		owner_text += "  (capture: %d left)" % capture_left
+	owner_label.text = owner_text
+
+
+## Occupied tile: only the occupant's move class matters. Empty tile: keep
+## the full four-class planning row.
+func _move_costs(terrain: TerrainType, unit: Unit) -> String:
+	var parts := PackedStringArray()
+	for pair: Array in CLASS_LABELS:
+		if unit != null and unit.type.move_class != pair[0]:
+			continue
+		var cost: int = terrain.move_cost(pair[0])
+		parts.append("%s %s" % [pair[1], "-" if cost == TerrainType.IMPASSABLE else str(cost)])
+	return "  ".join(parts)
+
+
+func _stars(count: int) -> String:
+	if count <= 0:
+		return "0"
+	return "★".repeat(count) + "☆".repeat(MAX_DEFENSE_STARS - count)
+
+
+## The same artwork the board draws: one cell of the terrain atlas, with the
+## owner-coloured row for properties (rows 1+ exist only when team_tinted).
+func _terrain_texture(terrain: TerrainType, owner_team: int) -> AtlasTexture:
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load(TERRAIN_ATLAS_PATH)
+	var row: int = owner_team if terrain.team_tinted and owner_team > 0 else 0
+	atlas.region = Rect2(terrain.atlas_col * TERRAIN_PX, row * TERRAIN_PX, TERRAIN_PX, TERRAIN_PX)
+	return atlas
+
+
+func set_side(on_right: bool) -> void:
+	var preset := Control.PRESET_BOTTOM_RIGHT if on_right else Control.PRESET_BOTTOM_LEFT
+	set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, 8)
+</script>
+
+  <script type="text/plain" id="src-view-old">func refresh_panel(cell: Vector2i) -> void:
+	terrain_panel.show_terrain(
+		map.terrain_at(cell), game.owner_at(cell), game.capture_progress.get(cell, -1)
+	)
+	var hovered := game.unit_at(cell)
+	if hovered != null and not can_see_unit(hovered):
+		hovered = null  # hidden enemies stay hidden in the panel too
+	var carrying := ""
+	if hovered != null:
+		var cargo := game.cargo_of(hovered)
+		if not cargo.is_empty():
+			carrying = cargo[0].type.display_name
+	terrain_panel.show_unit(hovered, carrying)
+	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
+</script>
+
+  <script type="text/plain" id="src-view-new">func refresh_panel(cell: Vector2i) -> void:
+	var hovered := game.unit_at(cell)
+	if hovered != null and not can_see_unit(hovered):
+		hovered = null  # hidden enemies stay hidden in the panel too
+	var carrying := ""
+	if hovered != null:
+		var cargo := game.cargo_of(hovered)
+		if not cargo.is_empty():
+			carrying = cargo[0].type.display_name
+	terrain_panel.show_tile(
+		map.terrain_at(cell),
+		game.owner_at(cell),
+		game.capture_progress.get(cell, -1),
+		hovered,
+		carrying
+	)
+	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
+</script>
+
+  <script type="text/plain" id="src-tscn">Rows (VBoxContainer)                      # UI/TerrainPanel/Margin/Rows
+├─ UnitRows (VBoxContainer)               # NEW · %UnitRows · visible = false
+│  ├─ UnitHeader (HBoxContainer)
+│  │  ├─ UnitIcon (TextureRect)           # NEW · %UnitIcon · 24x24 min · nearest filter · keep-aspect
+│  │  ├─ UnitNameLabel                    # NEW · font 13 · "Tank" · expand
+│  │  └─ UnitTeamLabel                    # NEW · font 10 · "Red Army" · align right
+│  ├─ UnitHpLabel                         # NEW · font 12 · "HP 10/10"
+│  ├─ UnitSupplyLabel                     # NEW · font 10 · "Fuel 70/70   Ammo 9/9"
+│  └─ UnitExtraLabel                      # NEW · font 10 · "Rng 2-3  Carrying Infantry  Waited"
+├─ Separator (HSeparator)                 # NEW · %Separator · visible = false
+├─ TerrainHeader (HBoxContainer)          # NEW wrapper: icon + the two existing labels
+│  ├─ TerrainIcon (TextureRect)           # NEW · %TerrainIcon · 18x18 min · nearest filter · keep-aspect
+│  ├─ NameLabel                           # kept · font 13 · "Road" · expand
+│  └─ DefLabel                            # kept · font 10 · "DEF ★★★☆" · align right
+├─ MoveLabel                              # kept · font 10 · "Treads 1" (full row on empty tiles)
+└─ OwnerLabel                             # kept · font 10 · "Red Army  (capture: 12 left)"
+
+# UnitLabel — DELETED (replaced by the UnitRows block)
+# All unique_name_in_owner flags (%) preserved / added as noted.
+# Both TextureRects: texture_filter = NEAREST so the 64px pixel art stays crisp
+# at icon size; textures are assigned in code, never saved into the scene.
+</script>
+
+  <script type="module">
+    import { File, FileDiff } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+
+    const grab = (id) => document.getElementById(id).textContent.replace(/^\n/, "");
+    const options = { theme: { light: "github-light", dark: "github-dark" }, themeType: "light", overflow: "wrap" };
+
+    new FileDiff({ ...options, diffStyle: "unified" }).render({
+      containerWrapper: document.querySelector("#diff-panel"),
+      oldFile: { name: "scenes/ui/terrain_panel.gd", contents: grab("src-panel-old") },
+      newFile: { name: "scenes/ui/terrain_panel.gd", contents: grab("src-panel-new") },
+    });
+
+    new File(options).render({
+      containerWrapper: document.querySelector("#file-tscn"),
+      file: { name: "battle.tscn — target node tree (edited in the Godot editor)", contents: grab("src-tscn") },
+    });
+
+    new FileDiff({ ...options, diffStyle: "unified" }).render({
+      containerWrapper: document.querySelector("#diff-view"),
+      oldFile: { name: "scenes/battle/battle_view.gd — refresh_panel()", contents: grab("src-view-old") },
+      newFile: { name: "scenes/battle/battle_view.gd — refresh_panel()", contents: grab("src-view-new") },
+    });
+  </script>
+</body>
+</html>
