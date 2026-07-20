@@ -5,7 +5,9 @@ extends RefCounted
 ## it is never the source of truth.
 ##
 ## Map text format (see maps/*.txt):
-##   # comment
+##   # <one-line description>   -- the first comment line; shown in the menu
+##   # symmetric               -- optional tag; asserts 180-degree symmetry
+##   # any other comment
 ##   [terrain]
 ##   <one row of terrain symbols per line, all rows the same width>
 ##   [owners]
@@ -15,11 +17,22 @@ extends RefCounted
 ##
 ## [owners] and [units] must come after [terrain] (they need the bounds).
 ## Unit symbols are validated later by GameState.create, which has the UnitDB.
+## The playability invariants no parser can express — one HQ per team, a base
+## each, reachable HQs, and the symmetry the tag above claims — are asserted
+## over every shipped map by tests/unit/test_maps.gd.
 
 const NEUTRAL := 0
+## Comment line that opts a map into the mirror check in tests/unit/test_maps.gd.
+const SYMMETRIC_TAG := "symmetric"
 
 var width := 0
 var height := 0
+## First comment line: the one-line pitch the map dropdown shows as a tooltip.
+var description := ""
+## Set by the `# symmetric` tag: this map claims 180-degree rotational symmetry.
+var symmetric := false
+## Where this map was read from; empty for maps parsed straight from a string.
+var source_path := ""
 ## Raw starting-unit entries: {team: int, symbol: String, cell: Vector2i}.
 var starting_units: Array[Dictionary] = []
 var _terrain: Array[TerrainType] = []  # row-major, width * height entries
@@ -33,7 +46,10 @@ static func load_from_file(path: String, db: TerrainDB) -> MapData:
 	if text.is_empty():
 		push_error("MapData: cannot read map file '%s'" % path)
 		return null
-	return parse(text, db)
+	var map := parse(text, db)
+	if map != null:
+		map.source_path = path
+	return map
 
 
 ## Returns null (with a pushed error) on any malformed input.
@@ -42,7 +58,10 @@ static func parse(text: String, db: TerrainDB) -> MapData:
 	var section := ""
 	for raw_line in text.split("\n"):
 		var line := raw_line.strip_edges()
-		if line.is_empty() or line.begins_with("#"):
+		if line.is_empty():
+			continue
+		if line.begins_with("#"):
+			map._read_comment(line.trim_prefix("#").strip_edges())
 			continue
 		if line.begins_with("["):
 			section = line
@@ -100,6 +119,21 @@ func property_cells() -> Array[Vector2i]:
 
 func size() -> Vector2i:
 	return Vector2i(width, height)
+
+
+## The cell `cell` rotates onto under 180 degrees. Its own inverse, and the one
+## definition of "mirrored" the maps and their symmetry lint share.
+func mirrored(cell: Vector2i) -> Vector2i:
+	return Vector2i(width - 1 - cell.x, height - 1 - cell.y)
+
+
+## Comments carry two pieces of data: the `# symmetric` tag, and the first
+## comment line, which by convention is the map's one-line description.
+func _read_comment(comment: String) -> void:
+	if comment == SYMMETRIC_TAG:
+		symmetric = true
+	elif description.is_empty():
+		description = comment
 
 
 func _append_terrain_row(line: String, db: TerrainDB) -> bool:

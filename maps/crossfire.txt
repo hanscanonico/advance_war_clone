@@ -1,7 +1,8 @@
-# Crossfire — 20x15, 180-degree rotationally symmetric: every cell mirrors
-# (x, y) -> (19 - x, 14 - y), so neither side gets a terrain or income edge.
-# A central lake splits the front; the long ring road rewards transports and
-# the mountains beside the lake are the passes that reward infantry.
+# A central lake splits the front; the ring road rewards transports.
+# symmetric
+# Mirrored: every cell maps to (19 - x, 14 - y), so neither side gets a terrain
+# or income edge — asserted by tests/unit/test_maps.gd. The mountains beside
+# the lake are the passes that reward infantry.
 # Symbols: . plains  F woods  M mountain  = road  ~ river
 #          C city  B base  Q HQ  S sea
 [terrain]

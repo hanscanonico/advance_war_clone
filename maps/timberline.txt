@@ -1,0 +1,44 @@
+# Two ridges cut three lanes: one fast road, two foot-only passes.
+# symmetric
+# Mountains take infantry and mechs only, so the side lanes are theirs
+# alone and vehicles are pinned to the exposed centre road. Dug into a
+# ridge at 4 stars, a mech is a wall. Mirrors on (x, y) -> (15 - x, 13 - y).
+# Symbols: . plains  F woods  M mountain  = road  ~ river
+#          C city  B base  Q HQ  S sea
+[terrain]
+SSSSSSSSSSSSSSSS
+S.Q======...C..S
+S.B.F..==..F...S
+S..F.M.==.M..F.S
+S.C.MM.==MM.C..S
+S...MM.==.M.F..S
+SF...MF==.M..C.S
+S.C..M.==FM...FS
+S..F.M.==.MM...S
+S..C.MM==.MM.C.S
+S.F..M.==.M.F..S
+S...F..==..F.B.S
+S..C...======Q.S
+SSSSSSSSSSSSSSSS
+[owners]
+1 2 1
+1 2 2
+2 13 11
+2 13 12
+[units]
+1 t 7 2
+1 r 8 2
+1 m 4 3
+1 a 6 3
+1 m 11 3
+1 i 12 3
+1 i 3 4
+1 g 7 4
+2 g 8 9
+2 i 12 9
+2 i 3 10
+2 m 4 10
+2 a 9 10
+2 m 11 10
+2 r 7 11
+2 t 8 11

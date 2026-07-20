@@ -1,0 +1,30 @@
+# Ten-minute duels: the starting army decides it before big builds land.
+# symmetric
+# 12x9 and unframed on purpose — the smallest board in the roster, and the
+# one to try a commander on. Mirrors on (x, y) -> (11 - x, 8 - y).
+# Symbols: . plains  F woods  M mountain  = road  ~ river
+#          C city  B base  Q HQ  S sea
+[terrain]
+............
+.QB=.....F..
+...=F.C.....
+...=...F....
+...======...
+....F...=...
+.....C.F=...
+..F.....=BQ.
+............
+[owners]
+1 1 1
+1 2 1
+2 9 7
+2 10 7
+[units]
+1 t 4 1
+1 r 5 1
+1 m 5 2
+1 i 4 3
+2 i 7 5
+2 m 6 6
+2 r 6 7
+2 t 7 7

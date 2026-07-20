@@ -60,11 +60,18 @@ so two scenarios run both ways by default.
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
-Two maps ship: `first_steps` (the default) and `crossfire`. The main menu lists every map in
-`maps/`, but command-line flags still override the menu so demos and tools can skip it:
-`--map=crossfire`, `--hotseat`, `--fog`, and `--co=alina_ward,viktor_draeg` (red first, blue
-second; either side may be left blank for no commander) — e.g.
+Seven maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
+`riverline`, `isthmus`, `crossfire`, `first_steps`, `ironworks` — so it opens on `scrimmage`, the
+quick match, and shows each one's size, property count and a one-line pitch as a tooltip.
+Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
+`--hotseat`, `--fog`, and `--co=alina_ward,viktor_draeg` (red first, blue second; either side may
+be left blank for no commander) — e.g.
 `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn -- --map=crossfire --fog`.
+
+Adding a map is dropping a `.txt` in `maps/` — the menu auto-discovers it and `tests/unit/`
+holds it to the playability invariants (one HQ and a base per side, reachable HQs, a claimed
+`# symmetric` tag that actually mirrors) and plays an AI-vs-AI match on it. See the format at the
+top of `core/map_data.gd`; the first comment line is the tooltip description.
 
 Any Godot 4.7+ works too — open the project folder in the editor.
 

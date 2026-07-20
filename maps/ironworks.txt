@@ -1,0 +1,50 @@
+# City-rich, two bases a side: the economy map, and the roster's biggest.
+# symmetric
+# 22 properties and a double road ring — income snowballs, production
+# splits between two fronts, and md tanks and rockets get the late game
+# they never reach elsewhere. Mirrors on (x, y) -> (23 - x, 15 - y).
+# Symbols: . plains  F woods  M mountain  = road  ~ river
+#          C city  B base  Q HQ  S sea
+[terrain]
+SSSSSSSSSSSSSSSSSSSSSSSS
+S.Q=..C....C.....C...F.S
+SB.=================..FS
+S...=....C....C....=...S
+SB..=.......F...MM.=C..S
+S...=.C............=...S
+S.C.=...========..F=.MMS
+S...=F..=..F...=...=.M.S
+S.M.=...=...F..=..F=...S
+SMM.=F..========...=.C.S
+S...=............C.=...S
+S..C=.MM...F.......=..BS
+S...=....C....C....=...S
+SF..=================.BS
+S.F...C.....C....C..=Q.S
+SSSSSSSSSSSSSSSSSSSSSSSS
+[owners]
+1 2 1
+1 1 2
+1 1 4
+2 22 11
+2 22 13
+2 21 14
+[units]
+1 p 3 2
+1 t 5 2
+1 r 8 2
+1 t 10 2
+1 i 3 3
+1 g 4 3
+1 i 7 3
+1 m 2 5
+1 a 4 5
+2 a 19 10
+2 m 21 10
+2 i 16 12
+2 g 19 12
+2 i 20 12
+2 t 13 13
+2 r 15 13
+2 t 18 13
+2 p 20 13
