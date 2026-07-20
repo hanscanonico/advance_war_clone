@@ -1,12 +1,17 @@
 extends Control
-## Main menu: pick a map, commanders and match options, then hand off to the
-## battle scene through the MatchConfig autoload.
+## Main menu: pick a map and match options, choose commanders on the dedicated
+## selection page, then hand off to the battle scene through MatchConfig.
+##
+## The two compact CO dropdowns are gone: "1 Player" and "2 Player" now open the
+## CommanderSelectPanel (readiness plan G2), which is shown *over* this menu so
+## the map and fog choices survive a Back. Nothing reaches MatchConfig until both
+## commanders are confirmed there. "Continue" bypasses selection entirely — a
+## saved match restores its own commanders (plan R5).
 
 const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
 
+@onready var center: CenterContainer = $Center
 @onready var map_option: OptionButton = %MapOption
-@onready var red_co_option: OptionButton = %RedCoOption
-@onready var blue_co_option: OptionButton = %BlueCoOption
 @onready var fog_check: CheckButton = %FogCheck
 @onready var one_player_button: Button = %OnePlayerButton
 @onready var two_player_button: Button = %TwoPlayerButton
@@ -16,21 +21,36 @@ const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
 ## The roster in dropdown order, parsed once at load so the tooltips can quote
 ## real numbers off the board rather than a hand-kept table.
 var _maps: Array[MapData] = []
-## Commander ids in dropdown order, shared by both sides.
-var _commander_ids: Array[StringName] = []
-var _commander_db: CommanderDB
+var _select_panel: CommanderSelectPanel
+## The AI sides the chosen mode will play; carried across the selection page so
+## `confirmed` knows whether it was a one-player or hot-seat start.
+var _pending_ai_teams: Array[int] = []
 
 
 func _ready() -> void:
-	_commander_db = CommanderDB.load_default()
 	_populate_maps()
-	_populate_commanders()
+	_select_panel = CommanderSelectPanel.new()
+	add_child(_select_panel)
+	_select_panel.confirmed.connect(_on_selection_confirmed)
+	_select_panel.cancelled.connect(_on_selection_cancelled)
 	continue_button.visible = SaveGame.has_save()
-	one_player_button.pressed.connect(_start.bind([2] as Array[int], false))
-	two_player_button.pressed.connect(_start.bind([] as Array[int], false))
-	continue_button.pressed.connect(_start.bind([] as Array[int], true))
+	one_player_button.pressed.connect(_open_select.bind([2] as Array[int]))
+	two_player_button.pressed.connect(_open_select.bind([] as Array[int]))
+	continue_button.pressed.connect(_continue)
 	quit_button.pressed.connect(get_tree().quit)
 	one_player_button.grab_focus()
+
+	# Dev captures of the selection page: `--co-select` opens it on the Red slot,
+	# `--co-select=blue` advances to the Blue slot. An ordinary capture (no such
+	# flag) photographs the menu itself.
+	var select_mode := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg == "--co-select" or arg.begins_with("--co-select="):
+			select_mode = arg.get_slice("=", 1) if arg.contains("=") else "red"
+	if select_mode != "":
+		_open_select([2] as Array[int])
+		if select_mode == "blue":
+			_select_panel.debug_advance_to_blue()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			ScreenshotUtil.capture_and_quit(self, arg.get_slice("=", 1))
@@ -74,58 +94,36 @@ func _map_at(index: int) -> MapData:
 	return _maps[index]
 
 
-## Both dropdowns list every general, neutral first, so "No Commander" stays the
-## default and the menu opens on the match this game has always played.
-##
-## What each one actually does rides in the tooltip rather than in a blurb on
-## the menu: the design viewport is 640x360, and a doctrine plus a power
-## description for two sides is more text than that has room for without
-## pushing the start buttons off the bottom.
-func _populate_commanders() -> void:
-	for commander in _commander_db.all():
-		_commander_ids.append(commander.id)
-		red_co_option.add_item(commander.display_name)
-		blue_co_option.add_item(commander.display_name)
-	red_co_option.selected = 0
-	blue_co_option.selected = 0
-	red_co_option.item_selected.connect(_on_commander_selected.bind(red_co_option))
-	blue_co_option.item_selected.connect(_on_commander_selected.bind(blue_co_option))
-	_refresh_tooltip(red_co_option)
-	_refresh_tooltip(blue_co_option)
+## Opens the selection page for the chosen mode, hiding the menu behind it so no
+## focus or click leaks through to the buttons underneath.
+func _open_select(ai_teams: Array[int]) -> void:
+	_pending_ai_teams = ai_teams
+	center.hide()
+	_select_panel.begin(not ai_teams.is_empty())
 
 
-func _on_commander_selected(_index: int, option: OptionButton) -> void:
-	_refresh_tooltip(option)
+func _on_selection_confirmed(red_id: StringName, blue_id: StringName) -> void:
+	_start(_pending_ai_teams, false, {1: red_id, 2: blue_id})
 
 
-func _refresh_tooltip(option: OptionButton) -> void:
-	var commander := _commander_at(option.selected)
-	if not commander.has_power():
-		option.tooltip_text = "No commander: the standard rules, and no Command Power."
-		return
-	option.tooltip_text = (
-		"%s\n%s\n\n%s: %s"
-		% [commander.faction, commander.doctrine_text, commander.power_name, commander.power_text]
-	)
+func _on_selection_cancelled() -> void:
+	center.show()
+	one_player_button.grab_focus()
 
 
-func _commander_at(index: int) -> CommanderType:
-	if index < 0 or index >= _commander_ids.size():
-		return CommanderType.neutral()
-	return _commander_db.by_id(_commander_ids[index])
+func _continue() -> void:
+	# The saved match applies its own map, commanders and AI sides.
+	_start([] as Array[int], true, {})
 
 
 ## `load_save` resumes the saved match (its own map, commanders and AI sides
 ## apply, so the dropdowns above are ignored).
-func _start(ai_teams: Array[int], load_save: bool) -> void:
+func _start(ai_teams: Array[int], load_save: bool, commanders: Dictionary) -> void:
 	var map := _map_at(map_option.selected)
 	if map != null:
 		MatchConfig.map_path = map.source_path
 	MatchConfig.ai_teams = ai_teams
 	MatchConfig.fog_enabled = fog_check.button_pressed
-	MatchConfig.commanders = {
-		1: _commander_at(red_co_option.selected).id,
-		2: _commander_at(blue_co_option.selected).id,
-	}
+	MatchConfig.commanders = commanders
 	MatchConfig.load_save = load_save
 	get_tree().change_scene_to_file(BATTLE_SCENE)
