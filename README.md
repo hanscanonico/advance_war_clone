@@ -210,8 +210,9 @@ vision.
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
-- `tools/` — the art and sound build scripts: the headless ground-tile and sound generators, plus
-  the PixVoxel atlas builder (see Assets below).
+- `tools/` — the art and sound build scripts: the headless ground-tile, sound, and portrait
+  generators, plus the PixVoxel atlas builder (see Assets below); and the offline commander-balance
+  runner (`docs/commander_balance.md`).
 - `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 

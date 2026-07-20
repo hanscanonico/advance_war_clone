@@ -237,7 +237,9 @@ func _assert_symmetric(name: String) -> bool:
 		var mirror := Vector2i(w - 1 - unit.cell.x, h - 1 - unit.cell.y)
 		var twin := state.unit_at(mirror)
 		if twin == null or twin.team != _swap_team(unit.team) or twin.type.id != unit.type.id:
-			return _fatal("scenario '%s' unit %s at %s has no mirror" % [name, unit.type.id, unit.cell])
+			return _fatal(
+				"scenario '%s' unit %s at %s has no mirror" % [name, unit.type.id, unit.cell]
+			)
 	return true
 
 
