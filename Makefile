@@ -39,6 +39,18 @@ MODES ?=
 smoke:
 	tools/smoke_scenarios.sh $(MODES)
 
+# Offline commander balance: plays AI-vs-AI across every pairing on two
+# rotationally-symmetric scenarios and writes a per-match CSV + a JSON summary to
+# reports/ (gitignored). The full batch (no args) is ~1,152 headless matches and
+# is a release task, deliberately out of `make verify` and `make test`. Narrow it
+# for iteration, e.g.:
+#   make commander-balance BAL="--commanders=alina_ward,cass_orlov --seeds=2"
+# The committed artifacts of a balance pass are tuned data/commanders/*.tres and
+# docs/commander_balance.md, never the generated report.
+BAL ?=
+commander-balance:
+	$(GODOT) --headless --path . -s res://tools/run_commander_balance.gd -- $(BAL)
+
 # Every .gd file that is actually ours: skips the engine cache, vendored addons,
 # the engine binary, and .claude/worktrees, which holds whole nested checkouts of
 # this same repo and would otherwise be linted as if it were project source.
@@ -114,4 +126,4 @@ gallery-screenshot: import
 
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
 	sprites-check ground sprites sfx portraits import screenshot menu-screenshot \
-	gallery-screenshot
+	gallery-screenshot commander-balance

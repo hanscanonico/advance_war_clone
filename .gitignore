@@ -13,6 +13,11 @@ bin
 screenshot*.png
 screenshot*.png.import
 
+# Balance runner output (tools/run_commander_balance.gd). The committed artifacts
+# of a balance pass are tuned data/commanders/*.tres and docs/commander_balance.md,
+# never the generated CSV/JSON.
+reports/
+
 # Agent scratch space. .claude/worktrees holds nested checkouts of this repo,
 # which git would otherwise offer to commit as embedded repositories.
 .claude/
