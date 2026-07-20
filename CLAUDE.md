@@ -28,7 +28,8 @@ property capture and income, and a computer opponent.
 2. **Data-driven via Resources.** Unit stats, terrain properties, and the damage chart are
    `.tres` `Resource` files under `data/`, not constants in code. Balancing = editing data;
    adding a unit = adding a file. The damage chart is one resource holding the attacker × defender
-   base-damage matrix.
+   base-damage matrix. Commanders split the two: the doctrine is a `CommanderType` subclass in
+   `core/commanders/`, every number it reads is `@export` on its `.tres` in `data/commanders/`.
 3. **Command pattern for all actions.** Every player or AI action is a command object under
    `core/commands/` (`Move`, `Attack`, `Capture`, `Build`, `EndTurn`, …) that is *validated* then
    *applied* to the sim, which emits typed events the scene layer animates. This gives us undo of
@@ -44,11 +45,11 @@ The AI plugs in at the exact same point as player input.
 
 ```
 res://
-├─ core/        # sim: game_state.gd, commands/, rules/  (NO Node references)
-├─ data/        # .tres resources: units/, terrain/, ai/, damage_chart
+├─ core/        # sim: game_state.gd, commands/, rules/, commanders/  (NO Node references)
+├─ data/        # .tres resources: units/, terrain/, commanders/, ai/, damage_chart
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
-│  ├─ menu/     # main_menu.tscn — map select, match options
+│  ├─ menu/     # main_menu.tscn — map and commander select, match options
 │  ├─ common/   # helpers shared by both scenes
 │  └─ ui/       # menus, panels, damage preview
 ├─ autoload/    # singletons: EventBus, MatchConfig, Sfx
