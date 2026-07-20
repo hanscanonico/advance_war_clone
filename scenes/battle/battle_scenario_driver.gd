@@ -71,7 +71,8 @@ func run() -> void:
 ## transport runs load -> drive -> drop, and load, cargo, and drop stop that
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
 ## picker; supply holds the APC next to its infantry so Supply is offered;
-## mapmenu stops at the map menu (End Turn / Save); victory routs Blue through
+## mapmenu stops at the map menu (End Turn / Save); powermenu fires a Command
+## Power from the HUD over an open action menu; victory routs Blue through
 ## a real attack so the victory screen comes up.
 ##
 ## Modes that stop early return without falling through to the rest of the
@@ -120,6 +121,8 @@ func _run_demo(mode: String) -> void:
 		"mapmenu":
 			_battle.confirm_at(Vector2i(10, 5))  # empty road tile -> End Turn / Save
 			await _until_state(Battle.State.MENU)
+		"powermenu":
+			await _run_power_menu_demo()
 		"victory":
 			await _run_victory_demo()
 		"aiturn":
@@ -156,6 +159,28 @@ func _run_transport_demo(mode: String) -> void:
 	_battle.confirm_at(_battle.cursor_cell)  # drop at the first offered cell
 	await _until_state(Battle.State.IDLE)
 	_battle.set_cursor_cell(Vector2i(3, 5))  # show the APC in the panel
+
+
+## Fires a Command Power from the HUD button with a unit's action menu already
+## open — the one route that reaches the power in State.MENU, since the map menu
+## closes itself on the way. The power abandons the move the menu belonged to, so
+## the menu has to go with it: a row chosen afterwards used to run against a
+## selection that was already cleared and take the scene down with it.
+func _run_power_menu_demo() -> void:
+	var co := _battle.commander_db.by_id(&"alina_ward")
+	_battle.game.set_commander(1, co)
+	_battle.game.commander_state(1).charge = co.power_cost
+	_battle.view.refresh_hud()  # the meter now reads full, so the button is live
+	_battle.confirm_at(Vector2i(8, 8))  # select the red tank
+	_battle.confirm_at(Vector2i(8, 8))  # stay put -> its action menu
+	await _until_state(Battle.State.MENU)
+	_battle.view.power_button.pressed.emit()
+	await _until_state(Battle.State.IDLE)
+	# Waited out rather than asserted, in the same spirit as _until_state: a menu
+	# that never closes hangs the scenario and the smoke run reports the timeout.
+	while _battle.action_menu.visible:
+		await _battle.get_tree().process_frame
+	_battle.action_menu.choose(&"wait")  # the click a player can no longer make
 
 
 ## Leaves Blue one nearly-dead unit, then wins through the ordinary

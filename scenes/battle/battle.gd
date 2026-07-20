@@ -110,7 +110,6 @@ func _ready() -> void:
 	# awaits, and a RefCounted nobody references is freed mid-scenario.
 	var driver := BattleScenarioDriver.new(self)
 	_capturing = driver.requested()
-
 	animator.capturing = _capturing
 	animator.start_cursor_pulse()
 	_on_turn_started()  # day 1 gets the same banner/cursor/event as every turn
@@ -123,7 +122,6 @@ func _ready() -> void:
 		# Captures show where the view settles, which is the position UI is
 		# already anchored to anyway (see BattleView.screen_pos_for_cell).
 		camera.position_smoothing_enabled = false
-	if _capturing:
 		_scenario_driver = driver
 		_scenario_driver.run()
 
@@ -158,6 +156,7 @@ func _build_view() -> BattleView:
 	built.db = db
 	built.map = map
 	built.game = game
+	built.ai_teams = ai_teams
 	return built
 
 
@@ -491,8 +490,9 @@ func _fire_command_power() -> void:
 	command.apply(game)
 	_announce_power(command)
 	# A power can change movement, vision and HP at once, so the whole board is
-	# redrawn — and any selection was ranged under rules that no longer apply.
-	# sync_sprites rewrites visibility, so _clear_selection's fog pass runs last.
+	# redrawn, and the selection — plus any menu the HUD button fired over, whose
+	# rows would otherwise act on it — belongs to rules that no longer apply.
+	action_menu.close()
 	view.sync_sprites()
 	_clear_selection()
 	_refresh_panel()

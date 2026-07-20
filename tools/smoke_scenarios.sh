@@ -32,11 +32,11 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 
 # One per branch of the interaction flow: targeting preview and resolved
 # combat, capture, the build menu and a completed build, the map menu and the
-# turn it ends, the load/drive/drop transport chain, supply, victory, and a
-# full AI turn.
+# turn it ends, the load/drive/drop transport chain, supply, a Command Power
+# fired from the HUD over an open menu, victory, and a full AI turn.
 DEFAULT_MODES=(
 	attack resolve capture build buildmenu endturn
-	load cargo drop transport supply mapmenu victory aiturn
+	load cargo drop transport supply mapmenu powermenu victory aiturn
 )
 
 if [[ ! -x "$GODOT" ]]; then

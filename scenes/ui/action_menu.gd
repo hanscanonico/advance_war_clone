@@ -78,7 +78,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Public so scripted drivers (screenshot demos) exercise the same path as
 ## the buttons and keyboard.
+##
+## A closed menu chooses nothing. Whoever opened it may close it from outside
+## the menu flow — firing a Command Power from the HUD abandons the move the
+## menu belonged to — and the rows left behind would otherwise still act, on a
+## selection that is gone.
 func choose(id: StringName) -> void:
+	if not visible:
+		return
 	var i := _ids.find(id)
 	if i >= 0 and _disabled[i]:
 		return

@@ -45,6 +45,9 @@ var power_button: Button
 var db: TerrainDB
 var map: MapData
 var game: GameState
+## Teams the computer plays. The view only needs them to know whose controls it
+## must not offer; Battle owns the list and hands it over, as with everything.
+var ai_teams: Array[int] = []
 
 var _sprites: Dictionary = {}  # Unit -> UnitSprite
 ## Cells the viewing team can see; refreshed by `refresh_fog` after commits.
@@ -52,6 +55,9 @@ var _visible_cells: Dictionary = {}
 ## Whose eyes the board is drawn from; set by the same pass. Starts on the
 ## opening team, which is who is looking before the first fog refresh runs.
 var _viewing_team: int = GameState.TEAMS[0]
+## True while a hot-seat handoff blacks the board out for everyone; set by the
+## same pass, and the one case where even your own units are hidden.
+var _blacked_out := false
 
 
 ## Builds the tile sets from data and paints the opening board. Call once, after
@@ -140,16 +146,27 @@ func spawn_sprite_for(unit: Unit) -> void:
 	units_root.add_child(sprite)
 	sprite.setup(unit, game.current_team)
 	_sprites[unit] = sprite
+	refresh_sprite(unit)
 
 
 func sprite_for(unit: Unit) -> UnitSprite:
 	return _sprites.get(unit)
 
 
+## Brings one sprite back in step with the sim, then hides it if the viewing
+## team may not see it.
+##
+## Applying fog here rather than at the call sites is what keeps it honest:
+## `UnitSprite.refresh` decides visibility from cargo alone and would happily
+## un-hide a fogged enemy, so every path that redraws a sprite goes through this
+## one and no caller has to remember to chase it with a fog pass.
 func refresh_sprite(unit: Unit) -> void:
 	var sprite: UnitSprite = _sprites.get(unit)
-	if sprite != null:
-		sprite.refresh()
+	if sprite == null:
+		return
+	sprite.refresh()
+	if _blacked_out or not can_see_unit(unit):
+		sprite.visible = false
 
 
 ## Hands the sprite over and stops tracking the unit, for callers that animate
@@ -161,9 +178,13 @@ func release_sprite(unit: Unit) -> UnitSprite:
 	return sprite
 
 
+## Re-tints every sprite for the team about to play. Goes back through
+## `refresh_sprite` afterwards because setting the team redraws the sprite, and
+## a redraw that skipped the fog decision would show the whole board again.
 func set_active_team(team: int) -> void:
 	for unit in game.units:
 		_sprites[unit].set_active_team(team)
+		refresh_sprite(unit)
 
 
 ## Brings every sprite back in step with the sim in one pass, for the changes
@@ -173,7 +194,8 @@ func set_active_team(team: int) -> void:
 ## cargo goes down with its transport — so any sprite whose unit has left
 ## `game.units` is freed. And a Command Power can heal or refuel a whole side at
 ## once, so every surviving sprite is redrawn rather than just the one that
-## acted.
+## acted. Survivors go through `refresh_sprite`, so the pass re-applies fog
+## instead of leaking whatever the last fog pass hid.
 func sync_sprites() -> void:
 	for unit: Unit in _sprites.keys():
 		if unit in game.units:
@@ -217,26 +239,28 @@ func update_path_line(path: Array[Vector2i]) -> void:
 
 ## Recomputes visibility and repaints the fog layer plus unit visibility.
 ## Called after every committed action and turn change (not per cursor move).
-## With fog off nothing is ever hidden, so the whole pass is skipped; when
+## With fog off the layer stays clear and nothing is ever hidden; when
 ## `blacked_out` (a hot-seat handoff) nobody may look and the board is hidden
 ## entirely.
+##
+## Only the *cells* are worked out here. Each sprite is then redrawn through
+## `refresh_sprite`, which is where hiding a unit is decided — for this pass and
+## for every other one.
 func refresh_fog(viewing_team: int, blacked_out: bool) -> void:
 	fog_layer.clear()
 	_viewing_team = viewing_team
-	if not game.fog_enabled:
-		_visible_cells = {}
-		return
-	_visible_cells = {} if blacked_out else Vision.visible_cells(game, viewing_team)
-	for y in map.height:
-		for x in map.width:
-			var cell := Vector2i(x, y)
-			if not _visible_cells.has(cell):
-				fog_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
+	_blacked_out = blacked_out
+	_visible_cells = {}
+	if game.fog_enabled:
+		if not blacked_out:
+			_visible_cells = Vision.visible_cells(game, viewing_team)
+		for y in map.height:
+			for x in map.width:
+				var cell := Vector2i(x, y)
+				if not _visible_cells.has(cell):
+					fog_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
 	for unit in game.units:
-		var sprite: UnitSprite = _sprites[unit]
-		sprite.refresh()
-		if blacked_out or (unit.carrier == null and not can_see_unit(unit)):
-			sprite.visible = false
+		refresh_sprite(unit)
 
 
 ## Whether the viewing team can see a unit — the question to ask before drawing
@@ -275,15 +299,19 @@ func _refresh_charge_meter() -> void:
 	if not showing:
 		return
 	charge_bar.value = co_state.charge_ratio()
-	charge_label.text = (
-		"%s  %d/%d" % [co_state.type.display_name, co_state.charge, co_state.type.power_cost]
-	)
-	power_button.text = co_state.type.power_name
-	power_button.disabled = not co_state.is_ready()
 	# An active power reads off the meter alone, which is empty either way while
 	# it runs — so say so rather than leaving the player guessing.
 	if co_state.power_active:
 		charge_label.text = "%s  ACTIVE" % co_state.type.power_name
+	else:
+		charge_label.text = (
+			"%s  %d/%d" % [co_state.type.display_name, co_state.charge, co_state.type.power_cost]
+		)
+	power_button.text = co_state.type.power_name
+	# A charged computer opponent that chose not to spend still fills the meter,
+	# and the click would be refused anyway — so the button says so up front
+	# rather than looking live and doing nothing.
+	power_button.disabled = not co_state.is_ready() or game.current_team in ai_teams
 
 
 func refresh_panel(cell: Vector2i) -> void:
