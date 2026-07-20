@@ -8,9 +8,12 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster,
 property capture and income, and a computer opponent.
 
-- **Status:** the design of record is `.lavish/advance-wars-clone-plan.html` — milestones M0–M7
-  and which of them are done, mechanics reference, damage formula. Read it before making
-  architectural decisions.
+- **Status:** two designs of record, both worth reading before an architectural decision.
+  `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
+  are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
+  and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
+  D2 asymmetric charge accrual, D3 what C1 ships, D4 Sable Wren's reworked Vanish) and the risk
+  register R1–R6 that work was built against.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
@@ -101,7 +104,7 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
 ## Working in this repo
 
 - **Match the plan's milestones.** Ship something playable each milestone; don't pull scope
-  forward — the plan artifact tracks which milestones are done and what each one owes.
+  forward — the plan artifacts track which milestones are done and what each one owes.
   Scope creep is the named top risk.
 - **Balance numbers live in `data/`.** Don't hardcode stats you could put in a `.tres`.
 - **Don't hand-edit** `.import` files or the binary/UID bits of `.tscn`/`.tres` unless you know
@@ -109,6 +112,17 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
   scene, and prefer editing resource *data* over scene graph plumbing.
 - **`project.godot`, autoloads, and the input map** are edited through the editor when practical;
   if editing by hand, keep changes minimal and reviewable.
+- **Doctrine hooks take an `Engagement`, not two `Unit`s.** `core/rules/engagement.gd` carries the
+  effective values a shot is resolved with: the cell it is *actually* fired from and the HP the
+  formula should use. A forecast fires from a cell the attacker has not moved to yet, and a
+  forecast's counter uses projected post-attack HP — handing hooks the effective values is what
+  keeps the damage preview and the resolved attack on identical numbers.
+- Two more single authorities, same rule as vision below — ask them, never re-derive:
+  `core/rules/attack_range.gd` owns how far a unit can shoot (countering is the one deliberate
+  exception, documented on `CombatResolver._defender_can_counter`), and `core/movement_resolver.gd`
+  owns the movement budget and per-step terrain cost, **including inside `MoveCommand.validate`**.
+  That last one is load-bearing: a fourth independent opinion on movement was a real bug here, and
+  it made the range overlay offer cells the command then refused.
 - Keep the vision/fog boundary clean: `core/rules/vision.gd` is the single authority for "what can
   this player see?" — ask it, never re-derive visibility. Fog is enforced in the presentation layer
   (the sim stays permissive, the UI refuses to target or inspect what the viewer cannot see), and
