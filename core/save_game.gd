@@ -14,7 +14,8 @@ extends RefCounted
 ## matches — see SaveCodec.
 
 const SAVE_PATH := "user://save.json"
-const VERSION := SaveCodec.VERSION
+const SAVE_CODEC_SCRIPT := preload("res://core/save_codec.gd")
+const VERSION := SAVE_CODEC_SCRIPT.VERSION
 
 
 static func has_save(path: String = SAVE_PATH) -> bool:
@@ -26,7 +27,7 @@ static func save(state: GameState, ai_teams: Array[int], path: String = SAVE_PAT
 	if file == null:
 		push_error("SaveGame: cannot write %s" % path)
 		return false
-	file.store_string(JSON.stringify(SaveCodec.encode(state, ai_teams), "\t"))
+	file.store_string(JSON.stringify(SAVE_CODEC_SCRIPT.encode(state, ai_teams), "\t"))
 	return true
 
 
@@ -37,7 +38,7 @@ static func load_game(
 	damage_chart: DamageChart,
 	path: String = SAVE_PATH,
 	commander_db: CommanderDB = null
-) -> SaveCodec.LoadedMatch:
+) -> SAVE_CODEC_SCRIPT.LoadedMatch:
 	var text := FileAccess.get_file_as_string(path)
 	if text.is_empty():
 		push_error("SaveGame: cannot read %s" % path)
@@ -46,4 +47,4 @@ static func load_game(
 	if json.parse(text) != OK or not json.data is Dictionary:
 		push_error("SaveGame: %s is not a valid save" % path)
 		return null
-	return SaveCodec.decode(json.data, terrain_db, unit_db, damage_chart, commander_db)
+	return SAVE_CODEC_SCRIPT.decode(json.data, terrain_db, unit_db, damage_chart, commander_db)

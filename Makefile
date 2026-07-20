@@ -5,10 +5,10 @@ BATTLE := scenes/battle/battle.tscn
 # Revised_PixVoxel_Wargame_1.7z — see assets/LICENSES.md for the source.
 PIXVOXEL ?= assets/sprites/pixvoxel_src
 
-run:
+run: import
 	$(GODOT) --path .
 
-hotseat:
+hotseat: import
 	$(GODOT) --path . $(BATTLE) -- --hotseat
 
 test:
@@ -92,10 +92,10 @@ import:
 	$(GODOT) --headless --path . --import
 
 # The battle scene is launched directly so demos and captures skip the menu.
-screenshot:
+screenshot: import
 	$(GODOT) --path . $(BATTLE) -- --screenshot=$(CURDIR)/screenshot.png
 
-menu-screenshot:
+menu-screenshot: import
 	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
