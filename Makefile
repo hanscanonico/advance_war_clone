@@ -88,6 +88,15 @@ sprites:
 sfx:
 	$(GODOT) --headless --path . -s res://tools/generate_sfx.gd
 
+# Regenerates the placeholder commander portraits (256x256 busts) and the four
+# faction emblems, then re-imports so the new PNGs register. These are committed
+# art, so this only needs rerunning when tools/generate_portraits.gd changes or
+# a commander is added. Placeholders until the final portrait pass — see the
+# commander-readiness plan's D1/R1.
+portraits:
+	$(GODOT) --headless --path . -s res://tools/generate_portraits.gd
+	$(GODOT) --headless --path . --import
+
 import:
 	$(GODOT) --headless --path . --import
 
@@ -98,5 +107,11 @@ screenshot: import
 menu-screenshot: import
 	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
+# The G1 gate: renders a card for all thirteen commander records at once, so a
+# missing portrait or empty copy field shows up as a crash or a blank card.
+gallery-screenshot: import
+	$(GODOT) --path . scenes/menu/commander_gallery.tscn -- --screenshot=$(CURDIR)/screenshot.png
+
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
-	sprites-check ground sprites sfx import screenshot menu-screenshot
+	sprites-check ground sprites sfx portraits import screenshot menu-screenshot \
+	gallery-screenshot
