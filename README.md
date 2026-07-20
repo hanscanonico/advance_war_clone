@@ -122,10 +122,13 @@ jumps to that team's first property.
   Power is charged the menu lists it first, so it is reachable from the keyboard as well as from
   the HUD button
 - The HUD shows the current day, team, and funds — plus, for a side playing a commander, that
-  side's charge meter and a **Power** button (see Commanders below); the corner panel shows the
-  hovered tile's terrain, defense stars, move costs, owner (with `capture: N left` while a
-  capture is in progress), and the unit standing there, if any — with its fuel, its ammo when the
-  unit needs any, and `[+Infantry]` when it is carrying a passenger
+  side's charge meter and a **Power** button (see Commanders below); the corner panel leads with
+  the unit on the hovered tile, if any: its sprite, name, army, `HP x/10`, fuel and ammo out of
+  their maximums (no ammo row for units that need none), its range when it is an indirect,
+  `Carrying …` when it is a loaded transport, and a `Waited` badge — dimming the card — once it
+  has acted this turn. Below that sits a compact terrain card: the tile's artwork, name, defense
+  stars, the move cost for the occupant's movement class (all four classes when the tile is
+  empty), and the owner, with `capture: N left` while a capture is in progress
 - Taking the enemy HQ or destroying every enemy unit ends the match on a victory screen naming
   the winner and the day, with **Rematch** (same map, fog, commanders, and sides) and **Main Menu**
 
