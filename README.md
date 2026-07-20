@@ -53,6 +53,10 @@ a player's input reaches and must still produce a frame. It renders, so it needs
 a local gate, not a headless-CI one. Narrow it with `make smoke MODES="attack capture"`, and keep
 the captures to look at with `SMOKE_KEEP=1 make smoke`.
 
+A mode may carry a `+fog` suffix (`make smoke MODES="victory+fog"`) to rerun that scenario with fog
+of war on. Fog is the only setting under which the scene hides units rather than just drawing them,
+so two scenarios run both ways by default.
+
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
 Two maps ship: `first_steps` (the default) and `crossfire`. The main menu lists every map in

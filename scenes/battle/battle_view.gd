@@ -144,29 +144,35 @@ func _spawn_unit_sprites() -> void:
 func spawn_sprite_for(unit: Unit) -> void:
 	var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
 	units_root.add_child(sprite)
+	sprite.fogged = _is_fogged(unit)
 	sprite.setup(unit, game.current_team)
 	_sprites[unit] = sprite
-	refresh_sprite(unit)
 
 
 func sprite_for(unit: Unit) -> UnitSprite:
 	return _sprites.get(unit)
 
 
-## Brings one sprite back in step with the sim, then hides it if the viewing
-## team may not see it.
+## Brings one sprite back in step with the sim, fog included: the answer is
+## written onto the sprite, which then draws itself from it.
 ##
-## Applying fog here rather than at the call sites is what keeps it honest:
-## `UnitSprite.refresh` decides visibility from cargo alone and would happily
-## un-hide a fogged enemy, so every path that redraws a sprite goes through this
-## one and no caller has to remember to chase it with a fog pass.
+## Deciding it here and storing it there is what makes it stick. A sprite that
+## worked visibility out for itself would un-hide a fogged enemy every time
+## anything redrew it — and `UnitSprite` redraws on three different calls — so
+## the decision is made in one place and remembered rather than re-derived.
 func refresh_sprite(unit: Unit) -> void:
 	var sprite: UnitSprite = _sprites.get(unit)
 	if sprite == null:
 		return
+	sprite.fogged = _is_fogged(unit)
 	sprite.refresh()
-	if _blacked_out or not can_see_unit(unit):
-		sprite.visible = false
+
+
+## Whether the board currently hides `unit` from whoever is looking. Vision owns
+## the rule; the blackout is the view's own, since a hot-seat handoff hides even
+## your own units.
+func _is_fogged(unit: Unit) -> bool:
+	return _blacked_out or not can_see_unit(unit)
 
 
 ## Hands the sprite over and stops tracking the unit, for callers that animate
@@ -178,13 +184,12 @@ func release_sprite(unit: Unit) -> UnitSprite:
 	return sprite
 
 
-## Re-tints every sprite for the team about to play. Goes back through
-## `refresh_sprite` afterwards because setting the team redraws the sprite, and
-## a redraw that skipped the fog decision would show the whole board again.
+## Re-tints every sprite for the team about to play. Safe to call outside a fog
+## pass: setting the team redraws the sprite, and a redraw keeps whatever
+## `refresh_sprite` last decided about seeing it.
 func set_active_team(team: int) -> void:
 	for unit in game.units:
 		_sprites[unit].set_active_team(team)
-		refresh_sprite(unit)
 
 
 ## Brings every sprite back in step with the sim in one pass, for the changes

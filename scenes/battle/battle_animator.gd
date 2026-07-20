@@ -50,7 +50,7 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
 	var defender_sprite := view.sprite_for(defender)
 	var attacker_sprite := view.sprite_for(attacker)
-	attacker_sprite.refresh()  # snap to the committed destination
+	view.refresh_sprite(attacker)  # snap to the committed destination
 	Sfx.play(&"shot")
 	await defender_sprite.flash_hit()
 	shake_camera()
@@ -59,7 +59,7 @@ func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defende
 		view.release_sprite(defender)
 		await defender_sprite.die()
 	else:
-		defender_sprite.refresh()
+		view.refresh_sprite(defender)
 	if result.countered:
 		Sfx.play(&"shot")
 		await attacker_sprite.flash_hit()
@@ -67,7 +67,7 @@ func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defende
 		view.release_sprite(attacker)
 		await attacker_sprite.die()
 	else:
-		attacker_sprite.refresh()
+		view.refresh_sprite(attacker)
 	view.sync_sprites()
 
 

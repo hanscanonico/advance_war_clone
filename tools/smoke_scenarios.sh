@@ -12,6 +12,12 @@
 #
 # Usage:  tools/smoke_scenarios.sh [mode ...]   (see the `smoke` target)
 #
+# A mode may carry a `+fog` suffix — `victory+fog` is the victory scenario run
+# with fog of war on. Fog is the one setting under which this scene *hides*
+# units rather than merely drawing them, so a couple of fogged runs are part of
+# the sweep; the mode name is the label and the capture filename, so a failure
+# says which of the two it was.
+#
 # With no arguments it runs DEFAULT_MODES. Captures land in a temporary
 # directory that is removed on exit unless SMOKE_KEEP is set, in which case the
 # path is printed so the frames can be eyeballed.
@@ -34,9 +40,15 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # combat, capture, the build menu and a completed build, the map menu and the
 # turn it ends, the load/drive/drop transport chain, supply, a Command Power
 # fired from the HUD over an open menu, victory, and a full AI turn.
+#
+# Two of them run again under fog, where the sprite-hiding path exists at all:
+# powermenu+fog fires a power, which redraws every sprite on the board at once,
+# and victory+fog edits the sim behind the scene's back and resyncs. Both used
+# to leak enemy positions.
 DEFAULT_MODES=(
 	attack resolve capture build buildmenu endturn
 	load cargo drop transport supply mapmenu powermenu victory aiturn
+	powermenu+fog victory+fog
 )
 
 if [[ ! -x "$GODOT" ]]; then
@@ -84,10 +96,15 @@ run_with_timeout() {
 failed=0
 for mode in "${modes[@]}"; do
 	shot="$out_dir/$mode.png"
-	printf 'smoke: %-10s ' "$mode"
-	run_with_timeout "$SMOKE_TIMEOUT" \
-		"$GODOT" --path . "$BATTLE" -- \
-		"--screenshot=$shot" "--demo=$mode"
+	printf 'smoke: %-14s ' "$mode"
+	# `victory+fog` is the victory demo with fog on; anything else is the demo
+	# name as written.
+	demo="${mode%+fog}"
+	godot_args=(--path . "$BATTLE" -- "--screenshot=$shot" "--demo=$demo")
+	if [[ "$demo" != "$mode" ]]; then
+		godot_args+=(--fog)
+	fi
+	run_with_timeout "$SMOKE_TIMEOUT" "$GODOT" "${godot_args[@]}"
 	status=$?
 
 	if ((status == 124)); then

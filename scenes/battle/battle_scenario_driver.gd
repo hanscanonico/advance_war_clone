@@ -58,8 +58,33 @@ func run() -> void:
 		await _run_demo(_demo)
 	elif _select_cell.x >= 0:
 		_demo_select(_select_cell)
+	if not _fog_hides_unseen():
+		_battle.get_tree().quit(1)
+		return
 	if _shot_path != "":
 		await _save_screenshot_and_quit(_shot_path)
+
+
+## Every unit still on screen is one the viewing team is allowed to see.
+##
+## Checked here because a fog leak is silent: the frame renders either way, so a
+## scenario that only proves it produced one would pass straight through the
+## bug. Quitting non-zero is what turns that into a failed smoke run. With fog
+## off there is nothing to hide and the whole check is skipped.
+func _fog_hides_unseen() -> bool:
+	if not _battle.game.fog_enabled:
+		return true
+	for unit in _battle.game.units:
+		var sprite := _battle.view.sprite_for(unit)
+		if sprite != null and sprite.visible and not _battle.view.can_see_unit(unit):
+			push_error(
+				(
+					"fog leak: %s at %s is drawn but team %d cannot see it"
+					% [unit.type.id, unit.cell, _battle.game.current_team]
+				)
+			)
+			return false
+	return true
 
 
 ## Drives real flows through the same handlers a player's input reaches:
