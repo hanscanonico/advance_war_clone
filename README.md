@@ -79,7 +79,7 @@ Both CO dropdowns default to **No Commander**, which plays the plain rules. Hove
 general's doctrine and Command Power in its tooltip — the 640x360 design viewport has no room to
 print that for two sides on the menu itself.
 
-## Controls (M7)
+## Controls
 
 You play Red; Blue is the computer. Blue's turn plays itself — input is blocked while the AI
 moves, attacks, captures, and builds, and the cursor follows each of its actions so you can
