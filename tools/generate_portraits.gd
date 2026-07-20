@@ -107,9 +107,8 @@ func _draw_bust(commander: CommanderType) -> Image:
 	_draw_hair(img, hair, accessory)
 
 	# Eyes, then the identifying accessory over them.
-	var eye := OUTLINE if accessory != &"eyepatch" else OUTLINE
-	_disc(img, 110, 108, 6, 7, eye)
-	_disc(img, 146, 108, 6, 7, eye)
+	_disc(img, 110, 108, 6, 7, OUTLINE)
+	_disc(img, 146, 108, 6, 7, OUTLINE)
 	_draw_accessory(img, accessory, hair)
 
 	_frame(img, theme.color_dark)

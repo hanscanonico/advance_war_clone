@@ -143,7 +143,8 @@ func _init() -> void:
 	_load_dbs()
 	_parse_args()
 	for name in _scenario_names:
-		_assert_symmetric(name)
+		if not _assert_symmetric(name):
+			return
 	var rows := _run_all()
 	var summary := _summarise(rows)
 	_write_reports(rows, summary)
@@ -219,7 +220,7 @@ func _parse_scenario_list(value: String) -> Array[String]:
 ## teams swapped: terrain must map onto itself, and every owned cell and unit must
 ## have a mirror belonging to the other side. A broken map would quietly bias the
 ## whole run, which is the one thing the paired design exists to prevent.
-func _assert_symmetric(name: String) -> void:
+func _assert_symmetric(name: String) -> bool:
 	var map := MapData.parse(SCENARIOS[name], terrain_db)
 	var state := GameState.create(map, unit_db, chart)
 	var w := map.width
@@ -229,14 +230,15 @@ func _assert_symmetric(name: String) -> void:
 			var a := Vector2i(x, y)
 			var b := Vector2i(w - 1 - x, h - 1 - y)
 			if map.terrain_at(a).id != map.terrain_at(b).id:
-				_fatal("scenario '%s' terrain not symmetric at %s vs %s" % [name, a, b])
+				return _fatal("scenario '%s' terrain not symmetric at %s vs %s" % [name, a, b])
 			if state.owner_at(a) != _swap_team(state.owner_at(b)):
-				_fatal("scenario '%s' ownership not mirror-symmetric at %s" % [name, a])
+				return _fatal("scenario '%s' ownership not mirror-symmetric at %s" % [name, a])
 	for unit in state.units:
 		var mirror := Vector2i(w - 1 - unit.cell.x, h - 1 - unit.cell.y)
 		var twin := state.unit_at(mirror)
 		if twin == null or twin.team != _swap_team(unit.team) or twin.type.id != unit.type.id:
-			_fatal("scenario '%s' unit %s at %s has no mirror" % [name, unit.type.id, unit.cell])
+			return _fatal("scenario '%s' unit %s at %s has no mirror" % [name, unit.type.id, unit.cell])
+	return true
 
 
 func _swap_team(team: int) -> int:
@@ -247,9 +249,10 @@ func _swap_team(team: int) -> int:
 	return team
 
 
-func _fatal(message: String) -> void:
+func _fatal(message: String) -> bool:
 	push_error("balance: " + message)
 	quit(2)
+	return false
 
 
 # --- run ---------------------------------------------------------------------

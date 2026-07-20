@@ -170,7 +170,11 @@ static func faction_themes() -> Array:
 static func portrait_for(commander: CommanderType) -> Texture2D:
 	var id := commander.id if commander != null else CommanderType.NEUTRAL_ID
 	return _cached(
-		"%s/%s.png" % [PORTRAIT_DIR, id], func() -> Texture2D: return _fallback_portrait()
+		"%s/%s.png" % [PORTRAIT_DIR, id],
+		func() -> Texture2D:
+			if ResourceLoader.exists(NEUTRAL_PORTRAIT_PATH):
+				return load(NEUTRAL_PORTRAIT_PATH)
+			return _fallback_portrait()
 	)
 
 
@@ -185,17 +189,16 @@ static func emblem_for(commander: CommanderType) -> Texture2D:
 
 
 ## Loads `path` through a small cache, calling `on_missing` for the fallback when
-## the file is not there. Textures are shared immutable resources, so caching
-## them across scene loads is safe and keeps the select page from reloading
-## thirteen portraits every time a tab changes.
+## the file is not there. Each caller owns its own fallback: portraits borrow the
+## neutral bust, emblems fall to a transparent square. Textures are shared immutable
+## resources, so caching them across scene loads is safe and keeps the select page
+## from reloading thirteen portraits every time a tab changes.
 static func _cached(path: String, on_missing: Callable) -> Texture2D:
 	if _texture_cache.has(path):
 		return _texture_cache[path]
 	var texture: Texture2D
 	if ResourceLoader.exists(path):
 		texture = load(path)
-	if texture == null and ResourceLoader.exists(NEUTRAL_PORTRAIT_PATH):
-		texture = load(NEUTRAL_PORTRAIT_PATH)
 	if texture == null:
 		texture = on_missing.call()
 	_texture_cache[path] = texture
