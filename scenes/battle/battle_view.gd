@@ -331,6 +331,7 @@ func refresh_panel(cell: Vector2i) -> void:
 	terrain_panel.show_tile(
 		map.terrain_at(cell),
 		game.owner_at(cell),
+		game.current_team,
 		game.capture_progress.get(cell, -1),
 		hovered,
 		carrying

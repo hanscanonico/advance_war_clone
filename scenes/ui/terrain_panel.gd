@@ -39,19 +39,22 @@ func _ready() -> void:
 
 
 ## Single entry point per hovered tile; unit is null on empty or fogged tiles.
-## `carrying` names the cargo when the unit is a loaded transport.
+## `carrying` names the cargo when the unit is a loaded transport. The acted
+## dim and "Waited" badge apply only to `active_team`'s own units, matching
+## the map sprite's tint.
 func show_tile(
 	terrain: TerrainType,
 	owner_team: int,
+	active_team: int,
 	capture_left: int = -1,
 	unit: Unit = null,
 	carrying: String = ""
 ) -> void:
-	_show_unit(unit, carrying)
+	_show_unit(unit, carrying, active_team)
 	_show_terrain(terrain, owner_team, capture_left, unit)
 
 
-func _show_unit(unit: Unit, carrying: String) -> void:
+func _show_unit(unit: Unit, carrying: String, active_team: int) -> void:
 	unit_rows.visible = unit != null
 	separator.visible = unit != null
 	if unit == null:
@@ -66,16 +69,17 @@ func _show_unit(unit: Unit, carrying: String) -> void:
 	if unit.type.max_ammo > 0:
 		supply += "   Ammo %d/%d" % [unit.ammo, unit.type.max_ammo]
 	unit_supply_label.text = supply
+	var waited := unit.acted and unit.team == active_team
 	var extras := PackedStringArray()
 	if unit.type.min_range > 1:
 		extras.append("Rng %d-%d" % [unit.type.min_range, unit.type.max_range])
 	if carrying != "":
 		extras.append("Carrying %s" % carrying)
-	if unit.acted:
+	if waited:
 		extras.append("Waited")
 	unit_extra_label.visible = not extras.is_empty()
 	unit_extra_label.text = "  ".join(extras)
-	unit_rows.modulate = ACTED_TINT if unit.acted else Color.WHITE
+	unit_rows.modulate = ACTED_TINT if waited else Color.WHITE
 
 
 func _show_terrain(terrain: TerrainType, owner_team: int, capture_left: int, unit: Unit) -> void:
@@ -105,7 +109,8 @@ func _move_costs(terrain: TerrainType, unit: Unit) -> String:
 func _stars(count: int) -> String:
 	if count <= 0:
 		return "0"
-	return "★".repeat(count) + "☆".repeat(MAX_DEFENSE_STARS - count)
+	var filled := mini(count, MAX_DEFENSE_STARS)
+	return "★".repeat(filled) + "☆".repeat(MAX_DEFENSE_STARS - filled)
 
 
 ## The same artwork the board draws: one cell of the terrain atlas, with the
