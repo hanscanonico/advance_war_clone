@@ -1,4 +1,4 @@
-# First Steps — 20x15 starter map.
+# Roomy, road-laced and gentle: the board to learn the game on.
 # Symbols: . plains  F woods  M mountain  = road  ~ river
 #          C city  B base  Q HQ  S sea
 [terrain]

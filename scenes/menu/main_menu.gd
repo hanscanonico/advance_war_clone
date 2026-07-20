@@ -3,7 +3,6 @@ extends Control
 ## battle scene through the MatchConfig autoload.
 
 const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
-const MAPS_DIR := "res://maps"
 
 @onready var map_option: OptionButton = %MapOption
 @onready var red_co_option: OptionButton = %RedCoOption
@@ -14,7 +13,9 @@ const MAPS_DIR := "res://maps"
 @onready var continue_button: Button = %ContinueButton
 @onready var quit_button: Button = %QuitButton
 
-var _map_paths: Array[String] = []
+## The roster in dropdown order, parsed once at load so the tooltips can quote
+## real numbers off the board rather than a hand-kept table.
+var _maps: Array[MapData] = []
 ## Commander ids in dropdown order, shared by both sides.
 var _commander_ids: Array[StringName] = []
 var _commander_db: CommanderDB
@@ -35,22 +36,42 @@ func _ready() -> void:
 			ScreenshotUtil.capture_and_quit(self, arg.get_slice("=", 1))
 
 
+## Smallest board first, so item 0 — the option the menu opens on — is the
+## quickest match rather than whichever filename happened to sort first.
 func _populate_maps() -> void:
-	var dir := DirAccess.open(MAPS_DIR)
-	if dir == null:
-		push_error("main menu: cannot open %s" % MAPS_DIR)
+	_maps = MapCatalog.ordered(TerrainDB.load_default())
+	if _maps.is_empty():
+		push_error("main menu: no maps found in %s" % MapCatalog.MAPS_DIR)
 		return
-	var files := dir.get_files()
-	files.sort()
-	for file in files:
-		# Exported builds list .txt files with a .remap suffix.
-		var map_file := file.trim_suffix(".remap")
-		if not map_file.ends_with(".txt"):
-			continue
-		_map_paths.append(MAPS_DIR.path_join(map_file))
-		map_option.add_item(map_file.trim_suffix(".txt").capitalize())
-	if map_option.item_count > 0:
-		map_option.selected = 0
+	for map in _maps:
+		map_option.add_item(MapCatalog.display_name(map.source_path))
+	map_option.selected = 0
+	map_option.item_selected.connect(_on_map_selected)
+	_refresh_map_tooltip()
+
+
+func _on_map_selected(_index: int) -> void:
+	_refresh_map_tooltip()
+
+
+## Size and property count read off the board itself; the blurb is the map
+## file's first comment line. Same reasoning as the commander tooltips below —
+## the 640x360 viewport has no room for a description beside the dropdown.
+func _refresh_map_tooltip() -> void:
+	var map := _map_at(map_option.selected)
+	if map == null:
+		map_option.tooltip_text = ""
+		return
+	map_option.tooltip_text = (
+		"%d×%d · %d properties\n%s"
+		% [map.width, map.height, map.property_cells().size(), map.description]
+	)
+
+
+func _map_at(index: int) -> MapData:
+	if index < 0 or index >= _maps.size():
+		return null
+	return _maps[index]
 
 
 ## Both dropdowns list every general, neutral first, so "No Commander" stays the
@@ -97,8 +118,9 @@ func _commander_at(index: int) -> CommanderType:
 ## `load_save` resumes the saved match (its own map, commanders and AI sides
 ## apply, so the dropdowns above are ignored).
 func _start(ai_teams: Array[int], load_save: bool) -> void:
-	if not _map_paths.is_empty():
-		MatchConfig.map_path = _map_paths[map_option.selected]
+	var map := _map_at(map_option.selected)
+	if map != null:
+		MatchConfig.map_path = map.source_path
 	MatchConfig.ai_teams = ai_teams
 	MatchConfig.fog_enabled = fog_check.button_pressed
 	MatchConfig.commanders = {
