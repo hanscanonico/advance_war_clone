@@ -6,9 +6,9 @@
 # This is deliberately NOT a GUT suite. GUT stays limited to core/ and ai/,
 # which are Node-free; the battle scene is verified by driving it. Each demo
 # runs the real handlers a player's input reaches (see _run_demo in
-# battle.gd), so a scenario that stops producing a frame means the flow it
-# exercises has broken — a menu never opened, a state was never reached, or
-# the scene crashed on the way.
+# battle_scenario_driver.gd), so a scenario that stops producing a frame means
+# the flow it exercises has broken — a menu never opened, a state was never
+# reached, or the scene crashed on the way.
 #
 # Usage:  tools/smoke_scenarios.sh [mode ...]   (see the `smoke` target)
 #
@@ -45,10 +45,16 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # powermenu+fog fires a power, which redraws every sprite on the board at once,
 # and victory+fog edits the sim behind the scene's back and resyncs. Both used
 # to leak enemy positions.
+#
+# ambush and vanish turn fog on themselves — they are the same board with Sable
+# Wren's power down and up, and only the second one may hide anything. Running
+# both is what keeps `vanish` honest: a board that hid those units for some
+# unrelated reason would pass on its own, but it would take `ambush` down with
+# it.
 DEFAULT_MODES=(
 	attack resolve capture build buildmenu endturn
 	load cargo drop transport supply mapmenu powermenu victory aiturn
-	powermenu+fog victory+fog
+	powermenu+fog victory+fog ambush vanish
 )
 
 if [[ ! -x "$GODOT" ]]; then

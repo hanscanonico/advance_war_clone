@@ -97,7 +97,8 @@ func _fog_hides_unseen() -> bool:
 ## same chain at the Load menu, the loaded APC's panel, and the drop-target
 ## picker; supply holds the APC next to its infantry so Supply is offered;
 ## mapmenu stops at the map menu (End Turn / Save); powermenu fires a Command
-## Power from the HUD over an open action menu; victory routs Blue through
+## Power from the HUD over an open action menu; ambush and vanish are the same
+## staged board with Sable Wren's power down and up; victory routs Blue through
 ## a real attack so the victory screen comes up.
 ##
 ## Modes that stop early return without falling through to the rest of the
@@ -148,6 +149,8 @@ func _run_demo(mode: String) -> void:
 			await _until_state(Battle.State.MENU)
 		"powermenu":
 			await _run_power_menu_demo()
+		"ambush", "vanish":
+			_run_vanish_demo(mode)
 		"victory":
 			await _run_victory_demo()
 		"aiturn":
@@ -206,6 +209,42 @@ func _run_power_menu_demo() -> void:
 	while _battle.action_menu.visible:
 		await _battle.get_tree().process_frame
 	_battle.action_menu.choose(&"wait")  # the click a player can no longer make
+
+
+## Sable Wren's Vanish (decision D4), seen from Red's side of the screen.
+##
+## Two Blue units stand in Woods with a Red unit right beside each — the one
+## arrangement the plain Woods rule already reveals, since woods hide anything
+## further than a tile away from a viewer no matter whose turn it is. `ambush`
+## captures that board with the power down and `vanish` captures it with the
+## power up, and the pair is the whole point: D4 reworked Vanish *because* its
+## original wording ("revealed only from an adjacent tile") described what
+## Vision does anyway, so only a frame where an adjacent enemy stops seeing them
+## shows the rework doing something.
+##
+## Fog is turned on here rather than left to a `--fog` caller: with it off
+## nothing is hidden from anyone and both modes capture the same picture, which
+## would make the comparison silently vacuous.
+##
+## Blue's power is raised directly because PowerCommand only ever fires for the
+## team whose turn it is, and the frame under test is Red's. What the capture
+## proves is a presentation question — that the board honours `hides_unit` —
+## and the sim-side rules (who is hidden, and for how long) are pinned in
+## tests/unit/test_sable_wren.gd instead.
+func _run_vanish_demo(mode: String) -> void:
+	var game := _battle.game
+	game.fog_enabled = true
+	game.set_commander(2, _battle.commander_db.by_id(&"sable_wren"))
+	# Blue moves into the treeline on Red's flank; the Red tank comes up from the
+	# sandbox so the second wood has a viewer next to it as well.
+	game.unit_at(Vector2i(15, 10)).cell = Vector2i(4, 5)  # blue infantry -> woods
+	game.unit_at(Vector2i(17, 9)).cell = Vector2i(5, 5)  # blue mech -> woods
+	game.unit_at(Vector2i(8, 8)).cell = Vector2i(5, 4)  # red tank -> beside them
+	if mode == "vanish":
+		game.commander_state(2).power_active = true
+	_battle.view.sync_sprites()
+	_battle.view.refresh_fog(game.current_team, false)
+	_battle.set_cursor_cell(Vector2i(5, 5))  # the panel names whatever is on the tile
 
 
 ## Leaves Blue one nearly-dead unit, then wins through the ordinary
