@@ -60,13 +60,16 @@ ROW_TWEAK=("-modulate 100,0,100" "" "")
 UNIT_CROP="68x86+15+15"
 BLDG_CROP="81x91+6+12"
 
-# Column order is atlas_col from data/units/*.tres.
+# Column order is atlas_col from data/units/*.tres. The pack has no aircraft or
+# ships, so the columns past this list belong to tools/generate_unit_placeholders.gd,
+# which runs next and widens the atlas this step writes. Keep PIXVOXEL_COLS there
+# equal to the length of this array.
 UNITS=(Infantry Infantry_T Supply_T Tank Tank_P Artillery_S Artillery Artillery_T Supply)
 # Columns 5, 6, 7 of the terrain atlas: city, base, hq.
 BUILDINGS=(City Factory Castle)
 BLDG_COLS=(5 6 7)
 # COLS in tools/generate_tiles.gd; rows are the team rows above.
-TERRAIN_COLS=9
+TERRAIN_COLS=14
 TERRAIN_ROWS=${#ROW_PALETTE[@]}
 
 # Paved lot under a building, matching _ground(o, PAVE) in tools/generate_tiles.gd:

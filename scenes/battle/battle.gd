@@ -237,7 +237,7 @@ func confirm_at(cell: Vector2i) -> void:
 			var unit := game.unit_at(cell)
 			if unit != null and unit.team == game.current_team and not unit.acted:
 				_select(unit)
-			elif _is_own_empty_base(cell):
+			elif _is_own_empty_factory(cell):
 				_open_build_menu(cell)
 			elif unit == null:
 				_open_map_menu()
@@ -247,7 +247,9 @@ func confirm_at(cell: Vector2i) -> void:
 				_animate_move()
 			elif move_range.has(cell):
 				# Occupied but reachable: maybe a Load or Join destination.
-				var special := _special_dest_actions(cell)
+				var special := BattleMenus.destination_actions(
+					game, selected, move_range.path_to(cell)
+				)
 				if not special.is_empty():
 					_pending_special_actions = special
 					planned_path = move_range.path_to(cell)
@@ -269,22 +271,6 @@ func _cancel() -> void:
 		view.paint_move_overlay([])
 		_drop_targets = []
 		_on_move_animation_done()  # back to the unit menu
-
-
-## Menu entries offered when confirming onto a reachable friendly-occupied
-## cell: boarding a transport with room, or merging into a damaged twin.
-## The commands themselves decide what is legal, so the menu never drifts
-## from core/'s rules.
-func _special_dest_actions(cell: Vector2i) -> Array[Dictionary]:
-	var actions: Array[Dictionary] = []
-	var path := move_range.path_to(cell)
-	if path.is_empty():
-		return actions
-	if LoadCommand.new(selected, path).validate(game) == "":
-		actions.append({"id": &"load", "label": "Load"})
-	if JoinCommand.new(selected, path).validate(game) == "":
-		actions.append({"id": &"join", "label": "Join"})
-	return actions
 
 
 func _select(unit: Unit) -> void:
@@ -326,29 +312,17 @@ func _on_move_animation_done() -> void:
 		# Load/Join destination: only the special action (and Cancel) applies.
 		var special := _pending_special_actions
 		_pending_special_actions = []
-		special.append({"id": &"cancel", "label": "Cancel"})
+		special.append(BattleMenus.CANCEL)
 		action_menu.open(special, view.screen_pos_for_cell(dest))
 		return
 	_attack_targets = _attackable_cells(selected, dest, planned_path.size() > 1)
-	var actions: Array[Dictionary] = []
-	if not _attack_targets.is_empty():
-		actions.append({"id": &"fire", "label": "Fire"})
-	var dest_terrain := map.terrain_at(dest)
-	if (
-		selected.type.can_capture
-		and dest_terrain.is_property
-		and game.owner_at(dest) != selected.team
-	):
-		actions.append({"id": &"capture", "label": "Capture"})
-	if not game.cargo_of(selected).is_empty() and not _drop_cells(dest).is_empty():
-		actions.append({"id": &"drop", "label": "Drop"})
-	if (
-		selected.type.can_resupply
-		and not SupplyCommand.new(selected, planned_path).friendlies_in_reach(game, dest).is_empty()
-	):
-		actions.append({"id": &"supply", "label": "Supply"})
-	actions.append({"id": &"wait", "label": "Wait"})
-	actions.append({"id": &"cancel", "label": "Cancel"})
+	var actions := BattleMenus.unit_actions(
+		game,
+		selected,
+		planned_path,
+		not _attack_targets.is_empty(),
+		not _drop_cells(dest).is_empty()
+	)
 	action_menu.open(actions, view.screen_pos_for_cell(dest))
 
 
@@ -370,17 +344,17 @@ func _handle_unit_action(action: StringName) -> void:
 		&"drop":
 			_enter_drop_targeting()
 		&"load":
-			var command := LoadCommand.new(selected, planned_path)
-			var error := command.validate(game)
-			if error != "":
-				push_error("LoadCommand rejected: %s" % error)
-				_undo_move_preview()
-				return
-			command.apply(game)
-			EventBus.unit_moved.emit(selected)
-			view.refresh_sprite(selected)  # hides the boarded sprite
-			_clear_selection()
-			_refresh_panel()
+			# The refresh inside _commit hides the boarded sprite.
+			_commit(action, LoadCommand.new(selected, planned_path))
+		&"supply":
+			_commit(action, SupplyCommand.new(selected, planned_path))
+		&"dive", &"surface":
+			# Going under changes what the *other* side can see, so the fog pass
+			# _commit ends with is load-bearing here rather than incidental:
+			# without it the boat would keep the look it had.
+			_commit(action, DiveCommand.new(selected, planned_path, action == &"dive"))
+		&"wait":
+			_commit(action, MoveCommand.new(selected, planned_path))
 		&"join":
 			var command := JoinCommand.new(selected, planned_path)
 			var error := command.validate(game)
@@ -393,18 +367,6 @@ func _handle_unit_action(action: StringName) -> void:
 			command.apply(game)
 			mover_sprite.die()  # fade the merged-away sprite; fire and forget
 			view.refresh_sprite(game.unit_at(dest))
-			_clear_selection()
-			_refresh_panel()
-		&"supply":
-			var command := SupplyCommand.new(selected, planned_path)
-			var error := command.validate(game)
-			if error != "":
-				push_error("SupplyCommand rejected: %s" % error)
-				_undo_move_preview()
-				return
-			command.apply(game)
-			EventBus.unit_moved.emit(selected)
-			view.refresh_sprite(selected)
 			_clear_selection()
 			_refresh_panel()
 		&"capture":
@@ -427,21 +389,28 @@ func _handle_unit_action(action: StringName) -> void:
 			_refresh_hud()
 			if game.winner != 0:
 				_enter_victory()
-		&"wait":
-			var command := MoveCommand.new(selected, planned_path)
-			var error := command.validate(game)
-			if error != "":
-				# The UI only offers legal paths, so this is a bug guard.
-				push_error("MoveCommand rejected: %s" % error)
-				_undo_move_preview()
-				return
-			command.apply(game)
-			EventBus.unit_moved.emit(selected)
-			view.refresh_sprite(selected)
-			_clear_selection()
-			_refresh_panel()
 		&"cancel":
 			_undo_move_preview()
+
+
+## The shape every plain unit action shares: refuse to run a command the rules
+## turn down, then apply it and put the board back in step. The menu only offers
+## legal actions, so a rejection here is a bug rather than a player mistake — it
+## is reported and the uncommitted move is rolled back rather than half-applied.
+##
+## Capture and Join are not routed through this: each has work of its own between
+## the apply and the refresh, which is the only reason they read differently.
+func _commit(action: StringName, command: Command) -> void:
+	var error := command.validate(game)
+	if error != "":
+		push_error("%s rejected: %s" % [action, error])
+		_undo_move_preview()
+		return
+	command.apply(game)
+	EventBus.unit_moved.emit(selected)
+	view.refresh_sprite(selected)
+	_clear_selection()
+	_refresh_panel()
 
 
 func _handle_build_action(action: StringName) -> void:
@@ -514,9 +483,12 @@ func _announce_power(fired: PowerCommand) -> void:
 	EventBus.power_activated.emit(fired.team, fired.commander)
 
 
-func _is_own_empty_base(cell: Vector2i) -> bool:
+## A production property of ours standing empty. Which terrains those are is the
+## terrain's own data, so a port and an airport open the build menu through this
+## same check — and offer only what they build, see _open_build_menu.
+func _is_own_empty_factory(cell: Vector2i) -> bool:
 	return (
-		map.terrain_at(cell).id == &"base"
+		not map.terrain_at(cell).builds.is_empty()
 		and game.owner_at(cell) == game.current_team
 		and game.unit_at(cell) == null
 	)
@@ -526,37 +498,14 @@ func _open_build_menu(cell: Vector2i) -> void:
 	_menu_context = &"base"
 	_build_cell = cell
 	state = State.MENU
-	var actions: Array[Dictionary] = []
-	for unit_type in unit_db.all():
-		(
-			actions
-			. append(
-				{
-					"id": unit_type.id,
-					"label": "%s  %d" % [unit_type.display_name, unit_type.cost],
-					"disabled": game.funds[game.current_team] < unit_type.cost,
-					"icon": UnitSprite.texture_for(unit_type, game.current_team),
-				}
-			)
-		)
-	actions.append({"id": &"cancel", "label": "Cancel"})
+	var actions := BattleMenus.build_actions(game, unit_db, map.terrain_at(cell), game.current_team)
 	action_menu.open(actions, view.screen_pos_for_cell(cell))
 
 
 func _open_map_menu() -> void:
 	_menu_context = &"map"
 	state = State.MENU
-	var actions: Array[Dictionary] = []
-	# The HUD button is the obvious way to fire a power; this keeps it reachable
-	# from the keyboard too, which the rest of the game already is.
-	var co_state := game.commander_state(game.current_team)
-	if co_state.is_ready():
-		actions.append({"id": &"power", "label": co_state.type.power_name})
-	actions.append({"id": &"commanders", "label": "Commanders"})
-	actions.append({"id": &"end_turn", "label": "End Turn"})
-	actions.append({"id": &"save", "label": "Save"})
-	actions.append({"id": &"cancel", "label": "Cancel"})
-	action_menu.open(actions, view.screen_pos_for_cell(cursor_cell))
+	action_menu.open(BattleMenus.map_actions(game), view.screen_pos_for_cell(cursor_cell))
 
 
 ## Opens the both-sides commander reference over the board. A modal, like the
@@ -583,27 +532,25 @@ func _on_turn_started() -> void:
 ## Everything the incoming team is allowed to see, run once the device has
 ## actually changed hands (immediately, outside fogged hot-seat).
 func _begin_turn() -> void:
+	# Units can be lost between turns with no shot fired: an air or sea unit that
+	# ran its tank dry is already gone from the sim by now, so the board is
+	# resynced before it is drawn — and a side wiped out by its own fuel gauge
+	# ends the match here, exactly as one shot to pieces does.
+	view.sync_sprites()
 	_refresh_fog()
 	_refresh_hud()
 	_refresh_panel()
+	if game.winner != 0:
+		_enter_victory()
+		return
 	Sfx.play(&"fanfare", -8.0)
-	(
-		animator
-		. show_banner(
-			(
-				"Day %d - %s"
-				% [
-					game.day,
-					TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
-				]
-			)
-		)
-	)
+	var team_name: String = TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team))
+	animator.show_banner("Day %d - %s" % [game.day, team_name])
 	var homes := game.properties_of(game.current_team)
 	if not homes.is_empty():
 		set_cursor_cell(homes[0])
 	EventBus.turn_started.emit(game.current_team, game.day)
-	if game.winner == 0 and game.current_team in ai_teams:
+	if game.current_team in ai_teams:
 		state = State.AI_TURN
 		_ai_runner.run()
 	else:
@@ -667,7 +614,11 @@ func _refresh_fog() -> void:
 	view.refresh_fog(_viewing_team(), state == State.HANDOFF)
 
 
+## Idempotent: a rout resolved inside _begin_turn is seen again by whatever was
+## driving that turn, and the match is only won once however many callers notice.
 func _enter_victory() -> void:
+	if state == State.VICTORY:
+		return
 	state = State.VICTORY
 	animator.hide_banner()
 	Sfx.play(&"fanfare")
@@ -726,7 +677,7 @@ func _attackable_cells(unit: Unit, dest: Vector2i, moved: bool) -> Array[Vector2
 			continue  # the player cannot target what they cannot see
 		if not AttackRange.covers(game, unit, dest, other.cell):
 			continue
-		if game.damage_chart.can_attack(unit.type.id, other.type.id):
+		if AttackRange.can_engage(game, unit, other):
 			cells.append(other.cell)
 	cells.sort()
 	return cells
@@ -748,11 +699,12 @@ func _exit_targeting_to_menu() -> void:
 
 
 ## Adjacent cells where the selected transport (previewed at `dest`) could
-## unload its passenger. The vacated origin cell counts as free.
+## unload its passenger, empty when it is somewhere it cannot unload from at all.
+## The vacated origin cell counts as free.
 func _drop_cells(dest: Vector2i) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	var cargo := game.cargo_of(selected)
-	if cargo.is_empty():
+	if cargo.is_empty() or not selected.type.can_unload_from(map.terrain_at(dest).id):
 		return cells
 	for dir in MovementResolver.DIRECTIONS:
 		var cell := dest + dir

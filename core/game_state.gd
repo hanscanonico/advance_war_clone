@@ -73,7 +73,7 @@ static func create(
 			)
 			return null
 		state.units.append(Unit.create(type, entry.team, cell))
-	TurnRules.begin_turn(state)  # day-1 income for the first player
+	TurnRules.begin_turn(state)  # day-1 income and upkeep for the first player
 	return state
 
 

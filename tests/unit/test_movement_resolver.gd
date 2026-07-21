@@ -121,3 +121,32 @@ func test_fuel_still_caps_the_allowance() -> void:
 	var state := _state("[terrain]\n.....\n[units]\n1 i 0 0")
 	state.units[0].fuel = 1
 	assert_eq(MovementResolver.move_budget(state, state.units[0], 5), 1)
+
+
+## Air units cross everything at a flat cost, which is the whole air movement
+## model — one row of terrain data rather than a rule in this file. Asserted
+## against the terrain a ground unit is stopped by, since that is the difference
+## that matters and the one a missing `air` cost would silently remove.
+func test_aircraft_cross_ground_that_stops_an_army() -> void:
+	var state := _state("[terrain]\n.MMS\n.MMS\n[units]\n1 h 0 0\n1 t 0 1")
+	var copter := state.units[0]
+	var reachable := MovementResolver.reachable(state, copter)
+	assert_true(reachable.can_stop_at(Vector2i(1, 0)), "a helicopter clears a mountain")
+	assert_true(reachable.can_stop_at(Vector2i(3, 0)), "and settles over open sea past it")
+	var tank := state.units[1]
+	assert_false(
+		MovementResolver.reachable(state, tank).has(Vector2i(1, 1)),
+		"while the tank beside it is stopped by the same ridge"
+	)
+
+
+## And every step costs an aircraft exactly one point, whatever it is over — so a
+## plane's range is its move points and nothing about the ground changes it.
+func test_terrain_never_slows_an_aircraft() -> void:
+	var over_open := _state("[terrain]\n.....\n[units]\n1 h 0 0")
+	var over_rough := _state("[terrain]\n.MFMS\n[units]\n1 h 0 0")
+	assert_eq(
+		MovementResolver.reachable(over_open, over_open.units[0]).cells().size(),
+		MovementResolver.reachable(over_rough, over_rough.units[0]).cells().size(),
+		"the same helicopter should reach the same number of cells over either strip"
+	)

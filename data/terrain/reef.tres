@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="TerrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/terrain_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"reef"
+display_name = "Reef"
+symbol = "*"
+defense_stars = 1
+move_costs = {
+&"air": 1,
+&"lander": 2,
+&"ship": 2
+}
+is_property = false
+builds = Array[StringName]([])
+services = Array[StringName]([])
+conceals = true
+atlas_col = 13
+team_tinted = false

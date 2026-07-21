@@ -5,10 +5,10 @@ Guidance for AI agents (and humans) working in this repository.
 ## Project
 
 An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with **GDScript**.
-Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster,
-property capture and income, and a computer opponent.
+Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
+three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** three designs of record, all worth reading before an architectural decision.
+- **Status:** four designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -18,6 +18,9 @@ property capture and income, and a computer opponent.
   so difficulty may only change which `AIProfile` the planner weighs moves with, never income,
   vision, damage or luck. Its DF4 acceptance gate is currently **unmet** — read
   `docs/difficulty_check.md` before touching an AI weight or a tier `.tres`.
+  `.lavish/naval-air-units-plan.html` owns the air and naval domains — milestones N1–N4, decisions
+  D1–D6, and risks R1–R6, of which R1 is the standing one: the AI cannot plan a ferry, so it never
+  builds transports and a naval map has to let fleets reach each other without one.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
@@ -122,18 +125,28 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
   forecast's counter uses projected post-attack HP — handing hooks the effective values is what
   keeps the damage preview and the resolved attack on identical numbers.
 - Two more single authorities, same rule as vision below — ask them, never re-derive:
-  `core/rules/attack_range.gd` owns how far a unit can shoot (countering is the one deliberate
-  exception, documented on `CombatResolver._defender_can_counter`), and `core/movement_resolver.gd`
-  owns the movement budget and per-step terrain cost, **including inside `MoveCommand.validate`**.
-  That last one is load-bearing: a fourth independent opinion on movement was a real bug here, and
-  it made the range overlay offer cells the command then refused.
+  `core/rules/attack_range.gd` owns **who** a unit may shoot and **how far** — `can_engage` and
+  `covers` — and `core/movement_resolver.gd` owns the movement budget and per-step terrain cost,
+  **including inside `MoveCommand.validate`**. That last one is load-bearing: a fourth independent
+  opinion on movement was a real bug here, and it made the range overlay offer cells the command
+  then refused. `can_engage` exists for the same reason: the command, the planner and the targeting
+  overlay each used to ask the damage chart directly, which was the whole answer only until a
+  submarine could be under the water. Countering is the one deliberate exception on distance,
+  documented on `CombatResolver._defender_can_counter`; it asks `can_engage` for the rest.
+- **Movement domains are data, not code.** A move class is a key in each terrain's `move_costs`
+  (`air` on every terrain, `ship`/`lander` on the water), which is the entire reason aircraft and
+  hulls needed no change to `MovementResolver`. Which property builds and refits what is likewise
+  `TerrainType.builds` / `services`, read by `BuildCommand`, the build menu and the AI's production
+  alike — never a terrain id checked in three places, which is what those two lists replaced.
 - Keep the vision/fog boundary clean: `core/rules/vision.gd` is the single authority for "what can
   this player see?" — ask it, never re-derive visibility. Fog is enforced in the presentation layer
   (the sim stays permissive, the UI refuses to target or inspect what the viewer cannot see), and
   the AI deliberately sees everything **except** units a doctrine hides — it asks
   `Vision.is_hidden_from` for that one case, so an invisibility power is not inert against it.
   Terrain, range and property sight stay invisible to the AI's omniscience; don't widen the
-  exception without a matching decision in the plan.
+  exception without a matching decision in the plan. A submerged submarine is hidden through the
+  same hook and is the one rule there that holds **with fog off** — being under the water is not a
+  question of how far anyone can see.
 
 ## Commits
 

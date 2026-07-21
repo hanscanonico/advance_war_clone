@@ -359,8 +359,13 @@ func test_reactive_building_falls_back_to_the_list_with_no_enemy_seen() -> void:
 ## Plans the one build the given profile makes on `map_text` with 15,000 in the
 ## bank — enough for everything but the md_tank, which is where counter-building
 ## has anything to say.
+##
+## Saving up is switched off because it would answer a different question: with
+## the md_tank one turn of income out of reach, the planner would rightly bank
+## rather than buy, and these tests pin *what* the team buys, not *when*.
 func _build_pick(map_text: String, profile: AIProfile) -> StringName:
 	var state := _state(map_text)
+	profile.save_up_turns = 0
 	state.funds[1] = 15000
 	for unit in state.units:
 		unit.acted = true

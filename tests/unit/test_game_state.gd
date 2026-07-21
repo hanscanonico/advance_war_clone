@@ -9,8 +9,17 @@ func before_each() -> void:
 	unit_db = UnitDB.load_default()
 
 
-func test_unit_db_loads_all_nine() -> void:
-	assert_eq(unit_db.size(), 9)
+## Like TerrainDB, this is a directory scan: the number worth asserting is "every
+## resource on disk", since a duplicate id or symbol drops one silently. Adding a
+## unit should not mean editing a literal here.
+func test_unit_db_registers_every_unit_resource() -> void:
+	var dir := DirAccess.open(UnitDB.UNIT_DIR)
+	var on_disk := 0
+	for file in dir.get_files():
+		if file.trim_suffix(".remap").ends_with(".tres"):
+			on_disk += 1
+	assert_eq(unit_db.size(), on_disk)
+	assert_gt(unit_db.size(), 0, "data/units should not be empty")
 	assert_eq(unit_db.by_symbol("i").id, &"infantry")
 	assert_eq(unit_db.by_id(&"tank").move_points, 6)
 

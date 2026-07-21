@@ -1,0 +1,52 @@
+# Two mountain walls, four airfields: what flies gets there first.
+# symmetric
+# The board air was added for. Each side opens holding one airfield and the
+# ground army it already knew; the two in the middle are the fight. A mountain
+# spur walls each home approach off from vehicles, so armour has to take the
+# long road while anything with wings goes straight over — including over the
+# sea frame, which is a wall to everyone else.
+# Airfields are the only place aircraft refuel, and they sit behind the front on
+# purpose: a bomber that pushes to the far side and stays there runs its tank
+# dry and is lost with no shot fired.
+# Mirrors on (x, y) -> (19 - x, 13 - y).
+# Symbols: . plains  F woods  M mountain  = road  ~ river
+#          C city  B base  Q HQ  A airport  S sea
+[terrain]
+SSSSSSSSSSSSSSSSSSSS
+S...C.......=BQ...AS
+S...........=B...C.S
+S..MM.......=......S
+S..MMM..A...=...C..S
+S...MM......=......S
+S....F......======.S
+S.======......F....S
+S......=......MM...S
+S..C...=...A..MMM..S
+S......=.......MM..S
+S.C...B=...........S
+SA...QB=.......C...S
+SSSSSSSSSSSSSSSSSSSS
+[owners]
+1 1 12
+1 5 12
+1 6 12
+1 6 11
+2 18 1
+2 14 1
+2 13 1
+2 13 2
+[units]
+1 i 4 10
+1 i 3 10
+1 m 5 9
+1 r 4 9
+1 t 5 8
+1 a 4 8
+1 g 3 8
+2 i 15 3
+2 i 16 3
+2 m 14 4
+2 r 15 4
+2 t 14 5
+2 a 15 5
+2 g 16 5

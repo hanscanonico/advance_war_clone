@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="TerrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/terrain_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"port"
+display_name = "Port"
+symbol = "P"
+defense_stars = 3
+move_costs = {
+&"air": 1,
+&"boot": 1,
+&"foot": 1,
+&"lander": 1,
+&"ship": 1,
+&"tires": 1,
+&"treads": 1
+}
+is_property = true
+builds = Array[StringName]([&"ship", &"lander"])
+services = Array[StringName]([&"sea"])
+conceals = false
+atlas_col = 10
+team_tinted = true

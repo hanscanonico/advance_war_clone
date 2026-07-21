@@ -67,3 +67,34 @@ func test_enemy_units_do_not_reveal_for_us() -> void:
 	var state := _state("[terrain]\n......\n[units]\n1 i 0 0\n2 r 5 0")
 	var cells := Vision.visible_cells(state, 1)
 	assert_false(cells.has(Vector2i(5, 0)))
+
+
+## Concealment is a terrain flag now, not the id "woods", so a reef hides a hull
+## exactly as woods hide a tank: seen from next door, invisible from further off.
+func test_reefs_conceal_like_woods() -> void:
+	var state := _state("[terrain]\nS*SS*\n[units]\n1 s 0 0")
+	var cells := Vision.visible_cells(state, 1)
+	assert_true(cells.has(Vector2i(1, 0)), "the sub sees the reef right beside it")
+	assert_true(cells.has(Vector2i(3, 0)), "and open water three tiles off")
+	assert_false(cells.has(Vector2i(4, 0)), "but not the reef at that same range")
+
+
+## The doctrine that sees through cover sees through both kinds — it would be a
+## strange power that peered into a wood and not a reef.
+##
+## The tank is the control: it is not marching, so with the identical power up and
+## the identical sight range it still cannot read its reef. That is what makes
+## this a test of the cover rule rather than of the vision bonus beside it.
+func test_seeing_into_cover_covers_reefs_too() -> void:
+	var state := _state("[terrain]\n...*\n...*\n[units]\n1 i 0 0\n1 t 0 1")
+	state.set_commander(1, CommanderDB.load_default().by_id(&"nia_rowan"))
+	assert_false(
+		Vision.visible_cells(state, 1).has(Vector2i(3, 1)),
+		"before the power, the tank's reef is cover at three tiles"
+	)
+	state.commander_state(1).power_active = true
+	var cells := Vision.visible_cells(state, 1)
+	assert_true(cells.has(Vector2i(3, 0)), "Ghost March should read the marching unit's reef")
+	assert_false(
+		cells.has(Vector2i(3, 1)), "and leave the tank, which is not marching, blind to its"
+	)

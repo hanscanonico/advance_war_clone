@@ -63,7 +63,7 @@ func test_neutral_hooks_return_the_pre_commander_rules() -> void:
 	assert_eq(co.range_bonus(state, tank), 0)
 	assert_eq(co.vision_bonus(state, tank), 0)
 	assert_eq(co.enemy_vision_bonus(state, tank), 0)
-	assert_false(co.sees_into_woods(state, tank))
+	assert_false(co.sees_into_cover(state, tank))
 	assert_false(co.hides_unit(state, tank))
 	assert_eq(co.capture_bonus_pct(state, tank), 0)
 	assert_eq(co.supply_range(state, tank), 1)

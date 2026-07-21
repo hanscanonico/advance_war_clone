@@ -7,12 +7,12 @@ extends RefCounted
 ## Simplified Advance Wars rules:
 ## - Each unit on the board sees cells within its type's vision range
 ##   (Manhattan distance). Carried units see nothing.
-## - Woods are hiding spots: revealed only from distance <= 1, regardless
-##   of the viewer's range.
+## - Concealing terrain (woods, reefs) hides what stands on it: revealed only
+##   from distance <= 1, regardless of the viewer's range.
 ## - Owned properties watch their surroundings out to PROPERTY_VISION.
 ##
 ## Commanders bend all three: a doctrine can lengthen a unit's sight, let it see
-## into woods at range, jam an enemy's sight shorter, or hide its own units from
+## into cover at range, jam an enemy's sight shorter, or hide its own units from
 ## a viewer who can otherwise see the cell they stand on. Because of that last
 ## one, seeing a *cell* and seeing the *unit* on it are now separate questions —
 ## see can_see_unit.
@@ -33,7 +33,7 @@ static func visible_cells(state: GameState, team: int) -> Dictionary:
 			continue
 		var co := state.commander_of(team)
 		_reveal_around(
-			state, cells, unit.cell, _sight_of(state, unit), co.sees_into_woods(state, unit)
+			state, cells, unit.cell, _sight_of(state, unit), co.sees_into_cover(state, unit)
 		)
 	for cell in state.properties_of(team):
 		_reveal_around(state, cells, cell, PROPERTY_VISION, false)
@@ -51,23 +51,49 @@ static func visible_cells(state: GameState, team: int) -> Dictionary:
 static func can_see_unit(
 	state: GameState, viewer_team: int, unit: Unit, visible: Dictionary
 ) -> bool:
-	if not state.fog_enabled or unit.team == viewer_team:
+	if unit.team == viewer_team:
 		return true
-	if not visible.has(unit.cell):
+	# Asked before the fog check, not after it, because one of the things it
+	# answers — a submerged submarine — hides on a clear day too.
+	if is_hidden_from(state, viewer_team, unit):
 		return false
-	return not is_hidden_from(state, viewer_team, unit)
+	if not state.fog_enabled:
+		return true
+	return visible.has(unit.cell)
 
 
-## Whether a *doctrine* hides `unit` from `viewer_team` — the invisibility half
-## of Sable Wren's Vanish, and nothing else today. Split out from can_see_unit
-## because it is the one visibility rule the AI respects: the planner sees the
-## whole board deliberately, but a power that makes units unseeable would be
-## inert against it otherwise, so it asks this instead of ignoring fog wholesale.
-## Terrain, range and property sight stay invisible to that question.
+## Whether `unit` is hidden from `viewer_team` by something other than the fog
+## itself: a doctrine (the invisibility half of Sable Wren's Vanish) or a dive.
+##
+## Split out from can_see_unit because it is the one visibility rule the AI
+## respects: the planner sees the whole board deliberately, but a power that makes
+## units unseeable — or a submarine that has gone under — would be inert against it
+## otherwise, so it asks this instead of ignoring fog wholesale. Terrain, range and
+## property sight stay invisible to that question.
+##
+## The two halves differ in one way worth being explicit about. Vanish is a fog
+## power and does nothing in a clear match. A dive is not: a submerged sub is
+## unseeable whether or not the match has fog, because being under the water is
+## not a matter of how far anyone can see. Both are lifted by standing next to
+## it — hunting a submarine means closing with it.
 static func is_hidden_from(state: GameState, viewer_team: int, unit: Unit) -> bool:
-	if not state.fog_enabled or unit.team == viewer_team:
+	if unit.team == viewer_team:
+		return false
+	if unit.dived:
+		return not _has_neighbour_from(state, unit.cell, viewer_team)
+	if not state.fog_enabled:
 		return false
 	return state.commander_of(unit.team).hides_unit(state, unit)
+
+
+## True when `team` has a unit standing on a tile orthogonally adjacent to `cell`.
+static func _has_neighbour_from(state: GameState, cell: Vector2i, team: int) -> bool:
+	for other in state.units_of(team):
+		if other.carrier != null:
+			continue
+		if absi(other.cell.x - cell.x) + absi(other.cell.y - cell.y) == 1:
+			return true
+	return false
 
 
 ## How far a unit sees: its type's range, plus what its own commander adds, less
@@ -82,7 +108,7 @@ static func _sight_of(state: GameState, unit: Unit) -> int:
 
 
 static func _reveal_around(
-	state: GameState, cells: Dictionary, from: Vector2i, radius: int, through_woods: bool
+	state: GameState, cells: Dictionary, from: Vector2i, radius: int, through_cover: bool
 ) -> void:
 	for dy in range(-radius, radius + 1):
 		var span: int = radius - absi(dy)
@@ -90,9 +116,12 @@ static func _reveal_around(
 			var cell := from + Vector2i(dx, dy)
 			if not state.map.in_bounds(cell):
 				continue
-			if through_woods:
+			if through_cover:
 				cells[cell] = true
 				continue
-			if state.map.terrain_at(cell).id == &"woods" and absi(dx) + absi(dy) > 1:
-				continue  # woods hide anything not right next to a viewer
+			# Which terrain conceals is the terrain's own flag rather than a name
+			# checked here, so a reef hides a submarine exactly as woods hide a
+			# tank, and adding cover is a data edit.
+			if state.map.terrain_at(cell).conceals and absi(dx) + absi(dy) > 1:
+				continue  # cover hides anything not right next to a viewer
 			cells[cell] = true

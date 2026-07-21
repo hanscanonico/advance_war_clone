@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="TerrainType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/terrain_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"shoal"
+display_name = "Shoal"
+symbol = "_"
+defense_stars = 0
+move_costs = {
+&"air": 1,
+&"boot": 1,
+&"foot": 1,
+&"lander": 1,
+&"tires": 1,
+&"treads": 1
+}
+is_property = false
+builds = Array[StringName]([])
+services = Array[StringName]([])
+conceals = false
+atlas_col = 11
+team_tinted = false

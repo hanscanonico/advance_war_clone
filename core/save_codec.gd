@@ -1,6 +1,6 @@
 class_name SaveCodec
 extends RefCounted
-## Translation between a running match and the version-1 save dictionary.
+## Translation between a running match and the save dictionary.
 ##
 ## Pure: no filesystem, no JSON text, no `user://`. SaveGame owns storage and
 ## hands this a Dictionary that is already parsed. Keeping the two apart means
@@ -9,22 +9,24 @@ extends RefCounted
 ## malformed save.
 ##
 ## Version 2 adds the commander block: which general each side is playing, how
-## much charge their meter holds, and whether their Command Power is up. It is
-## purely additive, so version 1 is still read rather than rejected — a save
-## with no commander block loads with both sides neutral, which is exactly the
-## match a version-1 save recorded. New saves are always written at version 2.
+## much charge their meter holds, and whether their Command Power is up. Version 3
+## adds one flag per unit: whether a submarine is submerged. Both are purely
+## additive, so older saves are still read rather than rejected — a save with no
+## commander block loads with both sides neutral, and one with no dive flag loads
+## with every boat on the surface, which is exactly the match each recorded. New
+## saves are always written at the current version.
 ##
 ## When a format arrives that *cannot* be read this way, it gets its own
 ## encode/decode pair here and SaveGame keeps choosing between them; the facade
 ## and its callers do not change.
 
-const VERSION := 2
+const VERSION := 3
 ## Every version this codec can still read, oldest first.
-const READABLE_VERSIONS: Array[int] = [1, 2]
+const READABLE_VERSIONS: Array[int] = [1, 2, 3]
 
 ## Keys every save envelope must carry; optional ones (fog, winner,
-## capture_progress, carrier, ai_teams, commanders, difficulty) fall back to
-## defaults.
+## capture_progress, carrier, dived, ai_teams, commanders, difficulty) fall back
+## to defaults.
 const REQUIRED_KEYS: Array = [
 	"map_path",
 	"day",
@@ -73,6 +75,7 @@ static func encode(
 					"fuel": unit.fuel,
 					"ammo": unit.ammo,
 					"acted": unit.acted,
+					"dived": unit.dived,
 					"carrier": state.units.find(unit.carrier),  # -1 when on the board
 				}
 			)
@@ -159,6 +162,7 @@ static func decode(
 		unit.fuel = int(entry.fuel)
 		unit.ammo = int(entry.ammo)
 		unit.acted = bool(entry.acted)
+		unit.dived = bool(entry.get("dived", false))
 		state.units.append(unit)
 		carrier_indices.append(int(entry.get("carrier", NO_CARRIER)))
 

@@ -1,13 +1,19 @@
 class_name AttackRange
 extends RefCounted
-## How far a unit can shoot, doctrine included. The single authority on it.
+## Who a unit may shoot and how far, doctrine included. The single authority on
+## both.
 ##
-## Three places used to work this out independently from min_range/max_range:
-## AttackCommand's validation, the AI's target search, and the targeting overlay
-## the player aims with. That was harmless while the answer was fixed and a
-## liability the moment a commander could change it — a range bonus applied to
-## two of the three means the rules, the AI and the UI disagree about the same
-## shot, and the one that disagrees is whichever was forgotten.
+## Three places used to work the distance out independently from
+## min_range/max_range: AttackCommand's validation, the AI's target search, and
+## the targeting overlay the player aims with. That was harmless while the answer
+## was fixed and a liability the moment a commander could change it — a range
+## bonus applied to two of the three means the rules, the AI and the UI disagree
+## about the same shot, and the one that disagrees is whichever was forgotten.
+##
+## The same three then asked the damage chart directly about *whether* a target
+## could be engaged, which was fine while the chart was the whole answer. A
+## submerged submarine made it two answers, so that question moved here as
+## can_engage rather than being pattern-matched into three files.
 ##
 ## So they all ask here instead. Countering is the deliberate exception; see
 ## CombatResolver._defender_can_counter.
@@ -32,6 +38,22 @@ static func covers(state: GameState, unit: Unit, from: Vector2i, target: Vector2
 		return false
 	var dist := absi(target.x - from.x) + absi(target.y - from.y)
 	return dist >= minimum(state, unit) and dist <= maximum(state, unit)
+
+
+## Whether `attacker`'s weapon can touch `target` at all, distance aside: the
+## damage chart's answer, and then whether the target is somewhere the weapon can
+## reach it.
+##
+## Today that second half is the sea's surface. A submerged submarine is engaged
+## only by something built to hunt one, which is what the dive is for — and the
+## rule has to hold in the command that validates the shot, the planner that picks
+## it and the overlay that offers it, so all three ask this.
+static func can_engage(state: GameState, attacker: Unit, target: Unit) -> bool:
+	if state.damage_chart == null:
+		return false
+	if not state.damage_chart.can_attack(attacker.type.id, target.type.id):
+		return false
+	return not target.dived or attacker.type.can_hit_submerged
 
 
 ## True for a unit that shoots over distance: it cannot move and fire, never

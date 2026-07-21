@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="UnitType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/unit_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"battleship"
+display_name = "Battleship"
+symbol = "B"
+cost = 28000
+move_points = 5
+move_class = &"ship"
+domain = &"sea"
+vision = 2
+can_capture = false
+min_range = 2
+max_range = 6
+max_fuel = 99
+fuel_upkeep = 1
+max_ammo = 9
+transport_capacity = 0
+cargo_classes = Array[StringName]([])
+unload_terrain = Array[StringName]([])
+can_resupply = false
+atlas_col = 14

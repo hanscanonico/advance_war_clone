@@ -48,7 +48,7 @@ func test_a_neighbour_of_the_same_class_does_not() -> void:
 	assert_eq(_damage(state, state.units[0], state.units[2]), 23)
 
 
-## Infantry is foot and Mech is boot: four movement classes exist, and these
+## Infantry is foot and Mech is boot: separate movement classes, and these
 ## two count as different even though both walk.
 func test_infantry_and_mech_count_as_mixed() -> void:
 	var state := _state("[terrain]\n..\n..\n[units]\n1 i 0 0\n1 m 0 1\n2 t 1 0")

@@ -32,10 +32,63 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 @export var min_useful_score: float = 40.0
 ## What advancing is worth. Deliberately tiny: it is the fallback.
 @export var advance_score: float = 1.0
-## Build preference once enough capture units exist, strongest first.
-@export var build_priority: Array[StringName] = [&"md_tank", &"tank", &"artillery", &"mech"]
+## Build preference once enough capture units exist, strongest first. Walked at
+## every production property and filtered by what that property can actually
+## build, so one list covers bases and airports without an entry per facility.
+##
+## Transports are deliberately absent: the planner cannot plan a load-move-unload
+## across turns, and a fleet of empty carriers is worse than none.
+@export var build_priority: Array[StringName] = [
+	&"md_tank",
+	&"bomber",
+	&"battleship",
+	&"fighter",
+	&"sub",
+	&"cruiser",
+	&"tank",
+	&"b_copter",
+	&"missiles",
+	&"artillery",
+	&"mech",
+]
 ## Infantry are bought until the team has this many capture-capable units.
 @export var capture_unit_target: int = 3
+## What to buy when the enemy is flying and we cannot reach them, best first.
+## Nothing in build_priority is guaranteed to answer air, so this is asked ahead
+## of it — otherwise an AI with a full bank watches bombers work unopposed.
+@export var air_answer_ids: Array[StringName] = [&"anti_air", &"missiles", &"fighter", &"cruiser"]
+## How many units that can shoot at aircraft the team wants while the enemy has
+## any. Counted from the damage chart, not from this list.
+@export var air_answer_target: int = 2
+## How many places down the build priority each copy already fielded pushes a
+## unit. Without it the list has exactly one winner and the AI buys that unit and
+## nothing else — the strongest thing a base makes, forever, while the port and
+## the airfield it owns never produce at all. This is the diminishing return a
+## player applies without thinking: a sixth tank is worth less than a first hull.
+@export var duplicate_priority_cost: int = 3
+## How many turns of income the planner will bank for a better unit than the one
+## it could buy today. Without it the AI spends whatever it holds every turn and
+## never accumulates, which does not merely make the expensive half of the roster
+## rare — it makes it unreachable, since a 20 000 airframe cannot be bought out of
+## a treasury that never passes ten thousand. Zero restores the spend-it-all
+## behaviour; large values stall production waiting for units out of reach.
+##
+## Two rather than three deliberately, and the difference is measured: banking is
+## what lets the AI field aircraft and hulls at all, but it also hands whoever
+## moves first a timing edge, since they cross a price threshold a turn earlier.
+## `make commander-balance --scenarios=clash,ridge --seeds=3` reports a first-side
+## bias of +5.6 pp with no banking, +14.9 at two turns, +20.2 at three — and both
+## the air and naval soaks still build their expensive rosters at two. Raising it
+## buys nothing the game needs and costs first-move fairness.
+@export var save_up_turns: int = 2
+## What taking a submarine under (or bringing it back up) is worth. Above
+## advance_score so it beats drifting, and well below what an attack scores, so a
+## boat with a target sinks it rather than hiding from the escort beside it.
+@export var dive_score: float = 200.0
+## Turns of fuel margin an air or sea unit keeps before it breaks off to refuel:
+## below this it heads for the nearest property that services it. Zero disables
+## the behaviour and lets units fly until they drop.
+@export var refuel_margin_turns: int = 1
 
 # --- Difficult-tier capabilities ---------------------------------------------
 #

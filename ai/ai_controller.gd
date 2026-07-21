@@ -13,6 +13,12 @@ extends RefCounted
 ## file, so tuning and difficulty are data edits. This class decides *how* to
 ## choose; the profile decides *what it is worth*.
 
+## Spacing between the tiers production ranks candidates in; see _build_rank.
+## Wide enough that no tier's own ordering can reach into the next.
+const TIER_STRIDE := 1000
+## "Never buy this" — above every tier, so it loses every comparison.
+const RANK_NONE := TIER_STRIDE * 100
+
 
 class UnitPlan:
 	var command: Command
@@ -24,6 +30,42 @@ class UnitPlan:
 class AdvanceGoal:
 	var cell: Vector2i
 	var stand_off := false
+
+
+## The board-wide questions production asks, worked out once per decision rather
+## than once per candidate unit — each scans every unit on the board, and the
+## ranking below asks them for each of a dozen unit types at each of several
+## facilities.
+class _BuildWants:
+	var outgunned_in_the_air := false
+	var short_of_capture_units := false
+	## How many of each unit type the team already fields, by id.
+	var owned: Dictionary = {}
+	## S3's counter-build order — unit id to its place in the standing tier, best
+	## first. Empty whenever reactivity is off or there is nothing to answer, and
+	## then the profile's own build_priority order decides instead.
+	var reactive_order: Dictionary = {}
+
+	static func of(ai: AIController, state: GameState) -> _BuildWants:
+		var wants := _BuildWants.new()
+		wants.outgunned_in_the_air = ai._outgunned_in_the_air(state)
+		var capture_units := 0
+		for unit in state.units_of(state.current_team):
+			var id := unit.type.id
+			wants.owned[id] = int(wants.owned.get(id, 0)) + 1
+			if unit.type.can_capture:
+				capture_units += 1
+		wants.short_of_capture_units = capture_units < ai.profile.capture_unit_target
+		wants.reactive_order = ai._reactive_order(state)
+		return wants
+
+	func count_of(id: StringName) -> int:
+		return int(owned.get(id, 0))
+
+	## The rank at which the standing priority list starts — the boundary between
+	## what is urgent and what can wait for a better turn.
+	func first_priority_rank() -> int:
+		return TIER_STRIDE * 2
 
 
 var unit_db: UnitDB
@@ -114,6 +156,7 @@ func _best_unit_plan(state: GameState, unit: Unit) -> UnitPlan:
 	var reachable := MovementResolver.reachable(state, unit)
 	_consider_attacks(state, unit, reachable, plan)
 	_consider_captures(state, unit, reachable, plan)
+	_consider_dive(state, unit, plan)
 	if plan.score < profile.min_useful_score:
 		plan.command = _advance_command(state, unit, reachable)
 		plan.score = profile.advance_score
@@ -147,7 +190,7 @@ func _consider_attacks(
 		for enemy in enemies:
 			if not AttackRange.covers(state, unit, dest, enemy.cell):
 				continue
-			if not state.damage_chart.can_attack(unit.type.id, enemy.type.id):
+			if not AttackRange.can_engage(state, unit, enemy):
 				continue
 			if dest_penalty < 0.0:
 				if threat == null and profile.threat_aversion > 0.0:
@@ -302,6 +345,57 @@ func _consider_captures(
 			plan.command = CaptureCommand.new(unit, reachable.path_to(cell))
 
 
+## A submarine's one decision: whether to be under the water.
+##
+## It goes down when something out there could shoot a boat on the surface and
+## nothing that can reach under it is close, and comes back up when that threat
+## has passed. Scored above advancing so it beats drifting, and below an attack
+## worth making — a sub with something to sink does that instead of hiding.
+##
+## Never dives on its last few points of fuel, which is not caution but the thing
+## that stops it flip-flopping: staying under costs several times what the surface
+## does, so a boat that dived while nearly dry would surface again next turn for
+## exactly that reason, and dive again the turn after.
+func _consider_dive(state: GameState, unit: Unit, plan: UnitPlan) -> void:
+	if not unit.type.can_dive or state.damage_chart == null:
+		return
+	var threatened := _threatened_by(state, unit, false)
+	var wants: bool
+	if unit.dived:
+		wants = not threatened or unit.running_dry(profile.refuel_margin_turns)
+	else:
+		var dive_burn := unit.type.dived_fuel_upkeep + unit.type.move_points
+		wants = (
+			threatened
+			and not _threatened_by(state, unit, true)
+			and unit.fuel > dive_burn * profile.refuel_margin_turns
+		)
+	if not wants or profile.dive_score <= plan.score:
+		return
+	plan.score = profile.dive_score
+	plan.command = DiveCommand.new(unit, [unit.cell] as Array[Vector2i], not unit.dived)
+
+
+## Whether an enemy that could damage `unit` can plausibly reach it next turn —
+## and, with `submerged`, whether it could still do so with the boat under water.
+##
+## Reach is approximated as movement plus weapon range rather than flood-filled
+## per enemy: this is asked for every enemy on the board, and the answer only has
+## to be good enough to decide whether hiding is worth a turn. It errs toward
+## seeing threats, which is the safe direction for the unit deciding.
+func _threatened_by(state: GameState, unit: Unit, submerged: bool) -> bool:
+	for enemy in _visible_enemies(state, unit.team):
+		if submerged and not enemy.type.can_hit_submerged:
+			continue
+		if not state.damage_chart.can_attack(enemy.type.id, unit.type.id):
+			continue
+		var reach := enemy.type.move_points + AttackRange.maximum(state, enemy)
+		var dist := absi(enemy.cell.x - unit.cell.x) + absi(enemy.cell.y - unit.cell.y)
+		if dist <= reach:
+			return true
+	return false
+
+
 ## Fallback when no attack or capture is worthwhile: take the best position
 ## relative to a goal. Waits in place when nothing better is reachable, so the
 ## unit still acts.
@@ -383,12 +477,23 @@ static func _position_rank(state: GameState, unit: Unit, cell: Vector2i, goal: A
 	return high - dist
 
 
-## Damaged units head for a friendly property (repairs), capture units for the
-## nearest non-owned property, everyone else toward the nearest enemy — which
-## indirect units approach only as far as their firing ring.
+## Units low on fuel head for somewhere that refits them, damaged units for a
+## friendly property (repairs), capture units for the nearest non-owned property,
+## everyone else toward the nearest enemy — which indirect units approach only as
+## far as their firing ring.
+##
+## Fuel comes first because it is the only one of these that is fatal: a plane
+## that ignores it dies of it, where a damaged tank merely stays damaged. Note
+## this is the *fallback* goal — a fuel-critical bomber with a kill in reach
+## still takes the kill, which is the trade a greedy planner should make.
 func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	var goal := AdvanceGoal.new()
 	goal.cell = unit.cell
+	if unit.running_dry(profile.refuel_margin_turns):
+		var refits := _refitting_properties(state, unit)
+		if not refits.is_empty():
+			goal.cell = _nearest(unit.cell, refits)
+			return goal
 	if unit.hp <= profile.retreat_hp:
 		var owned := state.properties_of(unit.team)
 		if not owned.is_empty():
@@ -411,6 +516,17 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	return goal
 
 
+## Our properties that would refit this unit. A city is no use to a bomber, so
+## the domain gate is asked here exactly as TurnRules asks it — heading somewhere
+## that will not refuel you is worse than not breaking off at all.
+func _refitting_properties(state: GameState, unit: Unit) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for cell in state.properties_of(unit.team):
+		if state.map.terrain_at(cell).services_domain(unit.type.domain):
+			cells.append(cell)
+	return cells
+
+
 static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
 	var best := cells[0]
 	var best_dist := absi(best.x - from.x) + absi(best.y - from.y)
@@ -422,92 +538,160 @@ static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
 	return best
 
 
-## One build per call, at the first empty owned base the funds allow.
-func _plan_build(state: GameState) -> Command:
-	for cell in state.properties_of(state.current_team):
-		if state.map.terrain_at(cell).id != &"base":
-			continue
-		if state.unit_at(cell) != null:
-			continue
-		var choice := _pick_build(state)
-		if choice == null:
-			return null
-		return BuildCommand.new(state.current_team, choice, cell)
-	return null
-
-
-## Keep capture units flowing, then buy the strongest affordable vehicle.
-func _pick_build(state: GameState) -> UnitType:
-	var funds: int = state.funds[state.current_team]
-	var infantry := unit_db.by_id(&"infantry")
-	var capture_units := 0
-	for unit in state.units_of(state.current_team):
-		if unit.type.can_capture:
-			capture_units += 1
-	if infantry != null and capture_units < profile.capture_unit_target and funds >= infantry.cost:
-		return infantry
-	if profile.build_reactivity > 0.0:
-		var reactive := _reactive_build(state, funds)
-		if reactive != null:
-			return reactive
-	var listed := _static_build(funds)
-	if listed != null:
-		return listed
-	if infantry != null and funds >= infantry.cost:
-		return infantry
-	return null
-
-
-## The strongest affordable unit on the profile's build list. The whole of
-## Normal's and Easy's buying, and the fallback whenever counter-building has
-## nothing to say.
-func _static_build(funds: int) -> UnitType:
-	for id in profile.build_priority:
-		var unit_type := unit_db.by_id(id)
-		if unit_type != null and funds >= unit_type.cost:
-			return unit_type
-	return null
-
-
-## S3. Picks the affordable combat unit that best answers the enemy's actual,
-## cost-weighted roster, blended with the static build_priority order by
-## build_reactivity. At reactivity 0 this is never reached (the static list runs
-## instead); at 1 the matchup decides outright. Both components are normalised to
-## 0..1 so the blend mixes like with like. Only the *choice* changes — the unit
-## it returns is built by the same BuildCommand as any other.
+## One build per call: the best unit any empty owned facility can produce, or
+## nothing at all when banking one more turn buys something better.
 ##
-## Null when there is nothing to react to — no roster in sight, or none of it
+## Both halves of that matter. Taking the *best* build across every facility
+## rather than the first facility's — production is chosen the way a unit's
+## action is, by comparing candidates — is what stops the base nearest the top-left
+## corner spending the treasury before the airfield is ever asked.
+##
+## And the AI has to be able to save, or the expensive half of the roster does not
+## exist for it. Left to spend whatever it holds every turn, income never banks
+## past a few thousand, and a 20 000 airframe or an 18 000 hull is not "rarely
+## bought" but unbuyable — it would buy mechs forever on a board built around
+## ports. See _worth_waiting_for.
+func _plan_build(state: GameState) -> Command:
+	var team := state.current_team
+	var funds: int = state.funds[team]
+	var wants := _BuildWants.of(self, state)
+	var best_cell := Vector2i.ZERO
+	var best_choice: UnitType = null
+	var best_rank := RANK_NONE
+	var facilities: Array[TerrainType] = []
+	for cell in state.properties_of(team):
+		var terrain := state.map.terrain_at(cell)
+		if terrain.builds.is_empty() or state.unit_at(cell) != null:
+			continue
+		facilities.append(terrain)
+		var choice := _pick_build(terrain, wants, funds)
+		if choice == null:
+			continue
+		var rank := _build_rank(choice, wants)
+		if rank < best_rank:
+			best_rank = rank
+			best_choice = choice
+			best_cell = cell
+	if best_choice == null:
+		return null
+	if _worth_waiting_for(state, facilities, wants, funds, best_rank):
+		return null
+	return BuildCommand.new(team, best_choice, best_cell)
+
+
+## The best unit this facility can produce for the money, or null. Every
+## candidate is filtered through `terrain.can_build`, which is why one priority
+## list serves a base, an airport and a port alike — and why the capture-unit
+## fallback cannot conjure a rifleman out of a hangar.
+func _pick_build(terrain: TerrainType, wants: _BuildWants, funds: int) -> UnitType:
+	var best: UnitType = null
+	var best_rank := RANK_NONE
+	for unit_type in unit_db.all():
+		if not terrain.can_build(unit_type.move_class) or funds < unit_type.cost:
+			continue
+		var rank := _build_rank(unit_type, wants)
+		if rank < best_rank:
+			best_rank = rank
+			best = unit_type
+	return best
+
+
+## True when the team should bank this turn instead of buying `best_rank`.
+##
+## Only ever for the standing priority list: an answer to aircraft overhead and a
+## capture unit while we are short of them are both urgent, and saving through
+## either is how an AI loses while holding a full treasury. And only when the
+## better unit is genuinely close — within the profile's window of income — so
+## the planner can never sit on its hands for something it will not reach.
+func _worth_waiting_for(
+	state: GameState, facilities: Array[TerrainType], wants: _BuildWants, funds: int, best_rank: int
+) -> bool:
+	if best_rank < wants.first_priority_rank() or profile.save_up_turns <= 0:
+		return false
+	var income := state.properties_of(state.current_team).size() * GameState.INCOME_PER_PROPERTY
+	var budget := funds + income * profile.save_up_turns
+	for terrain in facilities:
+		for unit_type in unit_db.all():
+			if not terrain.can_build(unit_type.move_class) or unit_type.cost > budget:
+				continue
+			if _build_rank(unit_type, wants) < best_rank:
+				return true
+	return false
+
+
+## How much the team wants `unit_type`, lower being more wanted. Four tiers, in
+## order: an answer to enemy aircraft, a capture unit while we are short, the
+## standing build priority, and finally any capture unit at all — the last being
+## what keeps a base with a thousand in the bank turning out infantry.
+##
+## The standing tier is ordered by the profile's build_priority, or by S3's
+## counter-build blend where reactivity has re-ranked it. Only the *order inside
+## that tier* changes: reactivity never promotes a buy past an answer to aircraft
+## overhead, and never reaches the two urgent tiers above it at all.
+##
+## RANK_NONE is "never buy this", which is where transports land: nothing puts
+## them in a tier, because the planner cannot plan a ferry (see the profile).
+func _build_rank(unit_type: UnitType, wants: _BuildWants) -> int:
+	if wants.outgunned_in_the_air:
+		var answer := profile.air_answer_ids.find(unit_type.id)
+		if answer >= 0:
+			return answer
+	if unit_type.can_capture and wants.short_of_capture_units:
+		return TIER_STRIDE
+	# Each copy already fielded costs the type places in the tier, so the
+	# strongest thing a base makes does not win every decision the team ever
+	# takes while a port and an airfield sit idle beside it.
+	var duplicates := wants.count_of(unit_type.id) * profile.duplicate_priority_cost
+	if wants.reactive_order.has(unit_type.id):
+		return TIER_STRIDE * 2 + int(wants.reactive_order[unit_type.id]) + duplicates
+	var priority := profile.build_priority.find(unit_type.id)
+	if priority >= 0:
+		return TIER_STRIDE * 2 + priority + duplicates
+	if unit_type.can_capture:
+		return TIER_STRIDE * 3
+	return RANK_NONE
+
+
+## S3. Orders every combat unit by how well it answers the enemy's actual,
+## cost-weighted roster, blended with the static build_priority order by
+## build_reactivity. At reactivity 0 this returns nothing (the static list runs
+## instead); at 1 the matchup decides outright. Both components are normalised to
+## 0..1 so the blend mixes like with like. Only the *order* changes — whatever
+## comes out is built by the same BuildCommand as any other buy.
+##
+## Empty when there is nothing to react to — no roster in sight, or none of it
 ## takable damage — and the static list decides instead. Without that, full
 ## reactivity would score every candidate at zero and buy whichever the database
 ## happened to list first.
-func _reactive_build(state: GameState, funds: int) -> UnitType:
-	# Open assumption: every unit type in the roster today is a land unit and a
-	# base builds all of them, so widening the candidate set past
-	# profile.build_priority cannot name something BuildCommand would refuse.
-	# Producibility is owned by TerrainType.builds on the naval/air branch; when
-	# that lands this filter has to go through terrain.can_build(move_class) so
-	# the planner keeps no second opinion on what a property can turn out.
-	var candidates: Array[UnitType] = []
-	for unit_type in unit_db.all():
-		if unit_type.max_range > 0 and funds >= unit_type.cost:
-			candidates.append(unit_type)
-	if candidates.is_empty():
-		return null
+##
+## Scored across the whole roster rather than only what this turn's purse and
+## this facility can produce, because a rank has to mean the same thing at every
+## facility and under _worth_waiting_for's larger hypothetical budget. Producing
+## the winner is still TerrainType.builds' call: _pick_build filters before it
+## ever compares ranks, so a counter-build can never name a hull a base cannot
+## lay down.
+func _reactive_order(state: GameState) -> Dictionary:
+	if profile.build_reactivity <= 0.0:
+		return {}
 	var roster := _enemy_roster(state)
 	if roster.is_empty():
-		return null
-	var max_eff := 0.0
+		return {}
+	var candidates: Array[UnitType] = []
 	var effectiveness: Dictionary = {}
-	for cand in candidates:
-		var value := _effectiveness(state, cand, roster)
-		effectiveness[cand.id] = value
+	var max_eff := 0.0
+	for unit_type in unit_db.all():
+		if unit_type.max_range <= 0:
+			continue  # transports answer nothing; they stay off the list entirely
+		candidates.append(unit_type)
+		var value := _effectiveness(state, unit_type, roster)
+		effectiveness[unit_type.id] = value
 		max_eff = maxf(max_eff, value)
 	if max_eff <= 0.0:
-		return null  # nothing affordable can hurt what is out there; let the list decide
+		return {}  # nothing in the roster can be hurt; let the list decide
 	var priority := profile.build_priority
-	var best: UnitType = null
-	var best_score := -INF
-	for cand in candidates:
+	var scored: Array = []
+	for i in candidates.size():
+		var cand := candidates[i]
 		var static_norm := 0.0
 		var rank := priority.find(cand.id)
 		if rank >= 0:
@@ -516,10 +700,20 @@ func _reactive_build(state: GameState, funds: int) -> UnitType:
 		var score := (
 			(1.0 - profile.build_reactivity) * static_norm + profile.build_reactivity * eff_norm
 		)
-		if score > best_score:
-			best_score = score
-			best = cand
-	return best
+		scored.append([score, i, cand.id])
+	scored.sort_custom(_by_score_then_scan_order)
+	var order: Dictionary = {}
+	for i in scored.size():
+		order[scored[i][2]] = i
+	return order
+
+
+## Best score first, ties broken by database order so the ranking is as
+## deterministic as every other decision this planner makes.
+static func _by_score_then_scan_order(a: Array, b: Array) -> bool:
+	if a[0] != b[0]:
+		return a[0] > b[0]
+	return a[1] < b[1]
 
 
 ## The visible enemy roster as [cost, type id] pairs, the raw material S3 weighs a
@@ -547,3 +741,33 @@ func _effectiveness(state: GameState, cand: UnitType, roster: Array) -> float:
 	if total_weight <= 0.0:
 		return 0.0
 	return weighted / total_weight
+
+
+## Whether the enemy is flying and we field fewer units that can shoot back at
+## them than the profile wants.
+##
+## What counts as an answer comes off the damage chart rather than a list of ids,
+## so a unit that gains an air matchup starts counting with no planner change —
+## and one that loses it stops. The list in the profile is only what to *buy*.
+func _outgunned_in_the_air(state: GameState) -> bool:
+	var team := state.current_team
+	var flying: Array[Unit] = []
+	for enemy in _visible_enemies(state, team):
+		if enemy.type.domain == UnitType.AIR:
+			flying.append(enemy)
+	if flying.is_empty():
+		return false
+	var answers := 0
+	for unit in state.units_of(team):
+		if _can_hit_any(state, unit, flying):
+			answers += 1
+	return answers < profile.air_answer_target
+
+
+static func _can_hit_any(state: GameState, unit: Unit, targets: Array[Unit]) -> bool:
+	if unit.type.max_range <= 0:
+		return false
+	for target in targets:
+		if AttackRange.can_engage(state, unit, target):
+			return true
+	return false

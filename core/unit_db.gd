@@ -44,12 +44,22 @@ func by_symbol(symbol: String) -> UnitType:
 	return _by_symbol.get(symbol)
 
 
-## All unit types, cheapest first (build-menu order).
+## All unit types, cheapest first (build-menu order), ties broken by id. The
+## tie-break is what makes the order total: sort_custom is not stable and several
+## units share a price, so without it the menu would be seeded by whatever order
+## the directory happened to list. The ids are compared as Strings deliberately —
+## `<` on two StringNames ranks them by their address in the name table, which is
+## an arbitrary order that can differ between one run and the next.
 func all() -> Array[UnitType]:
 	var result: Array[UnitType] = []
 	for unit_type in _by_id.values():
 		result.append(unit_type)
-	result.sort_custom(func(a: UnitType, b: UnitType) -> bool: return a.cost < b.cost)
+	result.sort_custom(
+		func(a: UnitType, b: UnitType) -> bool:
+			if a.cost != b.cost:
+				return a.cost < b.cost
+			return String(a.id) < String(b.id)
+	)
 	return result
 
 

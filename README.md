@@ -1,10 +1,11 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. Three plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
+typed GDScript. Four plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
 game (architecture, mechanics, milestones M0–M7), `.lavish/commanders-plan.html` for
-Commanders and Command Powers (milestones C1–C4), and `.lavish/difficulty-modes-plan.html`
-for the Easy/Normal/Difficult tiers (milestones DF1–DF4).
+Commanders and Command Powers (milestones C1–C4), `.lavish/difficulty-modes-plan.html`
+for the Easy/Normal/Difficult tiers (milestones DF1–DF4), and
+`.lavish/naval-air-units-plan.html` for the air and naval domains (milestones N1–N4).
 
 ## Running
 
@@ -34,7 +35,8 @@ make test            # run the GUT unit test suite (headless)
 make check           # parse + type check every .gd file (fast; no scene tree)
 make lint            # gdlint — style and smells (config: gdlintrc)
 make format          # gdformat — reformat in place; format-check only reports
-make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
+make tiles           # rebuild the art: ground tiles, PixVoxel units/buildings, placeholders, import
+make unit-placeholders    # redraw the aircraft/fleet sprites the PixVoxel pack has no art for
 make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
 make portraits       # regenerate the placeholder commander portraits + faction emblems
@@ -65,9 +67,11 @@ so two scenarios run both ways by default.
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
-Seven maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
-`riverline`, `isthmus`, `crossfire`, `first_steps`, `ironworks` — so it opens on `scrimmage`, the
-quick match, and shows each one's size, property count and a one-line pitch as a tooltip.
+Nine maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
+`riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`, `the_straits`, `ironworks` — so it
+opens on `scrimmage`, the quick match, and shows each one's size, property count and a one-line
+pitch as a tooltip. The last two are the boards air and naval units were added for: `jet_stream`
+puts an airfield behind each front, and `the_straits` a port on each coast of one shared channel.
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
 `--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
 second; either side may be left blank for no commander) — e.g.
@@ -122,18 +126,32 @@ jumps to that team's first property.
 - Confirming onto a reachable cell held by one of *your* units offers **Load** (board a transport
   with room) or **Join** (merge into a damaged unit of the same type, adding up HP, fuel, and
   ammo). Cancel snaps the mover back, as with any uncommitted move
-- A loaded APC offers **Drop**, which enters a cell picker: the legal unload cells get the blue
-  overlay, and confirming on one puts the passenger out there, exhausted for the turn. **Supply**
-  refills every friendly unit within the APC's supply reach — normally the adjacent tiles, further
-  under a commander who says so
+- A loaded transport offers **Drop**, which enters a cell picker: the legal unload cells get the
+  blue overlay, and confirming on one puts the passenger out there, exhausted for the turn. What a
+  transport carries is its own: an APC or a T-Copter takes infantry, a Lander takes two of anything
+  that drives — and unloads only onto a shoal or a port, since a landing craft cannot tip a tank
+  over the side mid-channel. **Supply** refills every friendly unit within the APC's supply reach —
+  normally the adjacent tiles, further under a commander who says so
 - Moving spends fuel equal to the terrain cost of each step, discounted by any doctrine that makes
   that step cheaper, so you are never billed more than the range overlay showed; attacking spends
   one ammo, and so does each counter-attack, so a dry unit can neither fire nor counter. At the
-  start of your turn every unit standing on one of your properties or in reach of one of your APCs
-  is refilled
-- Confirm on one of your empty bases: the build menu lists units cheapest first, each row drawing
-  the unit's artwork in your team's colours beside its name and cost; rows you can't afford are
-  greyed out. A bought unit spawns exhausted and acts next turn
+  start of your turn every unit standing on a property that services it, or in reach of one of your
+  APCs, is refilled. Which property services what is the point: a city refits vehicles, an airport
+  aircraft, a port hulls, and none of them does another's job
+- A submarine adds one row of its own: **Dive** takes it under, **Surface** brings
+  it back. Submerged, only a Cruiser or another Sub can engage it, and it is
+  invisible to the other side unless one of their units is standing right next to
+  it — with or without fog, since being under the water is not a question of how
+  far anyone can see. It does not shoot back while hiding, and staying under costs
+  it five times the fuel, so a dive is a decision rather than a default
+- Aircraft and ships burn fuel simply by existing — a few points every turn, before anything
+  refills them — and are **destroyed** when the tank runs dry. A warning badge appears on any unit
+  inside its last turn's worth of fuel. Ground units have no upkeep: an empty tank strands them and
+  nothing worse. That is what makes airfields and ports worth taking rather than decoration
+- Confirm on one of your empty production properties — a base, an airport or a port: the build menu
+  lists what *that* facility makes, cheapest first, each row drawing the unit's artwork in your
+  team's colours beside its name and cost; rows you can't afford are greyed out. A bought unit
+  spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
   team (the day counter advances when the rotation wraps back to Red), and **Save**, which writes
   the whole match — map, day, funds, ownership, every unit, both commanders, and the RNG stream —
@@ -146,8 +164,8 @@ jumps to that team's first property.
   their maximums (no ammo row for units that need none), its range when it is an indirect,
   `Carrying …` when it is a loaded transport, and a `Waited` badge — dimming the card — once it
   has acted this turn. Below that sits a compact terrain card: the tile's artwork, name, defense
-  stars, the move cost for the occupant's movement class (all four classes when the tile is
-  empty), and the owner, with `capture: N left` while a capture is in progress
+  stars, the move cost for the occupant's movement class (every class that can enter, when the
+  tile is empty), and the owner, with `capture: N left` while a capture is in progress
 - Taking the enemy HQ or destroying every enemy unit ends the match on a victory screen naming
   the winner and the day, with **Rematch** (same map, fog, commanders, and sides) and **Main Menu**
 
@@ -184,11 +202,14 @@ meter is shown while it plays, but the button stays disabled — it is not yours
 Off by default; turn it on in the menu or with `--fog`. Fogged cells are darkened and the units
 in them are hidden — you can neither target nor inspect an enemy you cannot see. You see through
 your own units (each unit type has its own vision range) and out to two tiles around every
-property you own. Woods only give themselves up from an adjacent tile, and units riding a
-transport see nothing. A commander can bend all of that: lengthen their own units' sight, see
-into woods at range, jam the enemy's sight shorter, or hide their units outright on a tile you
-can otherwise see. Vision is recomputed after each committed action and turn change, not as the
-cursor moves.
+property you own. Concealing terrain — woods, and reefs at sea — only gives itself up from an
+adjacent tile, and units riding a transport see nothing. A commander can bend all of that:
+lengthen their own units' sight, see into cover at range, jam the enemy's sight shorter, or hide
+their units outright on a tile you can otherwise see. Vision is recomputed after each committed
+action and turn change, not as the cursor moves.
+
+A submerged submarine is the one thing hidden with fog switched off entirely —
+see Dive above. Everything else here needs fog to be on.
 
 The view is always *your* team's, including while the AI plays. The AI itself sees the whole
 board — an openly cheating opponent, not a guessing one — with one deliberate exception: a unit a
@@ -242,29 +263,36 @@ result, including one capability that measured *negative* and ships switched off
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
-- `tools/` — the art and sound build scripts: the headless ground-tile, sound, and portrait
-  generators, plus the PixVoxel atlas builder (see Assets below); and the offline AI-vs-AI runner,
-  which serves both the commander-balance matrix (`docs/commander_balance.md`) and the difficulty
-  ladder gate (`docs/difficulty_check.md`).
+- `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
+  and portrait generators, plus the PixVoxel atlas builder (see Assets below); and the offline
+  AI-vs-AI runner, which serves both the commander-balance matrix (`docs/commander_balance.md`)
+  and the difficulty ladder gate (`docs/difficulty_check.md`).
 - `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 
 ## Assets
 
-Units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
+Ground units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
 Sprites](https://opengameart.org/content/pixvoxel-revised-isometric-wargame-sprites); the ground
-tiles are still generated programmer art. The commander portraits and faction emblems are generated
-placeholder art too (`make portraits`) — project-original, no third-party pixels — until the final
-portrait pass. All sound is generated placeholder chiptune (`make sfx`). There is no music yet — it
-needs licensed tracks. Third-party asset licenses must be tracked in `assets/LICENSES.md`. No
-Nintendo assets or names may ever be used.
+tiles, the airport, and the aircraft are generated programmer art. The commander portraits and
+faction emblems are generated placeholder art too (`make portraits`) — project-original, no
+third-party pixels — until the final portrait pass. All sound is generated placeholder chiptune
+(`make sfx`). There is no music yet — it needs licensed tracks. Third-party asset licenses must be
+tracked in `assets/LICENSES.md`. No Nintendo assets or names may ever be used.
 
-`make tiles` rebuilds the art in four ordered steps: `sprites-check` verifies the build inputs,
-`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it, and `import`
-reimports the result — Godot caches image imports by size, so skipping the last step after a
-rebuild that changes atlas dimensions renders a blank map. The check runs first because `ground`
-is destructive: it replaces the committed building art with bare lots that only `sprites` can
-finish painting, so a failure has to happen while the tree is still clean.
+`make tiles` rebuilds the art in five ordered steps: `sprites-check` verifies the build inputs,
+`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it,
+`unit-placeholders` draws the units that pack has no sprite for, and `import` reimports the result
+— Godot caches image imports by size, so skipping the last step after a rebuild that changes atlas
+dimensions renders a blank map. The check runs first because `ground` is destructive: it replaces
+the committed building art with bare lots that only `sprites` can finish painting, so a failure has
+to happen while the tree is still clean.
+
+The pack has no aircraft and no ships, so those columns of the units atlas are flat 16px
+silhouettes drawn by `tools/generate_unit_placeholders.gd` from ASCII grids in its own source — a
+shape you can read and edit in place. They are deliberately placeholder, so that no milestone is
+ever blocked on art; the step widens the atlas to whatever `data/units/*.tres` asks for and leaves
+the PixVoxel columns untouched.
 
 The only external requirement is ImageMagick 7 (`brew install imagemagick`). The 36 CC0 source
 sprites are vendored under `assets/sprites/pixvoxel_src`, so a fresh clone rebuilds with no

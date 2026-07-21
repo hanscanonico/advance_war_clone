@@ -2,6 +2,12 @@ class_name DropCommand
 extends Command
 ## Moves a transport, then unloads its passenger onto an adjacent cell.
 ## The passenger comes out exhausted, like Advance Wars.
+##
+## Two terrain rules, and they are different questions. The cargo has to be able
+## to *stand* where it lands, which every transport shares; and the transport has
+## to be somewhere it can unload *from*, which is only the Lander's problem — a
+## landing craft beaches on a shoal or ties up at a port, and cannot tip a tank
+## over the side mid-ocean. Both come from data, so neither is a special case.
 
 var unit: Unit  # the transport
 var path: Array[Vector2i]
@@ -22,6 +28,8 @@ func validate(state: GameState) -> String:
 	if cargo.is_empty():
 		return "nothing to drop"
 	var dest: Vector2i = path[path.size() - 1]
+	if not unit.type.can_unload_from(state.map.terrain_at(dest).id):
+		return "cannot unload here"
 	var dist := absi(drop_cell.x - dest.x) + absi(drop_cell.y - dest.y)
 	if dist != 1:
 		return "drop cell must be adjacent"

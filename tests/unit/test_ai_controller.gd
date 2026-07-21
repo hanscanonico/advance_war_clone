@@ -97,25 +97,6 @@ func test_indirect_unit_closes_in_when_out_of_range() -> void:
 	assert_eq(path[path.size() - 1], Vector2i(5, 0), "spend the full 5 closing in")
 
 
-func test_builds_infantry_when_short_on_capture_units() -> void:
-	var state := _state("[terrain]\nB.\n[owners]\n1 0 0\n[units]\n1 i 1 0")
-	state.units[0].acted = true
-	var command := ai.plan_next_command(state)  # funds: 1000 day-1 income
-	assert_true(command is BuildCommand, "expected a build, got %s" % command)
-	assert_eq((command as BuildCommand).unit_type.id, &"infantry")
-	assert_eq(command.validate(state), "")
-
-
-func test_builds_tank_with_funds_and_enough_capture_units() -> void:
-	var state := _state("[terrain]\nB....\n[owners]\n1 0 0\n[units]\n1 i 1 0\n1 i 2 0\n1 m 3 0")
-	for unit in state.units:
-		unit.acted = true
-	state.funds[1] = 7000
-	var command := ai.plan_next_command(state)
-	assert_true(command is BuildCommand)
-	assert_eq((command as BuildCommand).unit_type.id, &"tank")
-
-
 func test_ends_turn_when_nothing_left() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 i 0 0")
 	state.units[0].acted = true
@@ -146,3 +127,58 @@ func test_full_turn_on_real_map_terminates_legally() -> void:
 	assert_true(ended, "AI must reach EndTurnCommand well under the cap")
 	assert_lt(commands, 30, "one AI turn should be a handful of commands")
 	assert_eq(state.current_team, 1)
+
+
+# --- the submarine's one decision ---------------------------------------------
+
+## A boat with something it can hit does that instead of hiding, so the dive is
+## scored below an attack on purpose. These check the case where there is nothing
+## worth shooting and something worth hiding from.
+
+
+func test_a_sub_dives_from_something_it_cannot_answer() -> void:
+	# Eight tiles off: inside a battleship's reach (move plus a six-tile gun),
+	# outside the sub's own move-and-fire. A boat that could shoot would.
+	var state := _state("[terrain]\nSSSSSSSSSSSS\n[units]\n1 s 0 0\n2 B 8 0")
+	var command := ai.plan_next_command(state)
+	assert_true(command is DiveCommand, "expected a dive, got %s" % command)
+	assert_true((command as DiveCommand).submerge)
+	assert_eq(command.validate(state), "")
+
+
+## Diving from a cruiser is worse than facing it: the escort reaches under the
+## water anyway, and a submerged boat gives up its counterattack doing it.
+func test_a_sub_does_not_hide_from_its_hunter() -> void:
+	var state := _state("[terrain]\nSSSSSSSS\n[units]\n1 s 0 0\n2 c 7 0")
+	var command := ai.plan_next_command(state)
+	assert_false(command is DiveCommand, "hiding from a cruiser buys nothing")
+
+
+func test_a_sub_surfaces_once_the_threat_is_gone() -> void:
+	var state := _state("[terrain]\nSSSSSS\n[units]\n1 s 0 0\n1 c 1 0")
+	state.units[0].dived = true
+	var command := ai.plan_next_command(state)
+	assert_true(command is DiveCommand, "expected a surface, got %s" % command)
+	assert_false((command as DiveCommand).submerge)
+
+
+## Going under on the last of the tank would only mean surfacing again next turn
+## for exactly that reason, and diving again the turn after. It stays up instead.
+func test_a_sub_low_on_fuel_stays_up() -> void:
+	var state := _state("[terrain]\nSSSSSSSSSSSS\n[units]\n1 s 0 0\n2 B 8 0")
+	var sub := state.units[0]
+	sub.fuel = sub.type.dived_fuel_upkeep + sub.type.move_points
+	var command := ai.plan_next_command(state)
+	assert_false(command is DiveCommand, "a boat this dry cannot afford to be under")
+
+
+## The damage chart is optional on a GameState, so every question the planner
+## asks of it is guarded — deciding whether to dive is a threat question, and a
+## state that resolves no combat has no threats to weigh.
+func test_planning_without_a_damage_chart_asks_the_chart_nothing() -> void:
+	var map := MapData.parse("[terrain]\nSSSSSSSSSSSS\n[units]\n1 s 0 0\n2 B 8 0", terrain_db)
+	var state := GameState.create(map, unit_db)
+	assert_not_null(state)
+	var command := ai.plan_next_command(state)
+	assert_false(command is DiveCommand, "nothing known to be dangerous is worth hiding from")
+	assert_eq(command.validate(state), "")

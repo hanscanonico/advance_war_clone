@@ -7,8 +7,13 @@ func before_each() -> void:
 	db = TerrainDB.load_default()
 
 
-func test_loads_all_terrains() -> void:
-	assert_eq(db.size(), 9)
+## The database is a directory scan, so the number worth pinning is "all of
+## them", not a literal. Registration drops a terrain silently on a duplicate id
+## or symbol, and that is the failure this catches; spelling the count out here
+## would only be a chore every time the roster grows.
+func test_loads_every_terrain_resource() -> void:
+	assert_eq(db.size(), _resource_count(TerrainDB.TERRAIN_DIR))
+	assert_gt(db.size(), 0, "data/terrain should not be empty")
 
 
 func test_lookup_by_symbol() -> void:
@@ -62,3 +67,105 @@ func test_defense_stars() -> void:
 	assert_eq(db.by_id(&"city").defense_stars, 3)
 	assert_eq(db.by_id(&"hq").defense_stars, 4)
 	assert_eq(db.by_id(&"mountain").defense_stars, 4)
+
+
+## Every terrain admits aircraft at cost 1: that one row of data, and nothing in
+## the movement resolver, is the whole air movement model. A terrain added
+## without it would quietly become a hole in the sky.
+func test_every_terrain_is_flyable_at_cost_one() -> void:
+	for terrain in db.all():
+		assert_eq(
+			terrain.move_cost(TerrainType.AIR),
+			1,
+			"%s should cost an aircraft exactly one point to cross" % terrain.id
+		)
+
+
+## Which property builds what, and which refits what, is terrain data — the
+## facilities the base game shipped with have to keep saying what they always
+## meant, or every land unit quietly loses production and repair.
+func test_land_properties_build_and_service_the_ground_army() -> void:
+	var base := db.by_id(&"base")
+	for move_class: StringName in [
+		TerrainType.FOOT, TerrainType.BOOT, TerrainType.TIRES, TerrainType.TREADS
+	]:
+		assert_true(base.can_build(move_class), "a base should build %s units" % move_class)
+	assert_false(base.can_build(TerrainType.AIR), "a base should not build aircraft")
+	for id: StringName in [&"city", &"base", &"hq"]:
+		assert_true(db.by_id(id).services_domain(UnitType.LAND), "%s should refit vehicles" % id)
+		assert_false(db.by_id(id).services_domain(UnitType.AIR), "%s should not refit air" % id)
+	for id: StringName in [&"city", &"hq"]:
+		assert_true(db.by_id(id).builds.is_empty(), "%s should not be a factory" % id)
+
+
+func test_airport_builds_and_services_only_aircraft() -> void:
+	var airport := db.by_id(&"airport")
+	assert_true(airport.is_property, "an airport should be capturable and pay income")
+	assert_true(airport.can_build(TerrainType.AIR))
+	assert_false(airport.can_build(TerrainType.TREADS), "an airport should not build tanks")
+	assert_true(airport.services_domain(UnitType.AIR))
+	assert_false(airport.services_domain(UnitType.LAND), "tanks refit at a city, not a hangar")
+	assert_true(
+		airport.is_passable(TerrainType.FOOT), "ground units should be able to walk onto the field"
+	)
+
+
+## Reads data/terrain the way TerrainDB does, so the count is derived rather than
+## restated.
+func _resource_count(dir_path: String) -> int:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return -1
+	var count := 0
+	for file in dir.get_files():
+		if file.trim_suffix(".remap").ends_with(".tres"):
+			count += 1
+	return count
+
+
+## Sea admits hulls and nothing else that drives. This is the whole naval
+## movement model, exactly as `air: 1` everywhere is the air one.
+func test_sea_carries_hulls_only() -> void:
+	var sea := db.by_id(&"sea")
+	assert_eq(sea.move_cost(TerrainType.SHIP), 1)
+	assert_eq(sea.move_cost(TerrainType.LANDER), 1)
+	for move_class: StringName in [
+		TerrainType.FOOT, TerrainType.BOOT, TerrainType.TIRES, TerrainType.TREADS
+	]:
+		assert_false(sea.is_passable(move_class), "%s should not cross open water" % move_class)
+
+
+## A shoal is the beach a lander runs onto: land units and the landing craft,
+## never a warship. A bridge is the mirror image — everything that drives, and no
+## hull at all, which is what makes it a chokepoint on the water as well as a
+## crossing on land.
+func test_shoals_and_bridges_split_the_fleet_from_the_army() -> void:
+	var shoal := db.by_id(&"shoal")
+	assert_true(shoal.is_passable(TerrainType.TREADS))
+	assert_true(shoal.is_passable(TerrainType.LANDER))
+	assert_false(shoal.is_passable(TerrainType.SHIP), "a warship cannot beach itself")
+	var bridge := db.by_id(&"bridge")
+	assert_true(bridge.is_passable(TerrainType.TREADS))
+	assert_false(bridge.is_passable(TerrainType.SHIP), "hulls do not fit under a bridge")
+	assert_false(bridge.is_passable(TerrainType.LANDER))
+
+
+func test_reefs_slow_hulls_and_hide_them() -> void:
+	var reef := db.by_id(&"reef")
+	assert_eq(reef.move_cost(TerrainType.SHIP), 2)
+	assert_false(reef.is_passable(TerrainType.FOOT), "a reef is still open water to an army")
+	assert_true(reef.conceals, "a reef is the sea's woods")
+	assert_true(db.by_id(&"woods").conceals, "and woods still conceal, now that it is a flag")
+	assert_false(db.by_id(&"plains").conceals)
+
+
+func test_port_builds_and_services_only_hulls() -> void:
+	var port := db.by_id(&"port")
+	assert_true(port.is_property)
+	assert_true(port.can_build(TerrainType.SHIP))
+	assert_true(port.can_build(TerrainType.LANDER))
+	assert_false(port.can_build(TerrainType.TREADS), "a dockyard does not turn out tanks")
+	assert_true(port.services_domain(UnitType.SEA))
+	assert_false(port.services_domain(UnitType.LAND))
+	assert_true(port.is_passable(TerrainType.SHIP), "a hull has to be able to tie up at it")
+	assert_true(port.is_passable(TerrainType.FOOT), "and an infantryman to walk up and take it")

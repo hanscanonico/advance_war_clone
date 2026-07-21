@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="UnitType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/unit_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"b_copter"
+display_name = "B-Copter"
+symbol = "h"
+cost = 9000
+move_points = 6
+move_class = &"air"
+domain = &"air"
+vision = 3
+can_capture = false
+min_range = 1
+max_range = 1
+max_fuel = 99
+fuel_upkeep = 2
+max_ammo = 6
+transport_capacity = 0
+cargo_classes = Array[StringName]([])
+can_resupply = false
+atlas_col = 11

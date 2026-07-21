@@ -9,11 +9,13 @@ display_name = "Woods"
 symbol = "F"
 defense_stars = 2
 move_costs = {
+&"air": 1,
 &"boot": 1,
 &"foot": 1,
 &"tires": 3,
 &"treads": 2
 }
 is_property = false
+conceals = true
 atlas_col = 2
 team_tinted = false
