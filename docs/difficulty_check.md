@@ -10,11 +10,10 @@ where the instrument can see it; **Difficult is not measurably stronger than
 Normal at all**. Details and the reasoning below — read §4 before changing a
 weight, and §5 before deciding what to do about it.
 
-**The recorded numbers are also out of date.** They were measured before
-`advance_threat_tiles` split off from `threat_aversion` (§2), which is what makes
-Difficult's kill-zone refusal do anything at all on the advance path. Both tiers
-plan differently now, so `make difficulty-check` must be re-run and its output
-committed over §4 before the standings are quoted again.
+**The recorded numbers are also out of date.** They were measured before this
+branch's later planner fixes — §4 says which. Both tiers plan differently now, so
+`make difficulty-check` must be re-run and its output committed over §4 before the
+standings are quoted again.
 
 ## 1. What difficulty is allowed to change
 

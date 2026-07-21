@@ -211,12 +211,14 @@ records the tier it was played at.
   real game.
 - **Normal** — the shipped AI, bit for bit. A test pins its profile to the planner's own defaults,
   so a same-seed replay of an old match still plays out identically.
-- **Difficult** — the same economy and the same dice, thinking better. It builds a **threat map**
-  each turn (what could shoot each cell next turn, forecast through the same combat resolver you
-  see in the damage preview) and weighs it two ways: a shot is discounted by what the firing cell
-  invites in return, scaled against the unit's own cost, and a unit that is only advancing will
-  give up tiles of progress rather than end its move in a kill zone. It also **counter-builds**
-  against your actual roster instead of a fixed shopping list.
+- **Difficult** — the same economy and the same dice, with more on its mind. It builds a **threat
+  map** each turn (what could shoot each cell next turn, forecast through the same combat resolver
+  you see in the damage preview) and weighs it two ways: a shot is discounted by what the firing
+  cell invites in return, scaled against the unit's own cost, and a unit that is only advancing
+  will give up tiles of progress rather than end its move in a kill zone. It also **counter-builds**
+  against your actual roster instead of a fixed shopping list. Whether all that actually *beats*
+  Normal is unconfirmed — the AI-vs-AI ladder has not separated the two; `docs/difficulty_check.md`
+  carries the standing numbers.
 
 Each tier is a `.tres` under `data/difficulty/` pointing at a profile in `data/ai/`, so retuning
 one is a data edit. `make difficulty-check` plays the tiers against each other headless and
