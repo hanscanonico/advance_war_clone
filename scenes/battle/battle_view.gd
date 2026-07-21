@@ -315,6 +315,12 @@ func refresh_panel(cell: Vector2i) -> void:
 		carrying
 	)
 	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
+	# The chip is pinned to the top-left and, unlike the terrain panel, has no
+	# free corner to flip to — the Day panel owns the other one. So it fades
+	# instead: the board reads through it while the cursor is on a tile it covers.
+	commander_chip.set_covering_cursor(
+		commander_chip.get_global_rect().intersects(_screen_rect_for_cell(cell))
+	)
 
 
 ## Shows the attack/counter forecast beside a cell. A null forecast — nothing
@@ -361,11 +367,23 @@ func _viewport_size() -> Vector2:
 
 
 func screen_pos_for_cell(cell: Vector2i) -> Vector2:
-	# Anchor to the camera's target (unsmoothed) position so UI placed during
-	# a camera glide lands where the view settles, not where it happens to be.
 	var world := cell_center(cell) + Vector2(TILE, -TILE) / 2.0
+	return (world - _screen_center()) * camera.zoom + _viewport_size() / 2.0 + Vector2(6, 0)
+
+
+## Where the cell is actually drawn, in screen pixels — what a HUD panel has to
+## be tested against to know whether it is sitting on top of it.
+func _screen_rect_for_cell(cell: Vector2i) -> Rect2:
+	var top_left := Vector2(cell * TILE) - _screen_center()
+	return Rect2(top_left * camera.zoom + _viewport_size() / 2.0, Vector2(TILE, TILE) * camera.zoom)
+
+
+## The world point the middle of the screen shows. Anchored to the camera's
+## target (unsmoothed) position so UI placed during a camera glide lands where
+## the view settles, not where it happens to be.
+func _screen_center() -> Vector2:
 	var view_size := _viewport_size()
-	var center := Vector2(
+	return Vector2(
 		clampf(
 			camera.position.x,
 			view_size.x / (2.0 * camera.zoom.x),
@@ -377,4 +395,3 @@ func screen_pos_for_cell(cell: Vector2i) -> Vector2:
 			camera.limit_bottom - view_size.y / (2.0 * camera.zoom.y)
 		)
 	)
-	return (world - center) * camera.zoom + view_size / 2.0 + Vector2(6, 0)

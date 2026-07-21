@@ -15,12 +15,22 @@ extends PanelContainer
 const _READY := Color(0.957, 0.745, 0.196)
 const _ACTIVE := Color(0.451, 0.808, 0.435)
 const _PORTRAIT := 40
+## How far the chip fades while it is standing on the tile the player is looking
+## at, and how long it takes to get there and back.
+const _DIM_ALPHA := 0.25
+const _FADE_TIME := 0.12
 
 ## Wired by Battle to _fire_command_power. Lives in the chip so the fire control
 ## sits with the readiness it reflects.
 var fire_button: Button
 
 var _built := false
+## True while the chip covers the cursor's tile — BattleView owns that geometry
+## and tells us. Pointing the mouse at the chip overrides it: the Fire button has
+## to stay legible under the hand that is about to click it.
+var _covering_cursor := false
+var _hovered := false
+var _fade: Tween
 var _field: Panel
 var _portrait: TextureRect
 var _name_label: Label
@@ -85,6 +95,9 @@ func _build() -> void:
 	foot.add_child(fire_button)
 	data.add_child(foot)
 
+	mouse_entered.connect(_set_hovered.bind(true))
+	mouse_exited.connect(_set_hovered.bind(false))
+
 	_built = true
 
 
@@ -99,6 +112,7 @@ func update_state(co_state: CommanderState, is_ai: bool) -> void:
 		hide()
 		return
 	show()
+	_apply_alpha()  # a chip that hid mid-fade comes back at the right opacity
 	var theme := CommanderVisuals.theme_for(commander)
 	_field.add_theme_stylebox_override("panel", _flat(theme.color))
 	_portrait.texture = CommanderVisuals.portrait_for(commander)
@@ -120,6 +134,31 @@ func update_state(co_state: CommanderState, is_ai: bool) -> void:
 
 	fire_button.visible = co_state.is_ready() and not is_ai
 	fire_button.disabled = not co_state.is_ready() or is_ai
+
+
+## Told by BattleView on every cursor move whether the chip is standing on the
+## tile being looked at. Fades rather than moves: the chip keeps its corner and
+## its readout, and the map underneath stays readable.
+func set_covering_cursor(covering: bool) -> void:
+	if covering == _covering_cursor:
+		return
+	_covering_cursor = covering
+	_apply_alpha()
+
+
+func _set_hovered(hovered: bool) -> void:
+	_hovered = hovered
+	_apply_alpha()
+
+
+func _apply_alpha() -> void:
+	var target := _DIM_ALPHA if _covering_cursor and not _hovered else 1.0
+	if is_equal_approx(modulate.a, target):
+		return
+	if _fade != null and _fade.is_valid():
+		_fade.kill()
+	_fade = create_tween()
+	_fade.tween_property(self, "modulate:a", target, _FADE_TIME)
 
 
 func _set_fill(color: Color) -> void:
