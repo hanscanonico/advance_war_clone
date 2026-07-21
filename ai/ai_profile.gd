@@ -45,10 +45,29 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 # data/ai/hard.tres turns them on. These change how the planner *ranks* its own
 # candidate moves — never a combat number, which stays owned by CombatResolver.
 
-## How heavily a destination's expected incoming damage next turn discounts its
-## score, as a fraction of the exposed unit's cost. >0 builds a per-turn threat
-## map (S1); 0 leaves it unbuilt, so the whole cost lands only on Difficult.
+## How heavily a destination's expected incoming damage next turn discounts an
+## *attack's* score, as a fraction of the exposed unit's cost. >0 builds a
+## per-turn threat map (S1); 0 leaves it unbuilt.
+##
+## Denominated in VALUE, because that is what _attack_score is: cost x damage
+## fraction. It cannot be reused on the advance path, whose score is counted in
+## tiles — see advance_threat_tiles.
 @export var threat_aversion: float = 0.0
+## How many tiles of forward progress a unit will give up to dodge a would-be
+## lethal incoming shot when it is only advancing (S1, same threat map).
+##
+## Denominated in TILES, because _position_rank is: the advance score steps by
+## whole integers of distance, so a value-denominated dial small enough to keep
+## threat_aversion sane on the attack path can only ever break ties here. That
+## scale difference is the entire reason this is a second field rather than a
+## second use of threat_aversion. A shot forecast to take half a unit's HP costs
+## half this many tiles.
+##
+## Below ~1.6 the dial cannot buy even one tile against a full-strength
+## artillery shot (63 damage through the plains defence), so it is inert; that is
+## the floor a tuned value has to clear. >0 builds the threat map on its own,
+## with or without threat_aversion.
+@export var advance_threat_tiles: float = 0.0
 ## Bonus for attacking a target other ready friendlies can still add damage to
 ## this turn, so the AI piles fire to finish a unit instead of scattering it
 ## (S2). Scaled by that follow-up potential; 0 disables it.

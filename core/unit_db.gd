@@ -53,5 +53,16 @@ func all() -> Array[UnitType]:
 	return result
 
 
+## Every unit type the terrain `site` produces, cheapest first. Empty for a
+## terrain nothing is built at, which is how a caller asks "is this a production
+## property?" without keeping a list of its own.
+func buildable_at(site: StringName) -> Array[UnitType]:
+	var result: Array[UnitType] = []
+	for unit_type in all():
+		if unit_type.buildable_at(site):
+			result.append(unit_type)
+	return result
+
+
 func size() -> int:
 	return _by_id.size()

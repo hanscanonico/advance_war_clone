@@ -3,9 +3,17 @@ extends GutTest
 ## state, each proved by the same board reaching a different command with the
 ## capability on than with it off.
 ##
-## Every test builds its own profile rather than leaning on data/ai/hard.tres:
-## these pin the *behaviour* of each smart, so retuning a shipped weight is a
-## balance decision and never a test failure.
+## Almost every test builds its own profile rather than leaning on
+## data/ai/hard.tres: these pin the *behaviour* of each smart, so retuning a
+## shipped weight is a balance decision and never a test failure.
+##
+## The exception is deliberate. A capability suite where every test picks its own
+## weight cannot notice a tier that ships a weight too small to do anything —
+## which is exactly how Difficult shipped a kill-zone refusal that never refused
+## anything. So one test loads the real Difficult profile and asserts the shipped
+## configuration reaches the behaviour the tier claims.
+
+const ARTILLERY_RING_BOARD := "[terrain]\n..........\n[units]\n1 t 0 0\n2 g 9 0"
 
 var terrain_db: TerrainDB
 var unit_db: UnitDB
@@ -35,11 +43,15 @@ func _profile() -> AIProfile:
 ## The flagship case. A tank walking at an enemy artillery ends its advance on
 ## the closest cell it can reach — which is inside the artillery's firing ring.
 ## With threat awareness on it gives up one tile and stops outside the ring.
-func test_threat_aversion_keeps_a_tank_out_of_the_artillery_ring() -> void:
-	var map_text := "[terrain]\n..........\n[units]\n1 t 0 0\n2 g 9 0"
-
+##
+## Exercised at 2.0, the value data/ai/hard.tres ships, because that is the
+## claim: this dial is denominated in tiles precisely so a ladder-safe weight can
+## still move a unit. The arithmetic is tight and worth spelling out — the shot
+## forecasts 63 damage, so a tile costs 63/100 of the dial, and anything under
+## ~1.6 leaves the tank inside the ring however confident the docs sound.
+func test_advance_threat_tiles_keeps_a_tank_out_of_the_artillery_ring() -> void:
 	var blind := AIController.new(unit_db, _profile())
-	var blind_move := blind.plan_next_command(_state(map_text))
+	var blind_move := blind.plan_next_command(_state(ARTILLERY_RING_BOARD))
 	assert_true(blind_move is MoveCommand, "expected an advance, got %s" % blind_move)
 	var blind_path: Array[Vector2i] = (blind_move as MoveCommand).path
 	assert_eq(
@@ -49,8 +61,8 @@ func test_threat_aversion_keeps_a_tank_out_of_the_artillery_ring() -> void:
 	)
 
 	var wary_profile := _profile()
-	wary_profile.threat_aversion = 5.0
-	var wary_state := _state(map_text)
+	wary_profile.advance_threat_tiles = 2.0
+	var wary_state := _state(ARTILLERY_RING_BOARD)
 	var wary_move := AIController.new(unit_db, wary_profile).plan_next_command(wary_state)
 	assert_true(wary_move is MoveCommand, "expected an advance, got %s" % wary_move)
 	var wary_path: Array[Vector2i] = (wary_move as MoveCommand).path
@@ -60,6 +72,75 @@ func test_threat_aversion_keeps_a_tank_out_of_the_artillery_ring() -> void:
 		"threat awareness gives up a tile to stop outside the artillery's reach"
 	)
 	assert_eq(wary_move.validate(wary_state), "", "a wary advance is still a legal move")
+
+
+## The same board against the profile the game actually ships as Difficult, not
+## a value invented for the test. The one above pins the capability; this pins
+## the *configuration*, which is where the claim rotted last time — the tier
+## shipped a weight that could not move a unit by a single tile, and every
+## capability test passed anyway because each chose its own number.
+func test_the_shipped_difficult_profile_refuses_the_artillery_ring() -> void:
+	var hard: AIProfile = load("res://data/ai/hard.tres")
+	assert_not_null(hard, "data/ai/hard.tres should load")
+	var state := _state(ARTILLERY_RING_BOARD)
+	var move := AIController.new(unit_db, hard).plan_next_command(state)
+	assert_true(move is MoveCommand, "expected an advance, got %s" % move)
+	var path: Array[Vector2i] = (move as MoveCommand).path
+	assert_eq(
+		path[path.size() - 1],
+		Vector2i(5, 0),
+		"Difficult as shipped must actually stop outside the ring, not merely intend to"
+	)
+	assert_eq(move.validate(state), "")
+
+
+## The advance dial is denominated in tiles, so its scale is readable: at 1.0 a
+## shot that would kill outright is worth exactly one tile of progress and no
+## more. Pins the shape of the formula, which is the thing a retune must not
+## quietly change.
+func test_advance_threat_tiles_are_priced_in_tiles() -> void:
+	# The artillery forecasts 63 damage, so a tile costs 0.63 of the dial.
+	var timid := _profile()
+	timid.advance_threat_tiles = 1.5  # 0.945 tiles: not quite enough to give one up
+	var timid_move := AIController.new(unit_db, timid).plan_next_command(
+		_state(ARTILLERY_RING_BOARD)
+	)
+	var timid_path: Array[Vector2i] = (timid_move as MoveCommand).path
+	assert_eq(
+		timid_path[timid_path.size() - 1],
+		Vector2i(6, 0),
+		"under one tile of aversion buys no tiles — the dial is not a veto"
+	)
+
+	var timider := _profile()
+	timider.advance_threat_tiles = 1.6  # 1.008 tiles: just over the line
+	var timider_move := AIController.new(unit_db, timider).plan_next_command(
+		_state(ARTILLERY_RING_BOARD)
+	)
+	var timider_path: Array[Vector2i] = (timider_move as MoveCommand).path
+	assert_eq(
+		timider_path[timider_path.size() - 1], Vector2i(5, 0), "just over one tile buys one tile"
+	)
+
+
+## The two dials are independent: the attack-path one must not move an advancing
+## unit, which is exactly the confusion that shipped a Difficult tier whose
+## advance never flinched.
+func test_the_attack_dial_does_not_steer_the_advance() -> void:
+	var attack_only := _profile()
+	attack_only.threat_aversion = 5.0
+	var wary := AIController.new(unit_db, attack_only).plan_next_command(
+		_state(ARTILLERY_RING_BOARD)
+	)
+	var blind := AIController.new(unit_db, _profile()).plan_next_command(
+		_state(ARTILLERY_RING_BOARD)
+	)
+	assert_true(wary is MoveCommand and blind is MoveCommand)
+	assert_eq(
+		(wary as MoveCommand).path,
+		(blind as MoveCommand).path,
+		"threat_aversion prices shots, not steps"
+	)
 
 
 ## Threat is a discount on the score, not a veto: a worthwhile attack still
@@ -83,6 +164,7 @@ func test_an_unreachable_enemy_threatens_nothing() -> void:
 	var map_text := "[terrain]\n...S...\n[units]\n1 t 0 0\n2 t 6 0"
 	var wary_profile := _profile()
 	wary_profile.threat_aversion = 5.0
+	wary_profile.advance_threat_tiles = 5.0
 	var wary := AIController.new(unit_db, wary_profile).plan_next_command(_state(map_text))
 	var blind := AIController.new(unit_db, _profile()).plan_next_command(_state(map_text))
 	assert_true(wary is MoveCommand and blind is MoveCommand)
@@ -201,17 +283,57 @@ func test_reactive_building_falls_back_to_the_list_with_no_enemy_seen() -> void:
 ## Plans the one build the given profile makes on `map_text` with 15,000 in the
 ## bank — enough for everything but the md_tank, which is where counter-building
 ## has anything to say.
-func _build_pick(map_text: String, profile: AIProfile) -> StringName:
-	var state := _state(map_text)
+func _build_pick(map_text: String, profile: AIProfile, db: UnitDB = null) -> StringName:
+	var roster := db if db != null else unit_db
+	var state := GameState.create(MapData.parse(map_text, terrain_db), roster, chart)
+	assert_not_null(state)
 	state.funds[1] = 15000
 	for unit in state.units:
 		unit.acted = true
-	var command := AIController.new(unit_db, profile).plan_next_command(state)
+	var command := AIController.new(roster, profile).plan_next_command(state)
 	assert_true(command is BuildCommand, "expected a build, got %s" % command)
 	if not (command is BuildCommand):
 		return &""
 	assert_eq(command.validate(state), "")
 	return (command as BuildCommand).unit_type.id
+
+
+## The planner must never propose a build the rules would refuse. A build list
+## naming a unit this site cannot produce skips it rather than handing
+## BuildCommand something it rejects — the guard that matters the day the roster
+## grows a naval or air unit, since a base is then no longer "everything".
+func test_the_planner_never_picks_a_unit_the_site_cannot_produce() -> void:
+	var map_text := (
+		"[terrain]\nB.......\n[owners]\n1 0 0\n"
+		+ "[units]\n1 i 1 0\n1 i 2 0\n1 i 3 0\n2 t 5 0\n2 t 6 0\n2 t 7 0"
+	)
+	var db := UnitDB.load_default()
+	db.register(_gunboat())
+
+	var listed := _profile()
+	listed.build_priority = [&"gunboat", &"tank"] as Array[StringName]
+	var static_pick := _build_pick(map_text, listed, db)
+	assert_eq(static_pick, &"tank", "a base skips the port unit at the head of its own build list")
+
+	var reactive := _profile()
+	reactive.build_priority = [&"gunboat", &"tank"] as Array[StringName]
+	reactive.build_reactivity = 1.0
+	assert_ne(_build_pick(map_text, reactive, db), &"gunboat", "counter-building sees it no more")
+
+
+## A cheap, well-armed unit that no base can build. Deliberately the sort of
+## thing every candidate filter would otherwise reach for first.
+func _gunboat() -> UnitType:
+	var boat := UnitType.new()
+	boat.id = &"gunboat"
+	boat.display_name = "Gunboat"
+	boat.symbol = "z"
+	boat.cost = 1000
+	boat.move_points = 7
+	boat.min_range = 1
+	boat.max_range = 1
+	boat.built_at = &"port"
+	return boat
 
 
 # --- the Normal pin -----------------------------------------------------------

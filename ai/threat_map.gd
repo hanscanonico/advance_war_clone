@@ -16,7 +16,10 @@ extends RefCounted
 ## The expensive half — one flood fill per enemy — depends only on where the
 ## enemies are, which does not change during the side's own turn (a unit only
 ## leaves the board by dying to a counter). So AIController builds one of these
-## once per turn and reuses it across every command it plans that turn.
+## once per turn and reuses it across every command it plans that turn, keyed on
+## the day and the enemy set so that a new day always rebuilds it — the day is
+## what marks the turn boundary there, since a controller plans for one team for
+## the whole match and its team id never changes.
 ##
 ## One approximation comes with that, and it is deliberate: an enemy's reach is
 ## flood-filled against the board as it stood when the map was built, so our own

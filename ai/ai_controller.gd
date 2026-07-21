@@ -35,10 +35,11 @@ var profile: AIProfile
 ## Difficult's threat map (S1). Built on first use each turn a profile with
 ## threat awareness is planning, and reused across every command that turn — the
 ## enemies it reads from cannot move while the AI plays, so one build is honest.
-## Stays null on Normal and Easy, which never pay to build it. See _threat_map_for.
+## Stays null when both threat dials are 0, which is what keeps Normal from
+## paying for it at all. See _threat_map_for.
 var _threat_map: ThreatMap = null
-## Signature of the enemy set the cached map was built from; a mismatch (an enemy
-## died to a counter, or the turn changed hands) rebuilds it.
+## Signature of the day and the enemy set the cached map was built from; a
+## mismatch (a new day, or an enemy that died to a counter) rebuilds it.
 var _threat_key: String = ""
 
 
@@ -177,10 +178,11 @@ func _attack_score(unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast) -
 	return value - risk
 
 
-## S1. What ending on `cell` costs `unit` in expected incoming damage next turn,
-## in the same cost-scaled currency an attack's value uses, so it discounts a
-## destination's score directly. 0 — and no threat map built — when the profile
-## has threat awareness off, which is what keeps Normal and Easy free of it.
+## S1. What firing from `cell` costs `unit` in expected incoming damage next
+## turn, in the same cost-scaled currency an attack's value uses, so it discounts
+## the shot's score directly. 0 — and no threat map built — when the profile has
+## attack-path threat awareness off, which is what keeps Normal free of it.
+## The advance path weighs the same map in tiles instead; see _advance_value.
 func _threat_penalty(state: GameState, unit: Unit, cell: Vector2i) -> float:
 	if profile.threat_aversion <= 0.0:
 		return 0.0
@@ -240,21 +242,29 @@ func _follow_up_damage(state: GameState, attacker: Unit, enemy: Unit) -> int:
 	return total
 
 
-## The threat map for the current turn (S1), built on first use and rebuilt only
-## when the enemy set changes. During the AI's own turn that means an enemy died
-## to a counter; a new turn changes current_team and so the signature too.
+## The threat map for the current turn (S1), built on first use and rebuilt
+## whenever the day or the enemy set changes. Within the AI's own turn only the
+## latter can happen — an enemy died to a counter.
+##
+## The day is what draws the turn boundary, and it has to be in the key: a
+## controller plans for exactly one team for the whole match, so current_team is
+## a constant here and could never invalidate anything. Without the day, an
+## opponent that ended its turn with every visible unit back on the cells it
+## started on would hand us a flood fill from a turn ago, taken against a board
+## our own units have since rearranged — staleness well past the within-turn
+## approximation ThreatMap documents.
 func _threat_map_for(state: GameState) -> ThreatMap:
 	var enemies := _visible_enemies(state, state.current_team)
-	var key := _threat_signature(state.current_team, enemies)
+	var key := _threat_signature(state, enemies)
 	if _threat_map == null or _threat_key != key:
 		_threat_map = ThreatMap.build(state, enemies)
 		_threat_key = key
 	return _threat_map
 
 
-static func _threat_signature(team: int, enemies: Array[Unit]) -> String:
+static func _threat_signature(state: GameState, enemies: Array[Unit]) -> String:
 	var parts := PackedStringArray()
-	parts.append(str(team))
+	parts.append("%d.%d" % [state.day, state.current_team])
 	for enemy in enemies:
 		parts.append("%d.%d.%d" % [enemy.team, enemy.cell.x, enemy.cell.y])
 	return ",".join(parts)
@@ -290,13 +300,20 @@ func _advance_command(
 	state: GameState, unit: Unit, reachable: MovementResolver.MoveRange
 ) -> Command:
 	var goal := _advance_goal(state, unit)
+	# Resolved once for the whole candidate sweep. The map cannot change while a
+	# single unit's destinations are scored, and re-asking per cell rebuilt the
+	# visible-enemy list and its signature string every time. Still lazy: with
+	# the dial at 0 nothing is looked up and nothing is built.
+	var threat: ThreatMap = null
+	if profile.advance_threat_tiles > 0.0:
+		threat = _threat_map_for(state)
 	var best_cell := unit.cell
-	var best_value := _advance_value(state, unit, unit.cell, goal)
+	var best_value := _advance_value(state, unit, unit.cell, goal, threat)
 	var best_cost := 0
 	for cell in reachable.cells():
 		if not reachable.can_stop_at(cell):
 			continue
-		var value := _advance_value(state, unit, cell, goal)
+		var value := _advance_value(state, unit, cell, goal, threat)
 		var cost: int = reachable.costs[cell]
 		if value > best_value or (is_equal_approx(value, best_value) and cost < best_cost):
 			best_value = value
@@ -306,15 +323,26 @@ func _advance_command(
 
 
 ## How good ending on `cell` is, higher being better: closeness to the goal
-## (negative rank) less the expected incoming damage of standing there (S1),
-## discounted by threat_aversion. With threat awareness off this is exactly
-## -rank, so the cheaper-of-equal-value tiebreak above reproduces the original
-## nearest-cell advance bit for bit — Normal is untouched.
-func _advance_value(state: GameState, unit: Unit, cell: Vector2i, goal: AdvanceGoal) -> float:
+## (negative rank) less what standing there invites (S1).
+##
+## The threat term is counted in *tiles*, not in value, because the rank it has
+## to argue with is: a cell one step further from the goal is worth exactly -1
+## here, so a penalty scaled by unit cost as the attack path's is would swamp
+## the whole scale, and one small enough not to would never move the unit at all.
+## advance_threat_tiles is therefore how many tiles of progress a unit gives up
+## to dodge a shot that would kill it outright, prorated by the fraction of its
+## HP the forecast actually takes.
+##
+## `threat` is null when the dial is off, and this is then exactly -rank, so the
+## cheaper-of-equal-value tiebreak above reproduces the original nearest-cell
+## advance bit for bit — Normal is untouched.
+func _advance_value(
+	state: GameState, unit: Unit, cell: Vector2i, goal: AdvanceGoal, threat: ThreatMap
+) -> float:
 	var value := -float(_position_rank(state, unit, cell, goal))
-	if profile.threat_aversion > 0.0:
-		var incoming := _threat_map_for(state).incoming_damage(state, unit, cell)
-		value -= profile.threat_aversion * incoming / 100.0
+	if threat != null:
+		var incoming := threat.incoming_damage(state, unit, cell)
+		value -= profile.advance_threat_tiles * incoming / 100.0
 	return value
 
 
@@ -379,24 +407,33 @@ static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
 	return best
 
 
-## One build per call, at the first empty owned base the funds allow.
+## One build per call, at the first empty owned property that produces anything
+## the funds allow.
+##
+## Which property that is comes from the roster rather than from a terrain id
+## kept here: a site with nothing buildable at it is skipped, and every choice
+## below is made from that site's own list. So the planner asks the same question
+## BuildCommand.validate answers and can never propose a build it would refuse —
+## the AI holding a second opinion on a rule is a standing bug in this repo.
 func _plan_build(state: GameState) -> Command:
 	for cell in state.properties_of(state.current_team):
-		if state.map.terrain_at(cell).id != &"base":
+		var producible := unit_db.buildable_at(state.map.terrain_at(cell).id)
+		if producible.is_empty():
 			continue
 		if state.unit_at(cell) != null:
 			continue
-		var choice := _pick_build(state)
+		var choice := _pick_build(state, producible)
 		if choice == null:
 			return null
 		return BuildCommand.new(state.current_team, choice, cell)
 	return null
 
 
-## Keep capture units flowing, then buy the strongest affordable vehicle.
-func _pick_build(state: GameState) -> UnitType:
+## Keep capture units flowing, then buy the strongest affordable vehicle. Every
+## candidate comes from `producible`, the site's own roster.
+func _pick_build(state: GameState, producible: Array[UnitType]) -> UnitType:
 	var funds: int = state.funds[state.current_team]
-	var infantry := unit_db.by_id(&"infantry")
+	var infantry := _producible_type(producible, &"infantry")
 	var capture_units := 0
 	for unit in state.units_of(state.current_team):
 		if unit.type.can_capture:
@@ -404,10 +441,10 @@ func _pick_build(state: GameState) -> UnitType:
 	if infantry != null and capture_units < profile.capture_unit_target and funds >= infantry.cost:
 		return infantry
 	if profile.build_reactivity > 0.0:
-		var reactive := _reactive_build(state, funds)
+		var reactive := _reactive_build(state, funds, producible)
 		if reactive != null:
 			return reactive
-	var listed := _static_build(funds)
+	var listed := _static_build(funds, producible)
 	if listed != null:
 		return listed
 	if infantry != null and funds >= infantry.cost:
@@ -415,13 +452,21 @@ func _pick_build(state: GameState) -> UnitType:
 	return null
 
 
-## The strongest affordable unit on the profile's build list. The whole of
-## Normal's and Easy's buying, and the fallback whenever counter-building has
-## nothing to say.
-func _static_build(funds: int) -> UnitType:
+## The strongest affordable unit on the profile's build list that this site can
+## actually turn out. The whole of Normal's and Easy's buying, and the fallback
+## whenever counter-building has nothing to say. A build_priority naming a unit
+## the site does not produce simply moves on to the next entry.
+func _static_build(funds: int, producible: Array[UnitType]) -> UnitType:
 	for id in profile.build_priority:
-		var unit_type := unit_db.by_id(id)
+		var unit_type := _producible_type(producible, id)
 		if unit_type != null and funds >= unit_type.cost:
+			return unit_type
+	return null
+
+
+static func _producible_type(producible: Array[UnitType], id: StringName) -> UnitType:
+	for unit_type in producible:
+		if unit_type.id == id:
 			return unit_type
 	return null
 
@@ -437,9 +482,9 @@ func _static_build(funds: int) -> UnitType:
 ## takable damage — and the static list decides instead. Without that, full
 ## reactivity would score every candidate at zero and buy whichever the database
 ## happened to list first.
-func _reactive_build(state: GameState, funds: int) -> UnitType:
+func _reactive_build(state: GameState, funds: int, producible: Array[UnitType]) -> UnitType:
 	var candidates: Array[UnitType] = []
-	for unit_type in unit_db.all():
+	for unit_type in producible:
 		if unit_type.max_range > 0 and funds >= unit_type.cost:
 			candidates.append(unit_type)
 	if candidates.is_empty():

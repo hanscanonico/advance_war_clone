@@ -28,3 +28,13 @@ extends Resource
 @export var can_resupply: bool = false
 ## Column of this unit in the generated units atlas texture.
 @export var atlas_col: int = 0
+## Id of the terrain that produces this unit. The whole land roster is built at
+## a base, which is the default; a naval or air unit names its own site instead
+## and is then buildable nowhere else. This is the single authority on what a
+## property can turn out — BuildCommand rejects on it and the AI filters its
+## candidates through it, so the planner cannot propose a build the rules refuse.
+@export var built_at: StringName = &"base"
+
+
+func buildable_at(site: StringName) -> bool:
+	return built_at == site

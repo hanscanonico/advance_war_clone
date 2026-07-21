@@ -9,6 +9,15 @@
 ; unit's cost, so on a contested front the incoming total saturates and anything
 ; above ~0.15 stops the AI attacking at all (0.5 lost 88% of its games).
 ;
+; advance_threat_tiles is the same caution on the advance path, and it is a
+; separate dial because that path scores in tiles rather than in value —
+; threat_aversion's ladder-safe 0.1 is worth a hundredth of a tile there and
+; could only ever break ties, which left the tier's flagship "refuses a kill
+; zone" inert where nobody was attacking. 2.0 buys two tiles of retreat from a
+; shot that would kill outright; below ~1.6 it cannot buy even one against a
+; plain artillery shot and is inert again, so that is the floor. A starting
+; value: it has not been through the ladder yet.
+;
 ; focus_fire_bonus ships at 0. The capability is implemented and tested, but it
 ; measured negative in every shape tried — the planner already re-plans after
 ; each command, so a wounded target's kill is visible to the next attacker for
@@ -29,5 +38,6 @@ advance_score = 1.0
 build_priority = Array[StringName]([&"md_tank", &"tank", &"artillery", &"mech"])
 capture_unit_target = 3
 threat_aversion = 0.1
+advance_threat_tiles = 2.0
 focus_fire_bonus = 0.0
 build_reactivity = 0.6

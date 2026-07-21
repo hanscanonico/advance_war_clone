@@ -10,6 +10,12 @@ where the instrument can see it; **Difficult is not measurably stronger than
 Normal at all**. Details and the reasoning below — read §4 before changing a
 weight, and §5 before deciding what to do about it.
 
+**The recorded numbers are also out of date.** They were measured before
+`advance_threat_tiles` split off from `threat_aversion` (§2), which is what makes
+Difficult's kill-zone refusal do anything at all on the advance path. Both tiers
+plan differently now, so `make difficulty-check` must be re-run and its output
+committed over §4 before the standings are quoted again.
+
 ## 1. What difficulty is allowed to change
 
 Exactly one thing: **which `AIProfile` the computer plans with**.
@@ -42,14 +48,33 @@ reads it never runs, so **Normal plans exactly as the pre-difficulty AI did, on
 the same RNG stream** — pinned by `test_capability_defaults_plan_exactly_like_the_shipped_profile`,
 which compares a full AI turn command for command.
 
-- **S1 `threat_aversion` — threat awareness.** Builds a per-turn `ThreatMap`
+- **S1 threat awareness — two dials on one map.** Builds a per-turn `ThreatMap`
   (`ai/threat_map.gd`): for every visible enemy, its `MovementResolver` reach ×
   its `AttackRange` firing ring, and the damage a `CombatResolver.forecast`
-  says it would do to the unit standing there. Destination scores are
-  discounted by `threat × unit cost × threat_aversion`. Reuses the single
-  authorities and re-derives no rules; forecast is luck-free, so it draws no RNG
-  and the replay guarantee holds. Cached once per turn and rebuilt only when the
-  enemy set changes — during the AI's own turn that means a counter-kill.
+  says it would do to the unit standing there. Reuses the single authorities and
+  re-derives no rules; forecast is luck-free, so it draws no RNG and the replay
+  guarantee holds. Cached once per turn, keyed on the day and the enemy set, so a
+  new day always rebuilds it and a counter-kill mid-turn does too.
+
+  The map is read by two weights, because the two paths that read it do not score
+  in the same unit:
+
+  - **`threat_aversion` — attacks, in value.** An attack's score is
+    `cost × damage fraction`, so the firing cell's discount is
+    `threat × unit cost × threat_aversion` in that same currency. Must stay
+    small; see below.
+  - **`advance_threat_tiles` — advances, in tiles.** A destination a unit is
+    merely walking to scores as `-distance`, stepping by whole integers, so the
+    penalty is `advance_threat_tiles × damage fraction` *tiles* of forward
+    progress. Reusing the value-denominated dial here was a real defect: at
+    Difficult's ladder-safe `0.1` the advance penalty maxes out at a hundredth of
+    a tile and could only break ties, so the tier's headline "refuses a kill
+    zone" never once cost it a step. Cost-scaling the advance term instead is not
+    the fix — that is the R2 coward the 0.5 row below measures at 88% losses.
+    The floor for a live value is ~1.6: below that it cannot buy even one tile
+    against a full-strength artillery shot (63 damage), i.e. it is inert again.
+    `data/ai/hard.tres` ships `2.0` and `easy.tres` `3.0` as **starting values —
+    neither has been through the ladder.**
 - **S2 `focus_fire_bonus` — focus fire.** Boosts a target other ready friendlies
   could still add damage to. **Ships at `0.0` — see §4.**
 - **S3 `build_reactivity` — counter-building.** Re-ranks each affordable combat
@@ -80,6 +105,17 @@ Rejected commands and cap stalls are hard failures on top: they would mean the
 planner and the rules disagree.
 
 ## 4. What the measurement says
+
+> **Every number in this section predates the `advance_threat_tiles` split
+> described in §2, and predates the threat-map lookup being hoisted out of the
+> per-cell advance loop.** It was measured against a build where Difficult's
+> advance path could not give up a single tile for safety, and where Easy and
+> Difficult rebuilt the visible-enemy list and its cache key once per candidate
+> cell. Both tiers now plan differently, so **the ladder has to be re-run before
+> any of the standings below mean anything again.** They are kept as the record
+> of what was measured, not as a current claim. Nothing here has been re-scored
+> by estimate — `make difficulty-check` is the only thing allowed to write these
+> numbers.
 
 **Standing result — 120 matches, 15 seeds, default 20-day cap:**
 
@@ -127,9 +163,17 @@ unit dies". Above ~0.15 the discount exceeds the value of almost any attack, the
 planner stops attacking, and it loses on time — 0.5 lost 88% of its games. This
 is risk R2 (the coward) arriving exactly where the plan predicted.
 
-The same dial is what makes **Easy** weak, turned the other way: Easy ships
-`threat_aversion = 0.3`, so its timidity is mechanical rather than cosmetic. That
-is the single biggest reason Normal beats it 90% on `scrimmage`.
+That ceiling is exactly why the advance path needed `advance_threat_tiles` as a
+second field rather than a second reading of this one. A weight low enough to
+keep the AI attacking is, on a scale that steps by whole tiles, no weight at all.
+Splitting them lets caution be real where a unit is only walking and stay cheap
+where it is shooting; **the split is unmeasured** and both new values are
+starting points.
+
+The attack dial is also what makes **Easy** weak, turned the other way: Easy
+ships `threat_aversion = 0.3` (and now the larger `advance_threat_tiles` of the
+two tiers), so its timidity is mechanical rather than cosmetic. That is the
+single biggest reason Normal beat it 90% on `scrimmage` in the run above.
 
 ### Why focus fire ships switched off
 
@@ -160,10 +204,16 @@ Mean AI planning per turn, measured during the standing run:
 | Easy | 144.3 | 1154 turns |
 
 Well inside the budget: `BattleAiRunner` already waits 0.2 s between commands,
-so none of this is perceptible in play. Easy is the slowest tier, not Difficult —
+so none of this is perceptible in play. Easy was the slowest tier, not Difficult —
 its high `min_useful_score` sends more units down the advance path, which
 evaluates threat for every reachable cell, while Difficult's lower one usually
 finds an attack first.
+
+Most of that gap was avoidable and has since been closed: the advance loop asked
+for the threat map once per *candidate cell*, and each ask rebuilt the
+visible-enemy array and a formatted cache-key string only to conclude the cached
+map was still valid. The lookup now happens once per advance. The table above was
+measured before that, so the two tier costs should be re-read on the next run.
 
 ## 5. Where this leaves the feature
 
@@ -179,6 +229,10 @@ either way. But nothing here yet justifies telling a player it is harder.
 
 The candidates, in the order worth trying:
 
+0. **Re-run the ladder.** The standings in §4 predate the `advance_threat_tiles`
+   split, and Difficult's threat awareness was inert on the advance path when
+   they were taken. Whatever is decided next, it should be decided on numbers
+   that describe the planner as it is now.
 1. **Fix the instrument first.** A gate whose large board cannot distinguish Easy
    from Normal cannot be trusted about Difficult. Either give `ironworks` a
    decisive win condition instead of a day-cap tiebreak, or replace it with a

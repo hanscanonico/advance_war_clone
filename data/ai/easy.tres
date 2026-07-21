@@ -9,7 +9,9 @@
 ; The DF4 ladder found that over-weighting danger is what actually makes this
 ; planner weak (0.5 alone loses 88% of its games), and "flinches from danger" is
 ; exactly the character Easy wants: it hangs back, refuses trades it should take,
-; and lets the player dictate the fight. The remaining weights say the rest —
+; and lets the player dictate the fight. advance_threat_tiles is the same
+; flinch on the advance path, and Easy gets the larger of the two shipped values
+; because hanging back is its whole character. The remaining weights say the rest —
 ; poor finishing, fears every counter, runs home early, shrugs at marginal plays,
 ; over-buys infantry, and never fields an md tank.
 [resource]
@@ -26,5 +28,6 @@ advance_score = 1.0
 build_priority = Array[StringName]([&"tank", &"artillery", &"mech"])
 capture_unit_target = 4
 threat_aversion = 0.3
+advance_threat_tiles = 3.0
 focus_fire_bonus = 0.0
 build_reactivity = 0.0

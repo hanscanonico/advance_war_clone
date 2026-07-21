@@ -66,6 +66,7 @@ func test_normal_is_the_planner_defaults() -> void:
 func test_normal_leaves_every_capability_off() -> void:
 	var normal := db.by_id(&"normal").profile()
 	assert_almost_eq(normal.threat_aversion, 0.0, 0.0001)
+	assert_almost_eq(normal.advance_threat_tiles, 0.0, 0.0001)
 	assert_almost_eq(normal.focus_fire_bonus, 0.0, 0.0001)
 	assert_almost_eq(normal.build_reactivity, 0.0, 0.0001)
 
@@ -78,6 +79,14 @@ func test_difficult_turns_the_capabilities_on() -> void:
 	var hard := db.by_id(&"hard").profile()
 	assert_gt(hard.threat_aversion, 0.0, "Difficult must actually weigh threat")
 	assert_gt(hard.build_reactivity, 0.0, "Difficult must actually counter-build")
+	# A weight this dial cannot act on is the same as no dial: below ~1.6 it
+	# cannot buy a single tile away from a full-strength artillery shot, which is
+	# how the tier once shipped a kill-zone refusal that never refused anything.
+	assert_gt(
+		hard.advance_threat_tiles,
+		1.6,
+		"Difficult's advance must be able to give up a whole tile, not just break ties"
+	)
 	assert_almost_eq(
 		hard.focus_fire_bonus,
 		0.0,
@@ -94,6 +103,11 @@ func test_easy_is_timid_rather_than_handicapped() -> void:
 	var hard := db.by_id(&"hard").profile()
 	assert_gt(
 		easy.threat_aversion, hard.threat_aversion, "Easy should flinch harder than Difficult"
+	)
+	assert_gt(
+		easy.advance_threat_tiles,
+		hard.advance_threat_tiles,
+		"Easy should hang back further than Difficult too"
 	)
 	assert_gt(easy.retreat_hp, db.by_id(&"normal").profile().retreat_hp, "Easy runs home earlier")
 
