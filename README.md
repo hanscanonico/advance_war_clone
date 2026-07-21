@@ -42,6 +42,7 @@ make screenshot      # boot the battle scene, save screenshot.png, quit
 make menu-screenshot # the same, for the main menu
 make gallery-screenshot   # render all thirteen commander cards (the G1 gate)
 make commander-balance    # offline AI-vs-AI balance matrix -> reports/ (a release task)
+make difficulty-check     # AI-vs-AI difficulty ladder gate -> reports/ (a release task)
 ```
 
 `make verify` is the one command to run before merging: it parse-checks, lints, checks formatting,
@@ -67,8 +68,8 @@ Seven maps ship. The main menu lists them smallest board first — `scrimmage`, 
 `riverline`, `isthmus`, `crossfire`, `first_steps`, `ironworks` — so it opens on `scrimmage`, the
 quick match, and shows each one's size, property count and a one-line pitch as a tooltip.
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
-`--hotseat`, `--fog`, and `--co=alina_ward,viktor_draeg` (red first, blue second; either side may
-be left blank for no commander) — e.g.
+`--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
+second; either side may be left blank for no commander) — e.g.
 `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn -- --map=crossfire --fog`.
 
 Adding a map is dropping a `.txt` in `maps/` — the menu auto-discovers it and `tests/unit/`
@@ -80,10 +81,11 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 
 ## Main menu
 
-The game boots to the menu: pick a map, toggle **Fog of war**, then start a **1 Player** match
-against the Blue AI or a **2 Player** hot-seat game. Either opens the **commander selection page**;
-**Continue** appears only when a save exists and skips selection, resuming the save with its own
-map, fog setting, commanders, and AI sides. **Quit** exits.
+The game boots to the menu: pick a map and a **Difficulty**, toggle **Fog of war**, then start a
+**1 Player** match against the Blue AI or a **2 Player** hot-seat game. Either opens the
+**commander selection page**; **Continue** appears only when a save exists and skips selection,
+resuming the save with its own map, fog setting, difficulty, commanders, and AI sides. **Quit**
+exits.
 
 On the selection page you edit **Red**, confirm, then edit **Blue**, confirm. Four faction tabs and
 three peer portraits let you browse; one focused card shows the highlighted general's doctrine and
@@ -194,6 +196,28 @@ In a fogged hot-seat match a handoff
 screen blanks the board between turns so the incoming player never sees the outgoing one's
 vision.
 
+## Difficulty
+
+Pick **Easy**, **Normal** or **Difficult** in the menu, or pass `--difficulty=easy|normal|hard`.
+It steers exactly one thing: which `AIProfile` the computer plans with. **The AI never cheats at
+any tier** — same income, same vision, same fog boundary, same dice, same damage formula as you.
+It is inert in a 2-Player hot-seat, and a save records the tier it was played at.
+
+- **Easy** — timid. It over-weights danger, retreats early, refuses good trades, passes up
+  marginal plays, and never fields an md tank. It loses on judgement, so beating it teaches the
+  real game.
+- **Normal** — the shipped AI, bit for bit. A test pins its profile to the planner's own defaults,
+  so a same-seed replay of an old match still plays out identically.
+- **Difficult** — the same economy and the same dice, thinking better. It builds a **threat map**
+  each turn (what could shoot each cell next turn, forecast through the same combat resolver you
+  see in the damage preview) and refuses to end a move in a kill zone that is not worth it, and it
+  **counter-builds** against your actual roster instead of a fixed shopping list.
+
+Each tier is a `.tres` under `data/difficulty/` pointing at a profile in `data/ai/`, so retuning
+one is a data edit. `make difficulty-check` plays the tiers against each other headless and
+reports whether the ladder actually orders — see `docs/difficulty_check.md` for the standing
+result, including one capability that measured *negative* and ships switched off.
+
 ## Architecture
 
 - `core/` — pure simulation code. **Nothing here may reference a Node or a scene.**
@@ -202,8 +226,9 @@ vision.
   at a time, the exact same command objects player input produces, and the battle scene applies
   and animates them.
 - `data/` — game data as `Resource` files (terrain, units, the damage chart, the commander
-  roster in `data/commanders/`, and the AI profile in `data/ai/default.tres` — every weight the
-  opponent scores with, so tuning its behaviour is a data edit rather than a code change).
+  roster in `data/commanders/`, the AI profiles in `data/ai/` — every weight the opponent scores
+  with, so tuning its behaviour is a data edit rather than a code change — and the difficulty
+  tiers in `data/difficulty/`, each of which is just a label plus one of those profiles).
 - `maps/` — plain-text maps: an ASCII terrain grid, a *starting* property-ownership section, and
   a starting-units section. `MapData` (core) is authoritative for terrain and is never mutated by
   play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
@@ -211,8 +236,9 @@ vision.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
 - `tools/` — the art and sound build scripts: the headless ground-tile, sound, and portrait
-  generators, plus the PixVoxel atlas builder (see Assets below); and the offline commander-balance
-  runner (`docs/commander_balance.md`).
+  generators, plus the PixVoxel atlas builder (see Assets below); and the offline AI-vs-AI runner,
+  which serves both the commander-balance matrix (`docs/commander_balance.md`) and the difficulty
+  ladder gate (`docs/difficulty_check.md`).
 - `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 

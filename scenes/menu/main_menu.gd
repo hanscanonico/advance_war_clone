@@ -12,6 +12,7 @@ const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
 
 @onready var center: CenterContainer = $Center
 @onready var map_option: OptionButton = %MapOption
+@onready var difficulty_option: OptionButton = %DifficultyOption
 @onready var fog_check: CheckButton = %FogCheck
 @onready var one_player_button: Button = %OnePlayerButton
 @onready var two_player_button: Button = %TwoPlayerButton
@@ -21,6 +22,8 @@ const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
 ## The roster in dropdown order, parsed once at load so the tooltips can quote
 ## real numbers off the board rather than a hand-kept table.
 var _maps: Array[MapData] = []
+## The difficulty tiers in dropdown order, gentlest first.
+var _difficulties: Array[Difficulty] = []
 var _select_panel: CommanderSelectPanel
 ## The AI sides the chosen mode will play; carried across the selection page so
 ## `confirmed` knows whether it was a one-player or hot-seat start.
@@ -29,6 +32,7 @@ var _pending_ai_teams: Array[int] = []
 
 func _ready() -> void:
 	_populate_maps()
+	_populate_difficulties()
 	_select_panel = CommanderSelectPanel.new()
 	add_child(_select_panel)
 	_select_panel.confirmed.connect(_on_selection_confirmed)
@@ -94,6 +98,33 @@ func _map_at(index: int) -> MapData:
 	return _maps[index]
 
 
+## Gentlest tier first, opening on Normal — which is the game as it has always
+## played. The tooltip carries the one thing that is easy to get wrong about this
+## dropdown: it steers the computer, so a hot-seat match ignores it entirely.
+func _populate_difficulties() -> void:
+	_difficulties = DifficultyDB.load_default().all()
+	if _difficulties.is_empty():
+		push_error("main menu: no difficulty tiers found in %s" % DifficultyDB.DIFFICULTY_DIR)
+		difficulty_option.disabled = true
+		return
+	for tier in _difficulties:
+		difficulty_option.add_item(tier.display_name)
+	for i in _difficulties.size():
+		if _difficulties[i].id == Difficulty.DEFAULT_ID:
+			difficulty_option.selected = i
+	difficulty_option.tooltip_text = (
+		"How well the computer plays.\nSame rules, economy and dice at every tier — only its\n"
+		+ "judgement changes. Ignored in a 2-Player hot-seat."
+	)
+
+
+func _selected_difficulty() -> StringName:
+	var index := difficulty_option.selected
+	if index < 0 or index >= _difficulties.size():
+		return Difficulty.DEFAULT_ID
+	return _difficulties[index].id
+
+
 ## Opens the selection page for the chosen mode, hiding the menu behind it so no
 ## focus or click leaks through to the buttons underneath.
 func _open_select(ai_teams: Array[int]) -> void:
@@ -116,14 +147,15 @@ func _continue() -> void:
 	_start([] as Array[int], true, {})
 
 
-## `load_save` resumes the saved match (its own map, commanders and AI sides
-## apply, so the dropdowns above are ignored).
+## `load_save` resumes the saved match (its own map, commanders, AI sides and
+## difficulty apply, so the dropdowns above are ignored).
 func _start(ai_teams: Array[int], load_save: bool, commanders: Dictionary) -> void:
 	var map := _map_at(map_option.selected)
 	if map != null:
 		MatchConfig.map_path = map.source_path
 	MatchConfig.ai_teams = ai_teams
 	MatchConfig.fog_enabled = fog_check.button_pressed
+	MatchConfig.difficulty = _selected_difficulty()
 	MatchConfig.commanders = commanders
 	MatchConfig.load_save = load_save
 	get_tree().change_scene_to_file(BATTLE_SCENE)

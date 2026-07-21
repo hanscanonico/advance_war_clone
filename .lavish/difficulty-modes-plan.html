@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Difficulty Modes Plan</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-choice { cursor: pointer; }
+    .gc-choice:has(input:checked) { border-color: var(--gc-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-blue) 28%, transparent); }
+    .gc-locked { border-color: var(--gc-grass-dark); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-grass-dark) 30%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+    .gc-crosses li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-crosses li::before { content: "✗"; color: var(--gc-red); font-weight: 900; }
+    .gc-tier {
+      border: 2px solid var(--gc-water-dark);
+      border-radius: .6rem;
+      overflow: hidden;
+      background: white;
+    }
+    .gc-tier header { color: white; padding: .65rem .9rem; font-weight: 900; display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+    .gc-tier .body { padding: .8rem .9rem; font-size: .9rem; }
+    table.gc-nums td, table.gc-nums th { font-size: .85rem; }
+    table.gc-nums td:first-child { font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <div class="gc-shell">
+
+    <!-- ============================== HERO ============================== -->
+    <header class="gc-hero px-6 py-10 md:px-12">
+      <p class="gc-kicker opacity-80">Grid Commander · Stretch item · Proposal · rev 2 — no-cheating edition</p>
+      <h1 class="text-3xl md:text-4xl font-black mt-2">Difficulty Modes — Easy · Normal · Difficult</h1>
+      <p class="mt-3 max-w-3xl opacity-90">
+        A per-match difficulty picker on the main menu, driving <strong>one lever only: which
+        <span class="gc-file">AIProfile</span> the computer plays with</strong>. Easy detunes the
+        current planner's judgment. Difficult unlocks genuinely smarter planning — threat awareness,
+        focus fire, counter-building — each gated by profile data that defaults to off. The AI never
+        gets extra money, extra vision, or friendlier dice at any tier: same rules, same economy,
+        same fog boundary as the player, always.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <span class="badge badge-lg" style="background:var(--gc-grass); border:0;">Easy — poor judgment, same rules</span>
+        <span class="badge badge-lg" style="background:var(--gc-road); border:0;">Normal — today's game, bit for bit</span>
+        <span class="badge badge-lg" style="background:var(--gc-red); color:white; border:0;">Difficult — the same economy, a sharper mind</span>
+      </div>
+    </header>
+
+    <!-- ============================== 1 · SEAMS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">1</span>
+        <h2 class="text-2xl font-black">The seams already exist</h2>
+      </div>
+      <p class="max-w-3xl mb-4">
+        Nothing below requires new architecture — every hook is present and documented in the code:
+      </p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">AI judgment is already pure data</h3>
+          <p class="text-sm mt-1"><span class="gc-file">ai/ai_profile.gd:4</span> says it outright:
+          <em>"difficulty and iteration are edits to a .tres rather than to planner logic."</em>
+          Every weight the planner uses — kill bonus, counter fear, retreat threshold, build
+          priority — is an <code>@export</code> on a Resource. <span class="gc-file">AIController.new()</span>
+          already takes an optional profile (<span class="gc-file">ai/ai_controller.gd:36</span>);
+          the battle scene just never passes one (<span class="gc-file">scenes/battle/battle.gd:96</span>).</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The planner's blind spots are named in its own docstring</h3>
+          <p class="text-sm mt-1"><span class="gc-file">ai/ai_controller.gd:8</span> calls itself
+          <em>"credible, not strong: greedy per-unit utility scoring with no lookahead."</em> That is a
+          gift for Difficult: the missing smarts are specific, small, and implementable — it never asks
+          what the enemy can do next turn, never coordinates two attackers onto one target, and builds
+          from a static shopping list. §2 turns exactly those three gaps into the hard tier.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Menu → battle carrier exists</h3>
+          <p class="text-sm mt-1"><span class="gc-file">autoload/match_config.gd</span> already ferries
+          map, fog, AI sides and commanders from the menu into the battle scene, with CLI-flag
+          overrides for tooling. Difficulty is one more field on it, same pattern as
+          <code>fog_enabled</code>.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Saves and soaks are ready for it</h3>
+          <p class="text-sm mt-1"><span class="gc-file">core/save_codec.gd</span> already treats
+          <code>ai_teams</code> / <code>commanders</code> / <code>fog</code> as optional keys with
+          defaults — a <code>difficulty</code> id joins that list, and day-old saves keep loading as
+          Normal. The offline balance runner (<span class="gc-file">tools/run_commander_balance.gd</span>)
+          plays real AI-vs-AI matches headless — exactly the harness that can <em>prove</em> the three
+          tiers order Easy &lt; Normal &lt; Difficult, which matters double now that skill is the only
+          lever.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · THE TIERS ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">2</span>
+        <h2 class="text-2xl font-black">What each tier changes</h2>
+      </div>
+      <p class="max-w-3xl mb-5">
+        The design constraint, locked in D2: <strong>the AI never cheats — every tier plays under the
+        player's exact rules</strong>. So Easy is today's planner with worse judgment (pure weight
+        edits), and Difficult is today's planner with three new capabilities it currently lacks.
+        Each capability is gated by a new <code>@export</code> on <span class="gc-file">AIProfile</span>
+        whose default keeps it off — Normal stays bit-for-bit today's AI, pinned by test.
+        Numbers below are opening proposals; DF4 tunes them against the soak gate.
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="gc-tier">
+          <header style="background:var(--gc-grass-dark);">Easy <span class="text-sm font-mono opacity-80">id: easy</span></header>
+          <div class="body">
+            <p class="mb-2">The AI trades timidly, retreats early, passes up marginal plays, and never
+            fields its heaviest armor. Same income, same vision, same dice — it loses on judgment,
+            not on handicaps, so beating it teaches the real game.</p>
+            <table class="table table-xs gc-nums">
+              <tbody>
+                <tr><td>kill_bonus</td><td>1.6 → 1.2 <span class="opacity-60">(less finishing discipline)</span></td></tr>
+                <tr><td>counter_weight</td><td>0.6 → 1.0 <span class="opacity-60">(fully fears counters; refuses good trades)</span></td></tr>
+                <tr><td>retreat_hp</td><td>45 → 60 <span class="opacity-60">(runs home early)</span></td></tr>
+                <tr><td>min_useful_score</td><td>40 → 80 <span class="opacity-60">(shrugs at marginal plays)</span></td></tr>
+                <tr><td>build_priority</td><td>drops <code>md_tank</code> <span class="opacity-60">(no late-game hammer)</span></td></tr>
+                <tr><td>capture_unit_target</td><td>3 → 4 <span class="opacity-60">(over-buys infantry)</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="gc-tier">
+          <header style="background:var(--gc-water-dark);">Normal <span class="text-sm font-mono opacity-80">id: normal</span></header>
+          <div class="body">
+            <p class="mb-2"><strong>Today's game, bit for bit.</strong> The profile is the current
+            <span class="gc-file">data/ai/default.tres</span> numbers with every new capability field
+            at its off default. A GUT test pins Normal's profile to <code>AIProfile.new()</code>'s
+            defaults so drift can't sneak in — same-seed replays of existing matches stay
+            identical.</p>
+            <table class="table table-xs gc-nums">
+              <tbody>
+                <tr><td>profile</td><td>unchanged defaults</td></tr>
+                <tr><td>threat_aversion</td><td>0.0 <span class="opacity-60">(off)</span></td></tr>
+                <tr><td>focus_fire_bonus</td><td>0.0 <span class="opacity-60">(off)</span></td></tr>
+                <tr><td>build_reactivity</td><td>0.0 <span class="opacity-60">(off)</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="gc-tier">
+          <header style="background:var(--gc-red);">Difficult <span class="text-sm font-mono opacity-80">id: hard</span></header>
+          <div class="body">
+            <p class="mb-2">The same economy and the same dice — it just <em>thinks better</em>.
+            Three capabilities the planner is missing today, plus slightly sharper trade weights.
+            <strong>None of these touch combat numbers:</strong> every row below only changes how the
+            planner <em>ranks its own candidate moves</em> (<span class="gc-file">_attack_score</span>,
+            <span class="gc-file">ai_controller.gd:144</span>). Damage dealt and taken comes from
+            <span class="gc-file">CombatResolver</span> and the damage chart, identical at every
+            tier — same fight, same result, whoever's playing.</p>
+            <table class="table table-xs gc-nums">
+              <tbody>
+                <tr><td>threat_aversion</td><td>&gt; 0 <span class="opacity-60">(stops parking in your kill zones)</span></td></tr>
+                <tr><td>focus_fire_bonus</td><td>&gt; 0 <span class="opacity-60">(piles on to finish, not scatter)</span></td></tr>
+                <tr><td>build_reactivity</td><td>&gt; 0 <span class="opacity-60">(counter-builds your composition)</span></td></tr>
+                <tr><td>kill_bonus</td><td>1.6 → 1.8 <span class="opacity-60">(hunts kills harder)</span></td></tr>
+                <tr><td>counter_weight</td><td>0.6 → 0.5 <span class="opacity-60">(takes value trades sooner)</span></td></tr>
+              </tbody>
+            </table>
+            <p class="mt-2 text-xs opacity-70">UI label "Difficult" (your naming); internal id stays
+            <code>hard</code> for brevity in flags and saves.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- The three smarts -->
+      <div class="mt-6">
+        <h3 class="font-black text-lg mb-2">The three smarts, concretely</h3>
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="card bg-base-100 border p-4">
+            <h4 class="font-black">S1 · Threat awareness <span class="badge badge-sm badge-ghost">flagship</span></h4>
+            <p class="text-sm mt-1">Today <span class="gc-file">_advance_command</span> and
+            <span class="gc-file">_consider_attacks</span> score destinations with zero regard for
+            what the enemy can do <em>next</em> turn — a fresh tank will happily end its move beside
+            your md_tank. S1 builds a per-turn <strong>threat map</strong>: for each enemy, its
+            reachable cells × attack ring × forecast damage, summed into expected incoming damage per
+            cell. Destination scores subtract <code>threat × unit cost × threat_aversion</code>.
+            Computed once per AI turn and refreshed only when an enemy dies to a counter — enemies
+            don't move during the AI's own turn, so the cache is honest. Uses the same
+            <span class="gc-file">MovementResolver</span> / <span class="gc-file">AttackRange</span> /
+            <span class="gc-file">CombatResolver.forecast</span> authorities as everything else — no
+            re-derived rules.</p>
+          </div>
+          <div class="card bg-base-100 border p-4">
+            <h4 class="font-black">S2 · Focus fire</h4>
+            <p class="text-sm mt-1">Units score attacks independently, so two tanks each poke a
+            different target when combining would kill one. Because the planner already re-plans
+            after every applied command, half the fix is free — a wounded target's kill becomes
+            visible to the next attacker. S2 closes the other half: a target's score gains
+            <code>focus_fire_bonus</code> scaled by how much damage <em>other ready friendlies</em>
+            could still add to it this turn, so the first hit lands where a second can follow.</p>
+          </div>
+          <div class="card bg-base-100 border p-4">
+            <h4 class="font-black">S3 · Counter-building</h4>
+            <p class="text-sm mt-1">Today <span class="gc-file">_pick_build</span> walks a static
+            priority list. S3 re-scores each affordable unit by its damage-chart effectiveness
+            against the enemy's <em>actual</em> cost-weighted roster, blended in by
+            <code>build_reactivity</code>. Spam tanks and Difficult answers with anti-armor and
+            artillery instead of shopping from a list written before the match started.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 border mt-5 p-4 max-w-3xl">
+        <h3 class="font-black text-lg mb-1">The carrier: one Resource per tier</h3>
+        <p class="text-sm">New <span class="gc-file">core/difficulty.gd</span> —
+        <code>class_name Difficulty extends Resource</code> with <code>id</code>,
+        <code>display_name</code>, and <code>ai_profile: AIProfile</code>. Three files under
+        <span class="gc-file">data/difficulty/</span> (<code>easy.tres</code>, <code>normal.tres</code>,
+        <code>hard.tres</code>); Easy and Difficult get their own <span class="gc-file">data/ai/*.tres</span>,
+        Normal keeps pointing at <span class="gc-file">data/ai/default.tres</span>. Tuning a tier is
+        editing its .tres — the "balance numbers live in <code>data/</code>" rule holds: the planner
+        owns <em>how</em> to think, the profile owns <em>how much each thought is worth</em>, and a
+        capability at weight 0 is simply skipped.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">3</span>
+        <h2 class="text-2xl font-black">Decisions</h2>
+      </div>
+      <p class="max-w-3xl mb-4">D2 is locked per your call. The others: pre-checked cards are my
+      recommendation — tick a different one (or annotate) to change the plan before code is written.</p>
+
+      <h3 class="font-black mb-2">D2 · What makes Difficult difficult? <span class="badge badge-success badge-sm">locked</span></h3>
+      <div class="grid md:grid-cols-1 gap-3 mb-6 max-w-3xl">
+        <div class="gc-locked card bg-base-100 border-2 p-4">
+          <span class="font-bold">No handicaps, no cheating — a smarter planner <span class="badge badge-sm badge-success">your decision</span></span>
+          <p class="text-sm mt-1">The income multiplier from rev 1 is dropped at every tier. The AI
+          plays the player's exact rules — economy, vision, dice — and Difficult earns its name
+          through the S1–S3 capabilities alone. This also deletes the GameState/TurnRules/save-codec
+          income machinery from the plan: the sim isn't touched at all anymore. The honest cost:
+          Difficult's strength now rests on the smarts actually winning games, which is why the DF4
+          soak gate is the definition of done, not a nice-to-have.</p>
+        </div>
+      </div>
+
+      <h3 class="font-black mb-2">D1 · Where does the setting live?</h3>
+      <div class="grid md:grid-cols-2 gap-3 mb-6">
+        <label class="gc-choice card bg-base-100 border-2 p-4">
+          <input type="radio" name="d1" class="hidden" checked>
+          <span class="font-bold">Match option on the main menu <span class="badge badge-sm badge-primary">recommended</span></span>
+          <p class="text-sm mt-1">A "Difficulty" <code>OptionButton</code> in the options row beside Map and
+          Fog, defaulting to Normal. Same lifecycle as fog: chosen per match, carried by
+          <span class="gc-file">MatchConfig</span>, remembered by the save. There is no settings screen
+          today, and difficulty is a per-match choice anyway (it only means anything in 1-Player).</p>
+        </label>
+        <label class="gc-choice card bg-base-100 border-2 p-4">
+          <input type="radio" name="d1" class="hidden">
+          <span class="font-bold">A new persistent settings screen</span>
+          <p class="text-sm mt-1">A dedicated settings page with an on-disk config file. More
+          machinery than one dropdown deserves; worth building only if more global settings
+          (audio, speed) are queued behind it.</p>
+        </label>
+      </div>
+
+      <h3 class="font-black mb-2">D3 · Does difficulty ever touch combat numbers?</h3>
+      <div class="grid md:grid-cols-2 gap-3 mb-6">
+        <label class="gc-choice card bg-base-100 border-2 p-4">
+          <input type="radio" name="d3" class="hidden" checked>
+          <span class="font-bold">No — never <span class="badge badge-sm badge-primary">recommended</span></span>
+          <p class="text-sm mt-1">Luck ranges and damage stay owned by the combat resolver and
+          commander doctrines (Lyra Quill already narrows luck). This is the same principle as D2
+          from the other side: the player isn't secretly boosted on Easy any more than the AI is
+          boosted on Difficult. What the damage preview shows is always the truth.</p>
+        </label>
+        <label class="gc-choice card bg-base-100 border-2 p-4">
+          <input type="radio" name="d3" class="hidden">
+          <span class="font-bold">Yes — Easy also softens AI damage</span>
+          <p class="text-sm mt-1">A flat outgoing-damage multiplier on AI units on Easy. Stronger
+          knob, but it contradicts the no-cheating principle in mirror image and creates visible
+          "the numbers lie" moments in the damage preview.</p>
+        </label>
+      </div>
+
+      <h3 class="font-black mb-2">D4 · How much smart ships before the first gate?</h3>
+      <div class="grid md:grid-cols-2 gap-3">
+        <label class="gc-choice card bg-base-100 border-2 p-4">
+          <input type="radio" name="d4" class="hidden" checked>
+          <span class="font-bold">All three smarts, then gate once <span class="badge badge-sm badge-primary">recommended</span></span>
+          <p class="text-sm mt-1">Implement S1–S3 in one milestone (they're independent and
+          individually small), then run the DF4 soak against the full set. Skill-only difficulty
+          has no fallback lever, so going in with all three gives tuning room; any one can still be
+          zeroed in the .tres if it misbehaves.</p>
+        </label>
+        <label class="gc-choice card bg-base-100 border-2 p-4">
+          <input type="radio" name="d4" class="hidden">
+          <span class="font-bold">Threat awareness first, gate, then add</span>
+          <p class="text-sm mt-1">Ship S1 alone, soak, and only build S2/S3 if the 70% gate isn't
+          met. Less code before first evidence, but risks two extra implement-soak round trips,
+          and the soak is the expensive step.</p>
+        </label>
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">4</span>
+        <h2 class="text-2xl font-black">Milestones — each one shippable</h2>
+      </div>
+
+      <div class="grid gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">DF1 · Tier plumbing, invisible by default <span class="badge badge-sm">size S</span></h3>
+          <ul class="gc-checks mt-2 text-sm">
+            <li><span class="gc-file">core/difficulty.gd</span> + <span class="gc-file">data/difficulty/{easy,normal,hard}.tres</span>
+            + <span class="gc-file">data/ai/{easy,hard}.tres</span>, with a small
+            <code>DifficultyDB.load_default()</code> mirroring <span class="gc-file">core/commander_db.gd</span>.
+            Easy's .tres ships its §2 weights now; hard's capability weights stay 0 until DF3 gives
+            them meaning.</li>
+            <li><span class="gc-file">MatchConfig</span> gains <code>difficulty: StringName = &amp;"normal"</code>;
+            battle setup passes the tier's profile into <code>AIController.new()</code>. New
+            <code>--difficulty=</code> CLI flag beside <code>--map</code>/<code>--fog</code>/<code>--co</code>.</li>
+            <li><span class="gc-file">save_codec.gd</span>: one optional <code>difficulty</code> key,
+            defaulting to normal — every existing save still loads. The sim state itself is
+            untouched by this whole plan.</li>
+            <li><strong>GUT tests:</strong> the three tiers load; Normal's profile equals
+            <code>AIProfile.new()</code> defaults; legacy-save fallback; round-trip; a crafted state
+            where the Easy profile provably picks a different command than Normal (guards against
+            inert wiring).</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">DF2 · The menu picker <span class="badge badge-sm">size S</span></h3>
+          <ul class="gc-checks mt-2 text-sm">
+            <li>"Difficulty" <code>OptionButton</code> (Easy / Normal / Difficult) in the options row of
+            <span class="gc-file">scenes/menu/main_menu.tscn</span>, default Normal, tooltip noting it
+            steers the computer opponent — inert in a 2-Player hot-seat.</li>
+            <li>Wire through <span class="gc-file">main_menu.gd::_start</span> like fog; Continue keeps
+            ignoring the dropdowns because the save carries its own tier.</li>
+            <li>Verify with <code>make menu-screenshot</code> — the 640×360 viewport is tight; if the row
+            crowds, the dropdown moves under Fog.</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">DF3 · The smarts — S1, S2, S3 <span class="badge badge-sm">size M–L</span></h3>
+          <ul class="gc-checks mt-2 text-sm">
+            <li>Implement the three capabilities in <span class="gc-file">ai/ai_controller.gd</span>
+            (S1 likely as a small <span class="gc-file">ai/threat_map.gd</span> helper — Node-free,
+            like the rest of <code>ai/</code>), each gated by its new profile field, each skipped
+            entirely at weight 0. All computation is pure functions of state — no RNG draws — so
+            determinism and the replay guarantee hold, and Normal's RNG stream is untouched because
+            gated-off code never runs.</li>
+            <li>Reuse the single authorities: <span class="gc-file">MovementResolver</span> for enemy
+            reach, <span class="gc-file">AttackRange</span> for rings,
+            <span class="gc-file">CombatResolver.forecast</span> for expected damage. No fourth
+            opinion on movement — that bug class is documented in this repo's history.</li>
+            <li><strong>GUT tests per smart, on crafted states:</strong> with aversion on, a tank
+            refuses the cell inside artillery range that Normal happily takes; with focus fire on,
+            two attackers converge on one killable target instead of splitting; with reactivity on,
+            an armor-heavy enemy roster flips the build away from the static list. Plus the Normal
+            pin: profile defaults ⇒ command-for-command identical planning on a reference state.</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">DF4 · Prove the ordering, then tune <span class="badge badge-sm">size M</span></h3>
+          <ul class="gc-checks mt-2 text-sm">
+            <li>Teach <span class="gc-file">tools/run_commander_balance.gd</span> an opt-in
+            <code>--difficulty-check</code> mode: AI-vs-AI, Easy-vs-Normal and Normal-vs-Difficult,
+            both sides swapped, across the seed set, on a small and a large mirrored map. Default
+            runner behavior untouched, so committed commander-balance docs stay valid.</li>
+            <li><strong>Acceptance gate:</strong> the higher tier wins ≥ 70% of games in each pairing —
+            with identical economies, this is a pure planning-skill differential, which is exactly
+            the claim "smarter, not cheating" has to prove. Fails → tune the .tres weights (or zero a
+            misbehaving smart), not the planner. (This is the AI-vs-AI soak the repo's own history
+            says catches what unit tests structurally miss.)</li>
+            <li>Measure wall-clock per AI turn on Ironworks (24×16) with all smarts on, alongside the
+            win rates. New <code>make difficulty-check</code> target; results summarized in
+            <span class="gc-file">docs/</span> like the commander balance pass.</li>
+            <li>A couple of human playtest matches at Easy and Difficult — the soak proves ordering,
+            not <em>feel</em>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">5</span>
+        <h2 class="text-2xl font-black">Risks</h2>
+      </div>
+      <div class="grid gap-3">
+        <div class="card bg-base-100 gc-risk-high p-4">
+          <h3 class="font-bold">R1 · The smarts don't separate Difficult from Normal</h3>
+          <p class="text-sm">Skill-only difficulty has no fallback lever: if S1–S3 at sane weights
+          don't reach the 70% gate, there's no income knob to reach for — by design. Mitigation:
+          three independent smarts give three tuning axes; the gate runs on two map sizes so a
+          smart that only pays on big maps is caught; and if the gate still isn't met, the next
+          candidate smarts (HQ defense, artillery screening) are known and listed in §6 as deliberate
+          follow-ups, not scope creep.</p>
+        </div>
+        <div class="card bg-base-100 gc-risk-medium p-4">
+          <h3 class="font-bold">R2 · Threat aversion breeds a coward</h3>
+          <p class="text-sm">Overweighted S1 makes the AI orbit outside your range forever — a
+          stalemate is worse than a loss. Counter-levers: aversion discounts <em>net</em> score, so a
+          profitable attack still outweighs ambient danger; <code>advance_score</code> stays positive
+          so doing nothing never wins ties. The Easy-boredom twin of this risk (an AI that refuses
+          all trades and turtles) is watched in the same DF4 playtests.</p>
+        </div>
+        <div class="card bg-base-100 gc-risk-medium p-4">
+          <h3 class="font-bold">R3 · AI turn time</h3>
+          <p class="text-sm">S1 runs a movement resolve per enemy unit to build the threat map.
+          Cached once per AI turn (enemies can't move during it; refresh only when a counter kills
+          one), on a ≤24×16 board this is small — but it's measured, not assumed: DF4 records
+          per-turn wall-clock on Ironworks with all smarts on, and the budget is "no perceptible
+          pause vs today."</p>
+        </div>
+        <div class="card bg-base-100 gc-risk-good p-4">
+          <h3 class="font-bold">R4 · Save compatibility</h3>
+          <p class="text-sm">Handled by design: one new optional save key with a normal default, and
+          a legacy-envelope test pins it. Old saves resume as Normal. The sim state and save format
+          for match data are untouched.</p>
+        </div>
+        <div class="card bg-base-100 gc-risk-good p-4">
+          <h3 class="font-bold">R5 · Determinism &amp; doctrine entanglement</h3>
+          <p class="text-sm">No lever touches the RNG stream, luck bounds, damage, vision, or any
+          doctrine hook — same seed + same commands + same tier stays reproducible. The smarts read
+          state through the existing single authorities and consume no randomness, and commander
+          doctrines stay fully orthogonal to difficulty.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">6</span>
+        <h2 class="text-2xl font-black">Explicitly out of scope</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-3">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Any economy or damage handicap</h3>
+          <p class="text-sm">Locked out by D2/D3 at every tier, in both directions — no AI income
+          multipliers, no softened AI damage on Easy, no boosted player on anything. If a future
+          mode wants handicaps (a "challenge" toggle, say), it's a separate, honestly-labeled
+          feature.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Search-based lookahead</h3>
+          <p class="text-sm">S1–S3 are heuristics inside the existing greedy, one-command-at-a-time
+          planner. Minimax/MCTS over full turns is a planner rewrite with a determinism and
+          turn-time story of its own — a possible future stretch item, not this one.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">More smarts than S1–S3</h3>
+          <p class="text-sm">HQ defense, artillery screening, tempo-aware capture racing — real
+          candidates, deliberately benched. They're the named reserve if DF4's gate fails, and
+          otherwise future tuning material. Scope creep is this repo's top named risk.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Vision changes &amp; campaign difficulty</h3>
+          <p class="text-sm">The vision boundary (omniscient-except-hidden-units) stays exactly as
+          documented — smarter never means <em>seeing more</em>, and the one-case
+          <code>is_hidden_from</code> exception isn't widened. Campaign pacing stays owned by the
+          campaign plan; missions can reference these tier resources later.</p>
+        </div>
+      </div>
+      <p class="text-sm opacity-70 mt-6">Sources: <span class="gc-file">ai/ai_profile.gd</span> ·
+      <span class="gc-file">ai/ai_controller.gd</span> · <span class="gc-file">autoload/match_config.gd</span> ·
+      <span class="gc-file">core/save_codec.gd</span> · <span class="gc-file">core/rules/attack_range.gd</span> ·
+      <span class="gc-file">core/movement_resolver.gd</span> · <span class="gc-file">scenes/menu/main_menu.gd</span> ·
+      <span class="gc-file">tools/run_commander_balance.gd</span></p>
+    </section>
+
+  </div>
+</body>
+</html>

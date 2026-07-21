@@ -51,6 +51,20 @@ BAL ?=
 commander-balance:
 	$(GODOT) --headless --path . -s res://tools/run_commander_balance.gd -- $(BAL)
 
+# The difficulty ladder gate (plan DF4): the same runner in --difficulty-check
+# mode, playing Easy-vs-Normal and Normal-vs-Difficult on two mirrored maps with
+# both sides swapped. Unlike commander balance this one *is* a gate — with no
+# economy or damage handicap at any tier, the higher tier's win rate is the only
+# evidence that "smarter, not cheating" is true, so a shortfall fails the run.
+# Narrow it for iteration, e.g.:
+#   make difficulty-check DIFF="--seeds=2 --days=15"
+# The committed artifacts of a tuning pass are data/ai/{easy,hard}.tres and
+# docs/difficulty_check.md, never the generated report.
+DIFF ?=
+difficulty-check:
+	$(GODOT) --headless --path . -s res://tools/run_commander_balance.gd -- \
+		--difficulty-check $(DIFF)
+
 # Every .gd file that is actually ours: skips the engine cache, vendored addons,
 # the engine binary, and .claude/worktrees, which holds whole nested checkouts of
 # this same repo and would otherwise be linted as if it were project source.
@@ -126,4 +140,4 @@ gallery-screenshot: import
 
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
 	sprites-check ground sprites sfx portraits import screenshot menu-screenshot \
-	gallery-screenshot commander-balance
+	gallery-screenshot commander-balance difficulty-check

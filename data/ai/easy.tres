@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="AIProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ai/ai_profile.gd" id="1"]
+
+; Easy. Bad judgement, never a handicap: the same income, vision and dice as
+; every other tier — it simply reads the board worse.
+;
+; threat_aversion is the timidity dial, turned the opposite way from Difficult's.
+; The DF4 ladder found that over-weighting danger is what actually makes this
+; planner weak (0.5 alone loses 88% of its games), and "flinches from danger" is
+; exactly the character Easy wants: it hangs back, refuses trades it should take,
+; and lets the player dictate the fight. The remaining weights say the rest —
+; poor finishing, fears every counter, runs home early, shrugs at marginal plays,
+; over-buys infantry, and never fields an md tank.
+[resource]
+script = ExtResource("1")
+kill_bonus = 1.2
+counter_weight = 1.0
+capture_score = 900.0
+hq_capture_multiplier = 3.0
+capture_progress_bonus = 45.0
+step_cost_penalty = 4.0
+retreat_hp = 60
+min_useful_score = 80.0
+advance_score = 1.0
+build_priority = Array[StringName]([&"tank", &"artillery", &"mech"])
+capture_unit_target = 4
+threat_aversion = 0.3
+focus_fire_bonus = 0.0
+build_reactivity = 0.0

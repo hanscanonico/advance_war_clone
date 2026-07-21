@@ -21,35 +21,44 @@ class BuiltMatch:
 	var game: GameState
 	## Teams played by the computer. Blue by default; `--hotseat` clears it.
 	var ai_teams: Array[int] = []
+	## The tier the computer plays at. Never null — DifficultyDB always answers —
+	## and the source of both the AI's profile and the id the save records.
+	var difficulty: Difficulty
 
 
 static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: CommanderDB) -> BuiltMatch:
 	var result := BuiltMatch.new()
 	var chart: DamageChart = load(DAMAGE_CHART_PATH)
+	var difficulty_db := DifficultyDB.load_default()
 	var args := OS.get_cmdline_user_args()
 	var map_path: String = MatchConfig.map_path
 	var fog: bool = MatchConfig.fog_enabled
 	var picked: Dictionary = MatchConfig.commanders.duplicate()
+	var tier: StringName = MatchConfig.difficulty
 	result.ai_teams = MatchConfig.ai_teams.duplicate()
 	for arg in args:
 		if arg.begins_with("--map="):
 			map_path = "res://maps/%s.txt" % arg.get_slice("=", 1)
 		elif arg.begins_with("--co="):
 			picked = parse_co_flag(arg.get_slice("=", 1))
+		elif arg.begins_with("--difficulty="):
+			tier = StringName(arg.get_slice("=", 1).strip_edges())
 	if "--hotseat" in args:
 		result.ai_teams = []
 	if "--fog" in args:
 		fog = true
+	_apply_difficulty(result, difficulty_db, tier)
 	if MatchConfig.load_save and SaveGame.has_save():
 		MatchConfig.load_save = false
 		var loaded := SaveGame.load_game(
 			terrain_db, unit_db, chart, SaveGame.SAVE_PATH, commander_db
 		)
 		if loaded != null:
-			# A resumed save brings its own map, sides and commanders; nothing the
-			# menu last wrote applies to it.
+			# A resumed save brings its own map, sides, commanders and tier;
+			# nothing the menu last wrote applies to it.
 			result.game = loaded.state
 			result.ai_teams = loaded.ai_teams
+			_apply_difficulty(result, difficulty_db, loaded.difficulty)
 			result.map = result.game.map
 			return result
 	result.map = MapData.load_from_file(map_path, terrain_db)
@@ -68,10 +77,21 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 	return result
 
 
+## Resolves the tier and makes MatchConfig agree with it, so the id the save
+## records and the one a rematch replays are the tier actually being played —
+## whether it came from the menu, a `--difficulty=` flag, or the resumed save
+## itself. Doing it here means the battle scene never has to carry the tier
+## around just to hand it back.
+static func _apply_difficulty(result: BuiltMatch, db: DifficultyDB, id: StringName) -> void:
+	result.difficulty = db.by_id(id)
+	MatchConfig.difficulty = result.difficulty.id
+
+
 ## Writes the match actually running back into MatchConfig, so a rematch replays
 ## *it* — including one resumed from a save, whose map, sides and commanders the
 ## menu never saw — rather than whatever the menu last wrote. The mirror of
-## build(), and here for the same reason: it is setup, not flow.
+## build(), and here for the same reason: it is setup, not flow. Difficulty is
+## absent on purpose: _apply_difficulty already settled it.
 static func remember(game: GameState, ai_teams: Array[int]) -> void:
 	MatchConfig.map_path = game.map_path
 	MatchConfig.fog_enabled = game.fog_enabled

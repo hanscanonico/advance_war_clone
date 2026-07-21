@@ -37,6 +37,27 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 ## Infantry are bought until the team has this many capture-capable units.
 @export var capture_unit_target: int = 3
 
+# --- Difficult-tier capabilities ---------------------------------------------
+#
+# Each gates a planner smart the base AI lacks. Every default is 0, which skips
+# the capability entirely: at 0 the code that reads it never runs, so Normal and
+# Easy plan exactly as the pre-difficulty AI did, on the same RNG stream. Only
+# data/ai/hard.tres turns them on. These change how the planner *ranks* its own
+# candidate moves — never a combat number, which stays owned by CombatResolver.
+
+## How heavily a destination's expected incoming damage next turn discounts its
+## score, as a fraction of the exposed unit's cost. >0 builds a per-turn threat
+## map (S1); 0 leaves it unbuilt, so the whole cost lands only on Difficult.
+@export var threat_aversion: float = 0.0
+## Bonus for attacking a target other ready friendlies can still add damage to
+## this turn, so the AI piles fire to finish a unit instead of scattering it
+## (S2). Scaled by that follow-up potential; 0 disables it.
+@export var focus_fire_bonus: float = 0.0
+## How strongly the build choice re-ranks toward what the damage chart says beats
+## the enemy's actual cost-weighted roster, blended over the static list (S3).
+## 0 keeps the static build_priority order exactly.
+@export var build_reactivity: float = 0.0
+
 
 ## The profile the game plays with. Falling back to an unmodified profile keeps
 ## a missing or broken file from taking the AI out entirely — it plays with the

@@ -8,12 +8,16 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster,
 property capture and income, and a computer opponent.
 
-- **Status:** two designs of record, both worth reading before an architectural decision.
+- **Status:** three designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
   D2 asymmetric charge accrual, D3 what C1 ships, D4 Sable Wren's reworked Vanish) and the risk
-  register R1–R6 that work was built against.
+  register R1–R6 that work was built against. `.lavish/difficulty-modes-plan.html` owns the
+  difficulty tiers — milestones DF1–DF4 and the locked D2/D3: **the AI never cheats at any tier**,
+  so difficulty may only change which `AIProfile` the planner weighs moves with, never income,
+  vision, damage or luck. Its DF4 acceptance gate is currently **unmet** — read
+  `docs/difficulty_check.md` before touching an AI weight or a tier `.tres`.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
@@ -49,7 +53,7 @@ The AI plugs in at the exact same point as player input.
 ```
 res://
 ├─ core/        # sim: game_state.gd, commands/, rules/, commanders/  (NO Node references)
-├─ data/        # .tres resources: units/, terrain/, commanders/, ai/, damage_chart
+├─ data/        # .tres resources: units/, terrain/, commanders/, ai/, difficulty/, damage_chart
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
 │  ├─ menu/     # main_menu.tscn — map and commander select, match options

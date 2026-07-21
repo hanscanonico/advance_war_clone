@@ -23,7 +23,8 @@ const VERSION := 2
 const READABLE_VERSIONS: Array[int] = [1, 2]
 
 ## Keys every save envelope must carry; optional ones (fog, winner,
-## capture_progress, carrier, ai_teams, commanders) fall back to defaults.
+## capture_progress, carrier, ai_teams, commanders, difficulty) fall back to
+## defaults.
 const REQUIRED_KEYS: Array = [
 	"map_path",
 	"day",
@@ -44,12 +45,20 @@ const NO_CARRIER := -1
 class LoadedMatch:
 	var state: GameState
 	var ai_teams: Array[int] = []
+	## The tier the match was being played at. Normal for any save written before
+	## difficulty existed, which is the AI those saves actually recorded.
+	var difficulty: StringName = Difficulty.DEFAULT_ID
 
 
 ## The whole match as a plain Dictionary: sim state plus the match setup (AI
-## sides). The map itself is stored by path and reloaded from res:// on the way
-## back in, so saves stay small and follow map edits.
-static func encode(state: GameState, ai_teams: Array[int]) -> Dictionary:
+## sides and difficulty tier). The map itself is stored by path and reloaded from
+## res:// on the way back in, so saves stay small and follow map edits.
+##
+## `difficulty` is an id rather than the tier's numbers on purpose: retuning a
+## tier should reach saved matches too, exactly as retuning a commander does.
+static func encode(
+	state: GameState, ai_teams: Array[int], difficulty: StringName = Difficulty.DEFAULT_ID
+) -> Dictionary:
 	var units: Array = []
 	for unit in state.units:
 		(
@@ -92,6 +101,7 @@ static func encode(state: GameState, ai_teams: Array[int]) -> Dictionary:
 		"funds": {"1": state.funds[1], "2": state.funds[2]},
 		"rng_state": str(state.rng.state),  # int64 as string: JSON numbers are lossy
 		"ai_teams": ai_teams,
+		"difficulty": String(difficulty),
 		"commanders": commanders,
 		"owners": owners,
 		"capture_progress": progress,
@@ -169,6 +179,9 @@ static func decode(
 	if teams is Array:
 		for team in teams as Array:
 			result.ai_teams.append(int(team))
+	# Missing on every save written before difficulty existed; those matches were
+	# played against the shipped AI, which is exactly what Normal is.
+	result.difficulty = StringName(String(data.get("difficulty", String(Difficulty.DEFAULT_ID))))
 	return result
 
 
