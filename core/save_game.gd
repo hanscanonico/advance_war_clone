@@ -22,12 +22,19 @@ static func has_save(path: String = SAVE_PATH) -> bool:
 	return FileAccess.file_exists(path)
 
 
-static func save(state: GameState, ai_teams: Array[int], path: String = SAVE_PATH) -> bool:
+## `difficulty` trails `path` so every existing caller keeps working; a save
+## written without one records Normal, which is the tier those matches played at.
+static func save(
+	state: GameState,
+	ai_teams: Array[int],
+	path: String = SAVE_PATH,
+	difficulty: StringName = Difficulty.DEFAULT_ID
+) -> bool:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_error("SaveGame: cannot write %s" % path)
 		return false
-	file.store_string(JSON.stringify(SAVE_CODEC_SCRIPT.encode(state, ai_teams), "\t"))
+	file.store_string(JSON.stringify(SAVE_CODEC_SCRIPT.encode(state, ai_teams, difficulty), "\t"))
 	return true
 
 

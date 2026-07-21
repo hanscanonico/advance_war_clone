@@ -37,6 +37,47 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 ## Infantry are bought until the team has this many capture-capable units.
 @export var capture_unit_target: int = 3
 
+# --- Difficult-tier capabilities ---------------------------------------------
+#
+# Each gates a planner smart the base AI lacks. Every default is 0, which skips
+# the capability entirely: at 0 the code that reads it never runs, so Normal and
+# Easy plan exactly as the pre-difficulty AI did, on the same RNG stream. Only
+# data/ai/hard.tres turns them on. These change how the planner *ranks* its own
+# candidate moves — never a combat number, which stays owned by CombatResolver.
+
+## How heavily a destination's expected incoming damage next turn discounts an
+## *attack's* score, as a fraction of the exposed unit's cost. >0 builds a
+## per-turn threat map (S1); 0 leaves it unbuilt.
+##
+## Denominated in VALUE, because that is what _attack_score is: cost x damage
+## fraction. It cannot be reused on the advance path, whose score is counted in
+## tiles — see advance_threat_tiles.
+@export var threat_aversion: float = 0.0
+## How many tiles of forward progress a unit will give up to dodge a would-be
+## lethal incoming shot when it is only advancing (S1, same threat map).
+##
+## Denominated in TILES, because _position_rank is: the advance score steps by
+## whole integers of distance, so a value-denominated dial small enough to keep
+## threat_aversion sane on the attack path can only ever break ties here. That
+## scale difference is the entire reason this is a second field rather than a
+## second use of threat_aversion. A shot forecast to take half of the HP a unit
+## has left costs half this many tiles; one that would finish it costs all of
+## them, so a wounded unit flinches harder than a fresh one.
+##
+## Below ~1.6 the dial cannot buy even one tile for a healthy unit against a
+## full-strength artillery shot (63 of its 100 points, through the plains
+## defence), so it is inert there; that is the floor a tuned value has to clear.
+## >0 builds the threat map on its own, with or without threat_aversion.
+@export var advance_threat_tiles: float = 0.0
+## Bonus for attacking a target other ready friendlies can still add damage to
+## this turn, so the AI piles fire to finish a unit instead of scattering it
+## (S2). Scaled by that follow-up potential; 0 disables it.
+@export var focus_fire_bonus: float = 0.0
+## How strongly the build choice re-ranks toward what the damage chart says beats
+## the enemy's actual cost-weighted roster, blended over the static list (S3).
+## 0 keeps the static build_priority order exactly.
+@export var build_reactivity: float = 0.0
+
 
 ## The profile the game plays with. Falling back to an unmodified profile keeps
 ## a missing or broken file from taking the AI out entirely — it plays with the

@@ -40,19 +40,34 @@ func test_encode_decode_restores_the_match_without_touching_disk() -> void:
 	state.rng.seed = 99
 	var expected_rng := state.rng.state
 
-	var loaded := _decode(SaveCodec.encode(state, [1] as Array[int]))
+	var loaded := _decode(SaveCodec.encode(state, [1] as Array[int], &"hard"))
 	assert_not_null(loaded)
 	assert_eq(loaded.state.day, 5)
 	assert_eq(loaded.state.current_team, 2)
 	assert_eq(loaded.state.funds[1], 3300)
 	assert_eq(loaded.state.rng.state, expected_rng, "the RNG stream must survive a round trip")
 	assert_eq(loaded.ai_teams, [1] as Array[int])
+	assert_eq(loaded.difficulty, &"hard", "a resumed match keeps the tier it was played at")
 
 
 func test_encoded_save_declares_the_current_version() -> void:
 	assert_eq(int(_encoded()["version"]), 2)
 	assert_eq(SaveCodec.VERSION, 2)
 	assert_eq(SaveGame.VERSION, SaveCodec.VERSION, "the facade must report the codec's version")
+
+
+## Every save written before difficulty existed carries no such key. Those
+## matches were played against the shipped AI, which is exactly Normal — so they
+## resume rather than being rejected or resuming at some other tier. An encode
+## that is not told a tier records Normal for the same reason.
+func test_a_save_without_a_difficulty_resumes_as_normal() -> void:
+	assert_eq(String(_encoded()["difficulty"]), "normal", "an unspecified tier encodes as normal")
+	var data := _encoded()
+	data.erase("difficulty")
+	assert_eq(SaveCodec.validate(data), "", "difficulty is optional, never required")
+	var loaded := _decode(data)
+	assert_not_null(loaded)
+	assert_eq(loaded.difficulty, &"normal")
 
 
 func test_a_carried_unit_survives_the_round_trip() -> void:

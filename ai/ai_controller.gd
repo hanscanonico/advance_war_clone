@@ -32,6 +32,16 @@ var unit_db: UnitDB
 ## scene, most tests — need not mention it.
 var profile: AIProfile
 
+## Difficult's threat map (S1). Built on first use each turn a profile with
+## threat awareness is planning, and reused across every command that turn — the
+## enemies it reads from cannot move while the AI plays, so one build is honest.
+## Stays null when both threat dials are 0, which is what keeps Normal from
+## paying for it at all. See _threat_map_for.
+var _threat_map: ThreatMap = null
+## Signature of the day and the enemy set the cached map was built from; a
+## mismatch (a new day, or an enemy that died to a counter) rebuilds it.
+var _threat_key: String = ""
+
 
 func _init(p_unit_db: UnitDB, p_profile: AIProfile = null) -> void:
 	unit_db = p_unit_db
@@ -123,16 +133,35 @@ func _consider_attacks(
 			if reachable.can_stop_at(cell):
 				dests.append(cell)
 	var enemies := _visible_enemies(state, unit.team)
+	# One threat map for the whole sweep. Asking per destination rebuilt the
+	# visible-enemy list and the cache-key string every time only to arrive back
+	# at the same cached map. Still resolved on first need rather than up front,
+	# so a unit with nothing in reach builds nothing.
+	var threat: ThreatMap = null
 	for dest in dests:
+		# What firing from this cell costs, whoever the target turns out to be:
+		# the walk to it plus the fire it invites next turn. Both depend only on
+		# the cell, so they are worked out once per destination — and lazily, so a
+		# cell with nothing to shoot at never pays for a threat lookup at all.
+		var dest_penalty := -1.0
 		for enemy in enemies:
 			if not AttackRange.covers(state, unit, dest, enemy.cell):
 				continue
 			if not state.damage_chart.can_attack(unit.type.id, enemy.type.id):
 				continue
+			if dest_penalty < 0.0:
+				if threat == null and profile.threat_aversion > 0.0:
+					threat = _threat_map_for(state)
+				var step_cost: int = reachable.costs[dest]
+				dest_penalty = (
+					profile.step_cost_penalty * step_cost
+					+ _threat_penalty(state, unit, dest, threat)
+				)
 			var forecast := CombatResolver.forecast(state, unit, dest, enemy)
-			var step_cost: int = reachable.costs[dest]
 			var score: float = (
-				_attack_score(unit, enemy, forecast) - profile.step_cost_penalty * step_cost
+				_attack_score(unit, enemy, forecast)
+				+ _focus_bonus(state, unit, enemy, forecast)
+				- dest_penalty
 			)
 			if score > plan.score:
 				plan.score = score
@@ -155,6 +184,99 @@ func _attack_score(unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast) -
 		if forecast.counter_damage >= unit.hp:
 			risk *= 2.0
 	return value - risk
+
+
+## S1. What firing from `cell` costs `unit` in expected incoming damage next
+## turn, in the same cost-scaled currency an attack's value uses, so it discounts
+## the shot's score directly. `threat` is null — and no map was built — when the
+## profile has attack-path threat awareness off, which is what keeps Normal free
+## of it. The advance path weighs the same map in tiles instead; see
+## _advance_value.
+func _threat_penalty(state: GameState, unit: Unit, cell: Vector2i, threat: ThreatMap) -> float:
+	if threat == null:
+		return 0.0
+	var incoming := threat.incoming_damage(state, unit, cell)
+	return profile.threat_aversion * float(unit.type.cost) * incoming / 100.0
+
+
+## S2. How much more attractive `enemy` is because other ready friendlies could
+## still pile onto it this turn — the planner concentrates fire to finish a unit
+## rather than scatter it. 0 when focus fire is off, or when this shot already
+## kills: there is nothing left to follow up on.
+##
+## Deliberately a *proportion of this shot's own value* rather than a term of its
+## own. An independent bonus scaled by the follow-up damage swamps the score it
+## is meant to adjust — a 16,000-cost target the team can surround outranks every
+## shot on the board, so the AI walks into bad trades to reach the gang-up. As a
+## proportion it can at most double a shot the team can finish, which re-ranks
+## comparable attacks and never promotes a bad one. The AI-vs-AI gate measured
+## both shapes; the additive one lost games (see docs/difficulty_check.md).
+func _focus_bonus(
+	state: GameState, unit: Unit, enemy: Unit, forecast: CombatResolver.Forecast
+) -> float:
+	if profile.focus_fire_bonus <= 0.0:
+		return 0.0
+	var remaining := enemy.hp - forecast.attack_damage
+	if remaining <= 0:
+		return 0.0
+	var follow_up := mini(remaining, _follow_up_damage(state, unit, enemy))
+	if follow_up <= 0:
+		return 0.0
+	var value := float(enemy.type.cost) * mini(forecast.attack_damage, enemy.hp) / 100.0
+	return profile.focus_fire_bonus * value * float(follow_up) / float(remaining)
+
+
+## Summed forecast damage other ready, un-acted friendlies could deal `enemy`
+## this turn. Reach is the same Manhattan over-estimate the commander powers use
+## (move budget plus firing range), so no extra flood fill is spent and the worst
+## case is crediting a follow-up that terrain would have denied — the failure to
+## avoid is missing a real one. Draws no RNG: forecast is luck-free.
+func _follow_up_damage(state: GameState, attacker: Unit, enemy: Unit) -> int:
+	var total := 0
+	for friendly in state.units_of(attacker.team):
+		if friendly == attacker or friendly.acted or friendly.carrier != null:
+			continue
+		if friendly.type.max_range <= 0 or not friendly.has_ammo():
+			continue
+		if not state.damage_chart.can_attack(friendly.type.id, enemy.type.id):
+			continue
+		var reach := AttackRange.maximum(state, friendly)
+		if not AttackRange.is_indirect(friendly):
+			reach += MovementResolver.move_budget(state, friendly)
+		if absi(friendly.cell.x - enemy.cell.x) + absi(friendly.cell.y - enemy.cell.y) > reach:
+			continue
+		var forecast := CombatResolver.forecast(state, friendly, friendly.cell, enemy)
+		if forecast.can_attack:
+			total += forecast.attack_damage
+	return total
+
+
+## The threat map for the current turn (S1), built on first use and rebuilt
+## whenever the day or the enemy set changes. Within the AI's own turn only the
+## latter can happen — an enemy died to a counter.
+##
+## The day is what draws the turn boundary, and it has to be in the key: a
+## controller plans for exactly one team for the whole match, so current_team is
+## a constant here and could never invalidate anything. Without the day, an
+## opponent that ended its turn with every visible unit back on the cells it
+## started on would hand us a flood fill from a turn ago, taken against a board
+## our own units have since rearranged — staleness well past the within-turn
+## approximation ThreatMap documents.
+func _threat_map_for(state: GameState) -> ThreatMap:
+	var enemies := _visible_enemies(state, state.current_team)
+	var key := _threat_signature(state, enemies)
+	if _threat_map == null or _threat_key != key:
+		_threat_map = ThreatMap.build(state, enemies)
+		_threat_key = key
+	return _threat_map
+
+
+static func _threat_signature(state: GameState, enemies: Array[Unit]) -> String:
+	var parts := PackedStringArray()
+	parts.append("%d.%d" % [state.day, state.current_team])
+	for enemy in enemies:
+		parts.append("%d.%d.%d" % [enemy.team, enemy.cell.x, enemy.cell.y])
+	return ",".join(parts)
 
 
 func _consider_captures(
@@ -187,19 +309,56 @@ func _advance_command(
 	state: GameState, unit: Unit, reachable: MovementResolver.MoveRange
 ) -> Command:
 	var goal := _advance_goal(state, unit)
+	# Resolved once for the whole candidate sweep. The map cannot change while a
+	# single unit's destinations are scored, and re-asking per cell rebuilt the
+	# visible-enemy list and its signature string every time. Still lazy: with
+	# the dial at 0 nothing is looked up and nothing is built.
+	var threat: ThreatMap = null
+	if profile.advance_threat_tiles > 0.0:
+		threat = _threat_map_for(state)
 	var best_cell := unit.cell
-	var best_rank := _position_rank(state, unit, unit.cell, goal)
+	var best_value := _advance_value(state, unit, unit.cell, goal, threat)
 	var best_cost := 0
 	for cell in reachable.cells():
 		if not reachable.can_stop_at(cell):
 			continue
-		var rank := _position_rank(state, unit, cell, goal)
+		var value := _advance_value(state, unit, cell, goal, threat)
 		var cost: int = reachable.costs[cell]
-		if rank < best_rank or (rank == best_rank and cost < best_cost):
-			best_rank = rank
+		if value > best_value or (is_equal_approx(value, best_value) and cost < best_cost):
+			best_value = value
 			best_cost = cost
 			best_cell = cell
 	return MoveCommand.new(unit, reachable.path_to(best_cell))
+
+
+## How good ending on `cell` is, higher being better: closeness to the goal
+## (negative rank) less what standing there invites (S1).
+##
+## The threat term is counted in *tiles*, not in value, because the rank it has
+## to argue with is: a cell one step further from the goal is worth exactly -1
+## here, so a penalty scaled by unit cost as the attack path's is would swamp
+## the whole scale, and one small enough not to would never move the unit at all.
+## advance_threat_tiles is therefore how many tiles of progress a unit gives up
+## to dodge a shot that would kill it outright, prorated by how close the
+## forecast comes to killing it.
+##
+## Measured against the HP the unit has *now*, not against a full bar: a shot
+## that takes 49 of a hurt unit's last 49 points is lethal and has to read as
+## lethal, where against 100 it would read as a scratch worth half a tile. The
+## incoming total is already capped at that same HP by ThreatMap, so the ratio
+## lands in 0..1 and 1.0 means exactly "this kills me".
+##
+## `threat` is null when the dial is off, and this is then exactly -rank, so the
+## cheaper-of-equal-value tiebreak above reproduces the original nearest-cell
+## advance bit for bit — Normal is untouched.
+func _advance_value(
+	state: GameState, unit: Unit, cell: Vector2i, goal: AdvanceGoal, threat: ThreatMap
+) -> float:
+	var value := -float(_position_rank(state, unit, cell, goal))
+	if threat != null:
+		var incoming := threat.incoming_damage(state, unit, cell)
+		value -= profile.advance_threat_tiles * incoming / float(maxi(unit.hp, 1))
+	return value
 
 
 ## How good a destination is, lower being better. Direct units just close in on
@@ -287,10 +446,104 @@ func _pick_build(state: GameState) -> UnitType:
 			capture_units += 1
 	if infantry != null and capture_units < profile.capture_unit_target and funds >= infantry.cost:
 		return infantry
+	if profile.build_reactivity > 0.0:
+		var reactive := _reactive_build(state, funds)
+		if reactive != null:
+			return reactive
+	var listed := _static_build(funds)
+	if listed != null:
+		return listed
+	if infantry != null and funds >= infantry.cost:
+		return infantry
+	return null
+
+
+## The strongest affordable unit on the profile's build list. The whole of
+## Normal's and Easy's buying, and the fallback whenever counter-building has
+## nothing to say.
+func _static_build(funds: int) -> UnitType:
 	for id in profile.build_priority:
 		var unit_type := unit_db.by_id(id)
 		if unit_type != null and funds >= unit_type.cost:
 			return unit_type
-	if infantry != null and funds >= infantry.cost:
-		return infantry
 	return null
+
+
+## S3. Picks the affordable combat unit that best answers the enemy's actual,
+## cost-weighted roster, blended with the static build_priority order by
+## build_reactivity. At reactivity 0 this is never reached (the static list runs
+## instead); at 1 the matchup decides outright. Both components are normalised to
+## 0..1 so the blend mixes like with like. Only the *choice* changes — the unit
+## it returns is built by the same BuildCommand as any other.
+##
+## Null when there is nothing to react to — no roster in sight, or none of it
+## takable damage — and the static list decides instead. Without that, full
+## reactivity would score every candidate at zero and buy whichever the database
+## happened to list first.
+func _reactive_build(state: GameState, funds: int) -> UnitType:
+	# Open assumption: every unit type in the roster today is a land unit and a
+	# base builds all of them, so widening the candidate set past
+	# profile.build_priority cannot name something BuildCommand would refuse.
+	# Producibility is owned by TerrainType.builds on the naval/air branch; when
+	# that lands this filter has to go through terrain.can_build(move_class) so
+	# the planner keeps no second opinion on what a property can turn out.
+	var candidates: Array[UnitType] = []
+	for unit_type in unit_db.all():
+		if unit_type.max_range > 0 and funds >= unit_type.cost:
+			candidates.append(unit_type)
+	if candidates.is_empty():
+		return null
+	var roster := _enemy_roster(state)
+	if roster.is_empty():
+		return null
+	var max_eff := 0.0
+	var effectiveness: Dictionary = {}
+	for cand in candidates:
+		var value := _effectiveness(state, cand, roster)
+		effectiveness[cand.id] = value
+		max_eff = maxf(max_eff, value)
+	if max_eff <= 0.0:
+		return null  # nothing affordable can hurt what is out there; let the list decide
+	var priority := profile.build_priority
+	var best: UnitType = null
+	var best_score := -INF
+	for cand in candidates:
+		var static_norm := 0.0
+		var rank := priority.find(cand.id)
+		if rank >= 0:
+			static_norm = float(priority.size() - rank) / float(priority.size())
+		var eff_norm := float(effectiveness[cand.id]) / max_eff
+		var score := (
+			(1.0 - profile.build_reactivity) * static_norm + profile.build_reactivity * eff_norm
+		)
+		if score > best_score:
+			best_score = score
+			best = cand
+	return best
+
+
+## The visible enemy roster as [cost, type id] pairs, the raw material S3 weighs a
+## prospective buy against. Cost-weighted so answering an expensive threat counts
+## for more than swatting a cheap one.
+func _enemy_roster(state: GameState) -> Array:
+	var roster: Array = []
+	for enemy in _visible_enemies(state, state.current_team):
+		roster.append([enemy.type.cost, enemy.type.id])
+	return roster
+
+
+## Cost-weighted mean base damage `cand` deals across the enemy roster: higher
+## means this buy hurts what the enemy actually fields. 0 against an empty roster,
+## so early — before contact — S3 falls back to the static order.
+func _effectiveness(state: GameState, cand: UnitType, roster: Array) -> float:
+	var total_weight := 0.0
+	var weighted := 0.0
+	for entry in roster:
+		var enemy_cost: float = float(entry[0])
+		total_weight += enemy_cost
+		var damage := state.damage_chart.base_damage(cand.id, entry[1])
+		if damage > 0:
+			weighted += enemy_cost * damage
+	if total_weight <= 0.0:
+		return 0.0
+	return weighted / total_weight

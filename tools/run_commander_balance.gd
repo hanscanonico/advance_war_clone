@@ -24,6 +24,12 @@ extends SceneTree
 ## The full batch (no flags) is 12x12 ordered pairs x 2 scenarios x 4 seeds =
 ## 1,152 matches — an explicit release task, deliberately out of `make test`.
 ## A focused `--commanders`/`--scenarios`/`--seeds` run is the fast iteration loop.
+##
+## `--difficulty-check` (see `make difficulty-check`) is a second, opt-in mode
+## asking a different question: do the tiers actually order Easy < Normal <
+## Difficult? Tier against tier, no commanders, both mirrored maps, sides
+## swapped, gated on DIFFICULTY_GATE_PCT. Difficulty ships no economy or damage
+## handicap, so that win rate *is* the whole claim (plan D2).
 
 const COMMAND_CAP := 3000
 const DEFAULT_DAYS := 20
@@ -37,6 +43,35 @@ const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
 const BAND_PREFERRED := Vector2(45.0, 55.0)
 const BAND_WARNING := Vector2(40.0, 60.0)
 const MAX_SIDE_BIAS_PP := 5.0
+
+## --- difficulty check (plan DF4) ---------------------------------------------
+##
+## Two committed maps, small and large, because the gate has to answer whether
+## the extra thinking pays with room to manoeuvre as well as without. Both are
+## exactly 180-degree symmetric (asserted first), so a win here is planning.
+const DIFFICULTY_MAPS: Array[String] = ["scrimmage", "ironworks"]
+## Adjacent tiers only: each pairing asks whether one step up the ladder is a
+## real step. Higher tier second.
+const DIFFICULTY_PAIRINGS: Array = [[&"easy", &"normal"], [&"normal", &"hard"]]
+## The acceptance gate. With identical economies, vision and dice at every tier
+## this is a pure planning-skill differential — what "smarter, not cheating" has
+## to prove. Missing it means tuning the .tres, never loosening this number.
+const DIFFICULTY_GATE_PCT := 70.0
+
+const DIFFICULTY_CSV_COLUMNS: Array[String] = [
+	"map",
+	"seed",
+	"low_tier",
+	"high_tier",
+	"high_side",
+	"winner",
+	"high_won",
+	"termination",
+	"day_ended",
+	"commands",
+	"rejected",
+	"cap_stall",
+]
 
 ## Two 180-degree rotationally-symmetric boards (see _assert_symmetric), so
 ## neither side gets a terrain or income edge and a first-side bias in the
@@ -130,18 +165,23 @@ var terrain_db: TerrainDB
 var unit_db: UnitDB
 var chart: DamageChart
 var commander_db: CommanderDB
+var difficulty_db: DifficultyDB
 
 var _commander_ids: Array[StringName] = []
 var _scenario_names: Array[String] = []
 var _seed_count := DEFAULT_SEEDS
 var _days_cap := DEFAULT_DAYS
 var _include_neutral := false
-var _out_dir := "reports/commander_balance"
+var _difficulty_check := false
+var _out_dir := ""
 
 
 func _init() -> void:
 	_load_dbs()
 	_parse_args()
+	if _difficulty_check:
+		_run_difficulty_check()
+		return
 	for name in _scenario_names:
 		if not _assert_symmetric(name):
 			return
@@ -164,6 +204,7 @@ func _load_dbs() -> void:
 	unit_db = UnitDB.load_default()
 	chart = load(DAMAGE_CHART_PATH)
 	commander_db = CommanderDB.load_default()
+	difficulty_db = DifficultyDB.load_default()
 
 
 func _parse_args() -> void:
@@ -184,6 +225,10 @@ func _parse_args() -> void:
 			_out_dir = arg.get_slice("=", 1)
 		elif arg == "--neutral":
 			_include_neutral = true
+		elif arg == "--difficulty-check":
+			_difficulty_check = true
+	if _out_dir == "":
+		_out_dir = "reports/difficulty_check" if _difficulty_check else "reports/commander_balance"
 
 
 func _all_commander_ids() -> Array[StringName]:
@@ -221,7 +266,14 @@ func _parse_scenario_list(value: String) -> Array[String]:
 ## have a mirror belonging to the other side. A broken map would quietly bias the
 ## whole run, which is the one thing the paired design exists to prevent.
 func _assert_symmetric(name: String) -> bool:
-	var map := MapData.parse(SCENARIOS[name], terrain_db)
+	return _assert_map_symmetric(name, MapData.parse(SCENARIOS[name], terrain_db))
+
+
+## The same check against any already-parsed board, so the difficulty gate can
+## hold its committed maps to the identical standard as the embedded scenarios.
+func _assert_map_symmetric(name: String, map: MapData) -> bool:
+	if map == null:
+		return _fatal("cannot load board '%s'" % name)
 	var state := GameState.create(map, unit_db, chart)
 	var w := map.width
 	var h := map.height
@@ -230,15 +282,15 @@ func _assert_symmetric(name: String) -> bool:
 			var a := Vector2i(x, y)
 			var b := Vector2i(w - 1 - x, h - 1 - y)
 			if map.terrain_at(a).id != map.terrain_at(b).id:
-				return _fatal("scenario '%s' terrain not symmetric at %s vs %s" % [name, a, b])
+				return _fatal("board '%s' terrain not symmetric at %s vs %s" % [name, a, b])
 			if state.owner_at(a) != _swap_team(state.owner_at(b)):
-				return _fatal("scenario '%s' ownership not mirror-symmetric at %s" % [name, a])
+				return _fatal("board '%s' ownership not mirror-symmetric at %s" % [name, a])
 	for unit in state.units:
 		var mirror := Vector2i(w - 1 - unit.cell.x, h - 1 - unit.cell.y)
 		var twin := state.unit_at(mirror)
 		if twin == null or twin.team != _swap_team(unit.team) or twin.type.id != unit.type.id:
 			return _fatal(
-				"scenario '%s' unit %s at %s has no mirror" % [name, unit.type.id, unit.cell]
+				"board '%s' unit %s at %s has no mirror" % [name, unit.type.id, unit.cell]
 			)
 	return true
 
@@ -497,16 +549,16 @@ func _band_flag(rate: float) -> String:
 func _write_reports(rows: Array[Dictionary], summary: Dictionary) -> void:
 	var dir := ProjectSettings.globalize_path("res://").path_join(_out_dir)
 	DirAccess.make_dir_recursive_absolute(dir)
-	_write_csv(dir.path_join("matches.csv"), rows)
+	_write_csv(dir.path_join("matches.csv"), rows, CSV_COLUMNS)
 	_write_json(dir.path_join("summary.json"), summary)
 	print("balance: wrote matches.csv and summary.json to %s" % _out_dir)
 
 
-func _write_csv(path: String, rows: Array[Dictionary]) -> void:
-	var lines: Array[String] = [",".join(CSV_COLUMNS)]
+func _write_csv(path: String, rows: Array[Dictionary], columns: Array[String]) -> void:
+	var lines: Array[String] = [",".join(columns)]
 	for row in rows:
 		var cells: Array[String] = []
-		for column in CSV_COLUMNS:
+		for column in columns:
 			cells.append(str(row[column]))
 		lines.append(",".join(cells))
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -555,3 +607,254 @@ func _print_summary(summary: Dictionary) -> void:
 		print("FAIL: rejected commands or cap stalls — the AI and the rules disagree.")
 	else:
 		print("hard invariants clean (0 rejected, 0 cap stalls). Band flags are review triggers.")
+
+
+# --- difficulty check (plan DF4) ---------------------------------------------
+
+
+## Plays the tier ladder and gates on it: each adjacent pairing on both mirrored
+## maps, every seed, from both seats, with no commanders on either side — a
+## doctrine would be noise in a measurement of planning alone.
+func _run_difficulty_check() -> void:
+	for name in DIFFICULTY_MAPS:
+		if not _assert_map_symmetric(name, _difficulty_map(name)):
+			return
+	for pair: Array in DIFFICULTY_PAIRINGS:
+		for id: StringName in pair:
+			if not difficulty_db.has(id):
+				_fatal("unknown difficulty tier '%s'" % id)
+				return
+
+	var total := DIFFICULTY_PAIRINGS.size() * DIFFICULTY_MAPS.size() * _seed_count * 2
+	print(
+		(
+			"difficulty: %d pairings x %d maps x %d seeds x 2 sides -> %d matches"
+			% [DIFFICULTY_PAIRINGS.size(), DIFFICULTY_MAPS.size(), _seed_count, total]
+		)
+	)
+	var rows: Array[Dictionary] = []
+	var timing: Dictionary = {}
+	var done := 0
+	for map_name in DIFFICULTY_MAPS:
+		for pair: Array in DIFFICULTY_PAIRINGS:
+			for s in _seed_count:
+				# Paired seeds, same shape as the commander run: both seatings of a
+				# pairing meet on identical luck, so the side-swap is clean.
+				var seed_val := SEED_BASE + s + hash(map_name) % 1000
+				for high_is_red: bool in [true, false]:
+					rows.append(
+						_play_tiers(map_name, pair[0], pair[1], high_is_red, seed_val, timing)
+					)
+					done += 1
+					if done % 10 == 0:
+						print("difficulty: %d / %d matches" % [done, total])
+
+	var summary := _summarise_difficulty(rows, timing)
+	_write_difficulty_reports(rows, summary)
+	_print_difficulty_summary(summary)
+	quit(0 if summary["passed"] else 1)
+
+
+func _difficulty_map(name: String) -> MapData:
+	return MapData.load_from_file("res://maps/%s.txt" % name, terrain_db)
+
+
+## One tier-versus-tier match. `high_is_red` swaps which seat the stronger tier
+## takes, and each side gets its own AIController — its own profile, and its own
+## per-turn threat map.
+func _play_tiers(
+	map_name: String,
+	low: StringName,
+	high: StringName,
+	high_is_red: bool,
+	seed_val: int,
+	timing: Dictionary
+) -> Dictionary:
+	var state := GameState.create(_difficulty_map(map_name), unit_db, chart)
+	state.rng.seed = seed_val
+	var red_tier: StringName = high if high_is_red else low
+	var blue_tier: StringName = low if high_is_red else high
+	var planners := {
+		1: AIController.new(unit_db, difficulty_db.by_id(red_tier).profile()),
+		2: AIController.new(unit_db, difficulty_db.by_id(blue_tier).profile()),
+	}
+	var tiers := {1: red_tier, 2: blue_tier}
+
+	var rejected := 0
+	var commands := 0
+	while state.winner == 0 and state.day <= _days_cap and commands < COMMAND_CAP:
+		var team := state.current_team
+		var planner: AIController = planners[team]
+		var tier: StringName = tiers[team]
+		var started := Time.get_ticks_usec()
+		var command := planner.plan_next_command(state)
+		_record_time(timing, tier, Time.get_ticks_usec() - started, command is EndTurnCommand)
+		if command.validate(state) != "":
+			rejected += 1
+			command = EndTurnCommand.new()
+			if command.validate(state) != "":
+				break
+		command.apply(state)
+		commands += 1
+
+	var cap_stall := commands >= COMMAND_CAP
+	var winner: int = state.winner
+	if winner == 0 and not cap_stall:
+		winner = _tiebreak(state)
+	var high_team := 1 if high_is_red else 2
+	return {
+		"map": map_name,
+		"seed": seed_val,
+		"low_tier": String(low),
+		"high_tier": String(high),
+		"high_side": "red" if high_is_red else "blue",
+		"winner": winner,
+		"high_won": 1 if winner == high_team else 0,
+		"termination": _termination(state, cap_stall),
+		"day_ended": state.day,
+		"commands": commands,
+		"rejected": rejected,
+		"cap_stall": 1 if cap_stall else 0,
+	}
+
+
+## Planning wall-clock per tier, a turn counted each time one ends. The only
+## number here that is not reproducible run to run, so it is reported and never
+## gated on — it answers R3: does the extra thinking cost a perceptible pause?
+func _record_time(timing: Dictionary, tier: StringName, usec: int, ended_turn: bool) -> void:
+	var key := String(tier)
+	if not timing.has(key):
+		timing[key] = {"usec": 0, "turns": 0}
+	timing[key]["usec"] += usec
+	if ended_turn:
+		timing[key]["turns"] += 1
+
+
+func _summarise_difficulty(rows: Array[Dictionary], timing: Dictionary) -> Dictionary:
+	var total_rejected := 0
+	var total_cap_stalls := 0
+	for row in rows:
+		total_rejected += int(row["rejected"])
+		total_cap_stalls += int(row["cap_stall"])
+
+	var pairings: Array = []
+	var gates_ok := true
+	for pair: Array in DIFFICULTY_PAIRINGS:
+		var low := String(pair[0])
+		var high := String(pair[1])
+		var per_map: Dictionary = {}
+		for name in DIFFICULTY_MAPS:
+			per_map[name] = {"wins": 0, "played": 0}
+		var wins := 0
+		var played := 0
+		for row in rows:
+			if row["low_tier"] != low or row["high_tier"] != high:
+				continue
+			played += 1
+			wins += int(row["high_won"])
+			var bucket: Dictionary = per_map[row["map"]]
+			bucket["played"] += 1
+			bucket["wins"] += int(row["high_won"])
+		var rate := 100.0 * float(wins) / maxf(1.0, float(played))
+		gates_ok = gates_ok and rate >= DIFFICULTY_GATE_PCT
+		var maps: Array = []
+		for name in DIFFICULTY_MAPS:
+			var bucket: Dictionary = per_map[name]
+			var played_here := maxf(1.0, float(bucket["played"]))
+			var per_map_row := {
+				"map": name,
+				"played": bucket["played"],
+				"wins": bucket["wins"],
+				"win_rate": 100.0 * float(bucket["wins"]) / played_here,
+			}
+			maps.append(per_map_row)
+		var pairing_row := {
+			"low": low,
+			"high": high,
+			"played": played,
+			"wins": wins,
+			"win_rate": rate,
+			"gate_ok": rate >= DIFFICULTY_GATE_PCT,
+			"maps": maps,
+		}
+		pairings.append(pairing_row)
+
+	# A rejected command or an unresolvable match means planner and rules
+	# disagree — a real bug, and it fails this run as it fails the commander one.
+	return {
+		"matches": rows.size(),
+		"gate_pct": DIFFICULTY_GATE_PCT,
+		"total_rejected": total_rejected,
+		"total_cap_stalls": total_cap_stalls,
+		"pairings": pairings,
+		"turn_ms": _turn_times(timing),
+		"passed": gates_ok and total_rejected == 0 and total_cap_stalls == 0,
+	}
+
+
+## Mean planning milliseconds per turn per tier. R3's budget is "no perceptible
+## pause versus today", so Normal is the baseline, not any absolute number.
+func _turn_times(timing: Dictionary) -> Array:
+	var result: Array = []
+	for key: String in timing:
+		var stats: Dictionary = timing[key]
+		var turns := maxi(1, int(stats["turns"]))
+		var row := {
+			"tier": key,
+			"turns": stats["turns"],
+			"mean_ms": float(stats["usec"]) / 1000.0 / float(turns),
+		}
+		result.append(row)
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["tier"] < b["tier"])
+	return result
+
+
+func _write_difficulty_reports(rows: Array[Dictionary], summary: Dictionary) -> void:
+	var dir := ProjectSettings.globalize_path("res://").path_join(_out_dir)
+	DirAccess.make_dir_recursive_absolute(dir)
+	_write_csv(dir.path_join("matches.csv"), rows, DIFFICULTY_CSV_COLUMNS)
+	_write_json(dir.path_join("summary.json"), summary)
+	print("difficulty: wrote matches.csv and summary.json to %s" % _out_dir)
+
+
+func _print_difficulty_summary(summary: Dictionary) -> void:
+	print("\n=== difficulty ladder ===")
+	print(
+		(
+			"matches %d   rejected %d   cap-stalls %d   gate >= %.0f%%"
+			% [
+				summary["matches"],
+				summary["total_rejected"],
+				summary["total_cap_stalls"],
+				summary["gate_pct"],
+			]
+		)
+	)
+	for pairing: Dictionary in summary["pairings"]:
+		print(
+			(
+				"  %-7s over %-7s  %5.1f%%  (%d/%d)  %s"
+				% [
+					pairing["high"],
+					pairing["low"],
+					pairing["win_rate"],
+					pairing["wins"],
+					pairing["played"],
+					"ok" if pairing["gate_ok"] else "FAIL",
+				]
+			)
+		)
+		for entry: Dictionary in pairing["maps"]:
+			print(
+				(
+					"      on %-11s %5.1f%%  (%d/%d)"
+					% [entry["map"], entry["win_rate"], entry["wins"], entry["played"]]
+				)
+			)
+	print("mean AI planning per turn:")
+	for entry: Dictionary in summary["turn_ms"]:
+		print("  %-7s %7.1f ms over %d turns" % [entry["tier"], entry["mean_ms"], entry["turns"]])
+	if summary["passed"]:
+		print("PASS: every higher tier clears the gate.")
+	else:
+		print("FAIL: tune the tier .tres weights (or zero a misbehaving smart) — not this gate.")

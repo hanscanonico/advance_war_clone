@@ -93,13 +93,13 @@ func _ready() -> void:
 	db = TerrainDB.load_default()
 	unit_db = UnitDB.load_default()
 	commander_db = CommanderDB.load_default()
-	ai = AIController.new(unit_db)
 	_ai_runner = BattleAiRunner.new(self)
 	# Which match this is, BattleSetup decides; from here the scene just runs it.
 	var built := BattleSetup.build(db, unit_db, commander_db)
 	map = built.map
 	game = built.game
 	ai_teams = built.ai_teams
+	ai = AIController.new(unit_db, built.difficulty.profile())  # the one lever difficulty pulls
 	view = _build_view()
 	view.setup()
 	animator = _build_animator()
@@ -472,7 +472,7 @@ func _handle_map_action(action: StringName) -> void:
 		_open_commander_info()
 		return
 	if action == &"save":
-		if SaveGame.save(game, ai_teams):
+		if SaveGame.save(game, ai_teams, SaveGame.SAVE_PATH, MatchConfig.difficulty):
 			animator.show_banner("Saved")
 		return
 	if action != &"end_turn":
