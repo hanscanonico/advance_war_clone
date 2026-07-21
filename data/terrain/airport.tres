@@ -4,10 +4,10 @@
 
 [resource]
 script = ExtResource("1")
-id = &"road"
-display_name = "Road"
-symbol = "="
-defense_stars = 0
+id = &"airport"
+display_name = "Airport"
+symbol = "A"
+defense_stars = 3
 move_costs = {
 &"air": 1,
 &"boot": 1,
@@ -15,6 +15,8 @@ move_costs = {
 &"tires": 1,
 &"treads": 1
 }
-is_property = false
-atlas_col = 0
-team_tinted = false
+is_property = true
+builds = Array[StringName]([&"air"])
+services = Array[StringName]([&"air"])
+atlas_col = 9
+team_tinted = true

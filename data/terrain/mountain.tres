@@ -9,6 +9,7 @@ display_name = "Mountain"
 symbol = "M"
 defense_stars = 4
 move_costs = {
+&"air": 1,
 &"boot": 1,
 &"foot": 2
 }

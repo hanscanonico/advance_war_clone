@@ -1,8 +1,10 @@
 class_name LoadCommand
 extends Command
-## Moves a foot/boot unit onto a friendly transport and boards it.
-
-const TRANSPORTABLE: Array[StringName] = [TerrainType.FOOT, TerrainType.BOOT]
+## Moves a unit onto a friendly transport and boards it.
+##
+## What a transport accepts is its own data (UnitType.cargo_classes) rather than
+## one list shared by every carrier: an APC and a T-Copter take infantry, a
+## Lander takes what drives, and the difference between them is a .tres field.
 
 var unit: Unit
 var path: Array[Vector2i]
@@ -17,14 +19,14 @@ func validate(state: GameState) -> String:
 	var steps := MoveCommand.validate_path_steps(state, unit, path)
 	if steps != "":
 		return steps
-	if unit.type.move_class not in TRANSPORTABLE:
-		return "unit cannot be transported"
 	var dest: Vector2i = path[path.size() - 1]
 	var transport := state.unit_at(dest)
 	if transport == null or transport == unit or transport.team != unit.team:
 		return "no friendly transport at the destination"
 	if transport.type.transport_capacity <= 0:
 		return "destination unit is not a transport"
+	if not transport.type.can_carry(unit.type.move_class):
+		return "unit cannot be transported"
 	if state.cargo_of(transport).size() >= transport.type.transport_capacity:
 		return "transport is full"
 	return ""

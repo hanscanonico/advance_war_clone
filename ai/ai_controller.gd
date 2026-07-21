@@ -383,12 +383,23 @@ static func _position_rank(state: GameState, unit: Unit, cell: Vector2i, goal: A
 	return high - dist
 
 
-## Damaged units head for a friendly property (repairs), capture units for the
-## nearest non-owned property, everyone else toward the nearest enemy — which
-## indirect units approach only as far as their firing ring.
+## Units low on fuel head for somewhere that refits them, damaged units for a
+## friendly property (repairs), capture units for the nearest non-owned property,
+## everyone else toward the nearest enemy — which indirect units approach only as
+## far as their firing ring.
+##
+## Fuel comes first because it is the only one of these that is fatal: a plane
+## that ignores it dies of it, where a damaged tank merely stays damaged. Note
+## this is the *fallback* goal — a fuel-critical bomber with a kill in reach
+## still takes the kill, which is the trade a greedy planner should make.
 func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	var goal := AdvanceGoal.new()
 	goal.cell = unit.cell
+	if unit.running_dry(profile.refuel_margin_turns):
+		var refits := _refitting_properties(state, unit)
+		if not refits.is_empty():
+			goal.cell = _nearest(unit.cell, refits)
+			return goal
 	if unit.hp <= profile.retreat_hp:
 		var owned := state.properties_of(unit.team)
 		if not owned.is_empty():
@@ -411,6 +422,17 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	return goal
 
 
+## Our properties that would refit this unit. A city is no use to a bomber, so
+## the domain gate is asked here exactly as TurnRules asks it — heading somewhere
+## that will not refuel you is worse than not breaking off at all.
+func _refitting_properties(state: GameState, unit: Unit) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for cell in state.properties_of(unit.team):
+		if state.map.terrain_at(cell).services_domain(unit.type.domain):
+			cells.append(cell)
+	return cells
+
+
 static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
 	var best := cells[0]
 	var best_dist := absi(best.x - from.x) + absi(best.y - from.y)
@@ -422,38 +444,50 @@ static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
 	return best
 
 
-## One build per call, at the first empty owned base the funds allow.
+## One build per call, at the first empty owned property that can produce
+## something we can afford. Every facility gets asked in turn rather than only
+## the first: an airport too expensive to use this turn must not stop the base
+## beside it from building infantry.
 func _plan_build(state: GameState) -> Command:
 	for cell in state.properties_of(state.current_team):
-		if state.map.terrain_at(cell).id != &"base":
+		var terrain := state.map.terrain_at(cell)
+		if terrain.builds.is_empty() or state.unit_at(cell) != null:
 			continue
-		if state.unit_at(cell) != null:
-			continue
-		var choice := _pick_build(state)
+		var choice := _pick_build(state, terrain)
 		if choice == null:
-			return null
+			continue
 		return BuildCommand.new(state.current_team, choice, cell)
 	return null
 
 
-## Keep capture units flowing, then buy the strongest affordable vehicle.
-func _pick_build(state: GameState) -> UnitType:
+## What to buy at one facility: an answer to enemy aircraft first, then capture
+## units, then the strongest affordable thing this property builds.
+##
+## Every candidate is filtered through `terrain.can_build`, which is why one
+## priority list serves a base and an airport both — and why the infantry
+## fallback cannot conjure a rifleman out of a hangar.
+func _pick_build(state: GameState, terrain: TerrainType) -> UnitType:
 	var funds: int = state.funds[state.current_team]
+	if _outgunned_in_the_air(state):
+		for id in profile.air_answer_ids:
+			var answer := unit_db.by_id(id)
+			if answer != null and terrain.can_build(answer.move_class) and funds >= answer.cost:
+				return answer
 	var infantry := unit_db.by_id(&"infantry")
 	var capture_units := 0
 	for unit in state.units_of(state.current_team):
 		if unit.type.can_capture:
 			capture_units += 1
-	if infantry != null and capture_units < profile.capture_unit_target and funds >= infantry.cost:
+	if _affordable_here(terrain, infantry, funds) and capture_units < profile.capture_unit_target:
 		return infantry
 	if profile.build_reactivity > 0.0:
-		var reactive := _reactive_build(state, funds)
+		var reactive := _reactive_build(state, terrain, funds)
 		if reactive != null:
 			return reactive
-	var listed := _static_build(funds)
+	var listed := _static_build(terrain, funds)
 	if listed != null:
 		return listed
-	if infantry != null and funds >= infantry.cost:
+	if _affordable_here(terrain, infantry, funds):
 		return infantry
 	return null
 
@@ -461,10 +495,10 @@ func _pick_build(state: GameState) -> UnitType:
 ## The strongest affordable unit on the profile's build list. The whole of
 ## Normal's and Easy's buying, and the fallback whenever counter-building has
 ## nothing to say.
-func _static_build(funds: int) -> UnitType:
+func _static_build(terrain: TerrainType, funds: int) -> UnitType:
 	for id in profile.build_priority:
 		var unit_type := unit_db.by_id(id)
-		if unit_type != null and funds >= unit_type.cost:
+		if _affordable_here(terrain, unit_type, funds):
 			return unit_type
 	return null
 
@@ -480,16 +514,14 @@ func _static_build(funds: int) -> UnitType:
 ## takable damage — and the static list decides instead. Without that, full
 ## reactivity would score every candidate at zero and buy whichever the database
 ## happened to list first.
-func _reactive_build(state: GameState, funds: int) -> UnitType:
-	# Open assumption: every unit type in the roster today is a land unit and a
-	# base builds all of them, so widening the candidate set past
-	# profile.build_priority cannot name something BuildCommand would refuse.
-	# Producibility is owned by TerrainType.builds on the naval/air branch; when
-	# that lands this filter has to go through terrain.can_build(move_class) so
-	# the planner keeps no second opinion on what a property can turn out.
+func _reactive_build(state: GameState, terrain: TerrainType, funds: int) -> UnitType:
+	# The candidate set is wider than profile.build_priority, so producibility is
+	# asked of TerrainType.builds via _affordable_here rather than assumed: the
+	# planner keeps no second opinion on what a property can turn out, and a
+	# counter-build can never name a hull the base beside it cannot lay down.
 	var candidates: Array[UnitType] = []
 	for unit_type in unit_db.all():
-		if unit_type.max_range > 0 and funds >= unit_type.cost:
+		if unit_type.max_range > 0 and _affordable_here(terrain, unit_type, funds):
 			candidates.append(unit_type)
 	if candidates.is_empty():
 		return null
@@ -547,3 +579,39 @@ func _effectiveness(state: GameState, cand: UnitType, roster: Array) -> float:
 	if total_weight <= 0.0:
 		return 0.0
 	return weighted / total_weight
+
+
+static func _affordable_here(terrain: TerrainType, unit_type: UnitType, funds: int) -> bool:
+	if unit_type == null or not terrain.can_build(unit_type.move_class):
+		return false
+	return funds >= unit_type.cost
+
+
+## Whether the enemy is flying and we field fewer units that can shoot back at
+## them than the profile wants.
+##
+## What counts as an answer comes off the damage chart rather than a list of ids,
+## so a unit that gains an air matchup starts counting with no planner change —
+## and one that loses it stops. The list in the profile is only what to *buy*.
+func _outgunned_in_the_air(state: GameState) -> bool:
+	var team := state.current_team
+	var flying: Array[Unit] = []
+	for enemy in _visible_enemies(state, team):
+		if enemy.type.domain == UnitType.AIR:
+			flying.append(enemy)
+	if flying.is_empty():
+		return false
+	var answers := 0
+	for unit in state.units_of(team):
+		if _can_hit_any(state, unit, flying):
+			answers += 1
+	return answers < profile.air_answer_target
+
+
+static func _can_hit_any(state: GameState, unit: Unit, targets: Array[Unit]) -> bool:
+	if unit.type.max_range <= 0 or state.damage_chart == null:
+		return false
+	for target in targets:
+		if state.damage_chart.can_attack(unit.type.id, target.type.id):
+			return true
+	return false

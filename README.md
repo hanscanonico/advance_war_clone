@@ -35,6 +35,7 @@ make check           # parse + type check every .gd file (fast; no scene tree)
 make lint            # gdlint — style and smells (config: gdlintrc)
 make format          # gdformat — reformat in place; format-check only reports
 make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
+make unit-placeholders    # redraw the aircraft/fleet sprites the PixVoxel pack has no art for
 make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
 make portraits       # regenerate the placeholder commander portraits + faction emblems
@@ -251,20 +252,27 @@ result, including one capability that measured *negative* and ships switched off
 
 ## Assets
 
-Units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
+Ground units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
 Sprites](https://opengameart.org/content/pixvoxel-revised-isometric-wargame-sprites); the ground
-tiles are still generated programmer art. The commander portraits and faction emblems are generated
-placeholder art too (`make portraits`) — project-original, no third-party pixels — until the final
-portrait pass. All sound is generated placeholder chiptune (`make sfx`). There is no music yet — it
-needs licensed tracks. Third-party asset licenses must be tracked in `assets/LICENSES.md`. No
-Nintendo assets or names may ever be used.
+tiles, the airport, and the aircraft are generated programmer art. The commander portraits and
+faction emblems are generated placeholder art too (`make portraits`) — project-original, no
+third-party pixels — until the final portrait pass. All sound is generated placeholder chiptune
+(`make sfx`). There is no music yet — it needs licensed tracks. Third-party asset licenses must be
+tracked in `assets/LICENSES.md`. No Nintendo assets or names may ever be used.
 
-`make tiles` rebuilds the art in four ordered steps: `sprites-check` verifies the build inputs,
-`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it, and `import`
-reimports the result — Godot caches image imports by size, so skipping the last step after a
-rebuild that changes atlas dimensions renders a blank map. The check runs first because `ground`
-is destructive: it replaces the committed building art with bare lots that only `sprites` can
-finish painting, so a failure has to happen while the tree is still clean.
+`make tiles` rebuilds the art in five ordered steps: `sprites-check` verifies the build inputs,
+`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it,
+`unit-placeholders` draws the units that pack has no sprite for, and `import` reimports the result
+— Godot caches image imports by size, so skipping the last step after a rebuild that changes atlas
+dimensions renders a blank map. The check runs first because `ground` is destructive: it replaces
+the committed building art with bare lots that only `sprites` can finish painting, so a failure has
+to happen while the tree is still clean.
+
+The pack has no aircraft and no ships, so those columns of the units atlas are flat 16px
+silhouettes drawn by `tools/generate_unit_placeholders.gd` from ASCII grids in its own source — a
+shape you can read and edit in place. They are deliberately placeholder, so that no milestone is
+ever blocked on art; the step widens the atlas to whatever `data/units/*.tres` asks for and leaves
+the PixVoxel columns untouched.
 
 The only external requirement is ImageMagick 7 (`brew install imagemagick`). The 36 CC0 source
 sprites are vendored under `assets/sprites/pixvoxel_src`, so a fresh clone rebuilds with no

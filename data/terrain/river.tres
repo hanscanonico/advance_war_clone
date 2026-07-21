@@ -9,6 +9,7 @@ display_name = "River"
 symbol = "~"
 defense_stars = 0
 move_costs = {
+&"air": 1,
 &"boot": 1,
 &"foot": 2
 }

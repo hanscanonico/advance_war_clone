@@ -17,6 +17,7 @@ const CLASS_LABELS: Array = [
 	[TerrainType.BOOT, "Boot"],
 	[TerrainType.TIRES, "Tires"],
 	[TerrainType.TREADS, "Treads"],
+	[TerrainType.AIR, "Air"],
 ]
 
 @onready var unit_rows: VBoxContainer = %UnitRows
@@ -73,6 +74,8 @@ func _show_unit(unit: Unit, carrying: String, active_team: int) -> void:
 	var extras := PackedStringArray()
 	if unit.type.min_range > 1:
 		extras.append("Rng %d-%d" % [unit.type.min_range, unit.type.max_range])
+	if unit.running_dry():
+		extras.append("Low fuel")
 	if carrying != "":
 		extras.append("Carrying %s" % carrying)
 	if waited:
@@ -94,15 +97,26 @@ func _show_terrain(terrain: TerrainType, owner_team: int, capture_left: int, uni
 	owner_label.text = owner_text
 
 
-## Occupied tile: only the occupant's move class matters. Empty tile: keep
-## the full four-class planning row.
+## Occupied tile: only the occupant's move class matters, and it is always a real
+## cost — nothing stands where it cannot go. Empty tile: the planning row, listing
+## the classes that can actually enter.
+##
+## Listing only those, rather than every class with a dash for the rest, is what
+## keeps the row readable now that there are more classes than the four the game
+## shipped with: a mountain says "Foot 2  Boot 1  Air 1", and what is missing is
+## as legible as what is there.
 func _move_costs(terrain: TerrainType, unit: Unit) -> String:
 	var parts := PackedStringArray()
 	for pair: Array in CLASS_LABELS:
-		if unit != null and unit.type.move_class != pair[0]:
+		var move_class: StringName = pair[0]
+		if unit != null and unit.type.move_class != move_class:
 			continue
-		var cost: int = terrain.move_cost(pair[0])
-		parts.append("%s %s" % [pair[1], "-" if cost == TerrainType.IMPASSABLE else str(cost)])
+		var cost: int = terrain.move_cost(move_class)
+		if cost == TerrainType.IMPASSABLE:
+			continue
+		parts.append("%s %d" % [pair[1], cost])
+	if parts.is_empty():
+		return "Impassable"
 	return "  ".join(parts)
 
 

@@ -79,3 +79,41 @@ func test_rout_by_combat_sets_winner() -> void:
 	blue.hp = 10  # last blue unit; any hit kills
 	CombatResolver.resolve(state, state.units[0], blue)
 	assert_eq(state.winner, 1)
+
+
+# --- production facilities ---------------------------------------------------
+#
+# Which property builds what is terrain data, and this command, the build menu
+# and the AI all read the same list. These pin the command's half of that.
+
+
+func test_airport_builds_aircraft() -> void:
+	var state := _state("[terrain]\nA.\n[owners]\n1 0 0")
+	state.funds[1] = 99999
+	var command := BuildCommand.new(1, unit_db.by_id(&"fighter"), Vector2i(0, 0))
+	assert_eq(command.validate(state), "")
+	command.apply(state)
+	assert_eq(state.unit_at(Vector2i(0, 0)).type.id, &"fighter")
+
+
+func test_a_base_cannot_build_aircraft() -> void:
+	var state := _state("[terrain]\nB.\n[owners]\n1 0 0")
+	state.funds[1] = 99999
+	var command := BuildCommand.new(1, unit_db.by_id(&"bomber"), Vector2i(0, 0))
+	assert_eq(command.validate(state), "base does not build bomber")
+
+
+func test_an_airport_cannot_build_ground_units() -> void:
+	var state := _state("[terrain]\nA.\n[owners]\n1 0 0")
+	state.funds[1] = 99999
+	var command := BuildCommand.new(1, unit_db.by_id(&"infantry"), Vector2i(0, 0))
+	assert_eq(command.validate(state), "airport does not build infantry")
+
+
+## Missiles are a ground unit despite existing to shoot at aircraft, so a base
+## builds them and an airport does not. Easy to get backwards in data.
+func test_missiles_are_built_at_a_base() -> void:
+	var state := _state("[terrain]\nBA\n[owners]\n1 0 0\n1 1 0")
+	state.funds[1] = 99999
+	assert_eq(BuildCommand.new(1, unit_db.by_id(&"missiles"), Vector2i(0, 0)).validate(state), "")
+	assert_ne(BuildCommand.new(1, unit_db.by_id(&"missiles"), Vector2i(1, 0)).validate(state), "")

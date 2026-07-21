@@ -168,3 +168,31 @@ func test_ai_ignores_carried_units() -> void:
 	var ai := AIController.new(unit_db)
 	var command := ai.plan_next_command(state)
 	assert_true(command is EndTurnCommand, "a carried unit must not be planned for")
+
+
+# --- per-transport cargo rules -----------------------------------------------
+#
+# What a carrier accepts is its own data now, not one list every transport
+# shares. These pin that the T-Copter is an APC that flies rather than something
+# that will lift a tank.
+
+
+func test_t_copter_carries_infantry() -> void:
+	var state := _state("[terrain]\n..\n[units]\n1 H 0 0\n1 i 1 0")
+	var command := LoadCommand.new(state.units[1], _path([Vector2i(1, 0), Vector2i(0, 0)]))
+	assert_eq(command.validate(state), "")
+	command.apply(state)
+	assert_eq(state.units[1].carrier, state.units[0])
+
+
+func test_t_copter_will_not_lift_a_tank() -> void:
+	var state := _state("[terrain]\n..\n[units]\n1 H 0 0\n1 t 1 0")
+	var command := LoadCommand.new(state.units[1], _path([Vector2i(1, 0), Vector2i(0, 0)]))
+	assert_eq(command.validate(state), "unit cannot be transported")
+
+
+## An armed aircraft is not a transport whatever else it can do.
+func test_a_gunship_carries_nothing() -> void:
+	var state := _state("[terrain]\n..\n[units]\n1 h 0 0\n1 i 1 0")
+	var command := LoadCommand.new(state.units[1], _path([Vector2i(1, 0), Vector2i(0, 0)]))
+	assert_eq(command.validate(state), "destination unit is not a transport")

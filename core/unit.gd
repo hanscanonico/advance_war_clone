@@ -37,6 +37,21 @@ func has_ammo() -> bool:
 	return type.max_ammo == 0 or ammo > 0
 
 
+## True when the unit has under `margin_turns` worth of fuel left: it can no
+## longer both fly a full move and pay that many days of upkeep. Always false for
+## anything an empty tank merely strands — a tank out of fuel is parked, not
+## doomed, so warning about it would be noise.
+##
+## The single definition of "running dry". The board's warning badge, the tile
+## panel and the AI's decision to break off and refuel all ask this one question,
+## which is what stops the interface flagging a unit the planner is happy with,
+## or the reverse.
+func running_dry(margin_turns: int = 1) -> bool:
+	if not type.lost_when_dry() or margin_turns <= 0:
+		return false
+	return fuel <= (type.fuel_upkeep + type.move_points) * margin_turns
+
+
 func resupply() -> void:
 	fuel = type.max_fuel
 	ammo = type.max_ammo

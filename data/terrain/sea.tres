@@ -8,7 +8,9 @@ id = &"sea"
 display_name = "Sea"
 symbol = "S"
 defense_stars = 0
-move_costs = {}
+move_costs = {
+&"air": 1
+}
 is_property = false
 atlas_col = 8
 team_tinted = false

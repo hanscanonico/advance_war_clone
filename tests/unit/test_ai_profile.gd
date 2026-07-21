@@ -26,24 +26,26 @@ func test_default_profile_loads() -> void:
 	assert_not_null(profile, "res://data/ai/default.tres should load")
 
 
-## Pins the shipped values. These are the constants AIController carried before
-## they moved into data; changing one is a balance decision, and this test is
-## where that decision gets noticed.
-func test_default_profile_matches_the_original_constants() -> void:
-	var profile := AIProfile.load_default()
-	assert_almost_eq(profile.kill_bonus, 1.6, 0.0001)
-	assert_almost_eq(profile.counter_weight, 0.6, 0.0001)
-	assert_almost_eq(profile.capture_score, 900.0, 0.0001)
-	assert_almost_eq(profile.hq_capture_multiplier, 3.0, 0.0001)
-	assert_almost_eq(profile.capture_progress_bonus, 45.0, 0.0001)
-	assert_almost_eq(profile.step_cost_penalty, 4.0, 0.0001)
-	assert_almost_eq(profile.min_useful_score, 40.0, 0.0001)
-	assert_almost_eq(profile.advance_score, 1.0, 0.0001)
-	assert_eq(profile.retreat_hp, 45)
-	assert_eq(profile.capture_unit_target, 3)
-	assert_eq(
-		profile.build_priority, [&"md_tank", &"tank", &"artillery", &"mech"] as Array[StringName]
-	)
+## The shipped file and the script's own defaults have to be the same numbers.
+## ai_profile.gd promises exactly that, and load_default() leans on it: a match
+## played with the file missing must be the match the file would have produced,
+## or a broken install quietly plays a different game.
+##
+## Compared field by field off the property list rather than value by value, so
+## tuning a weight means one edit to the .tres and one to the default beside it —
+## and forgetting either is what fails here. That makes it the tripwire the
+## hand-written version was, without being a chore every time a weight is added.
+func test_default_profile_matches_the_built_in_defaults() -> void:
+	var shipped := AIProfile.load_default()
+	var defaults := AIProfile.new()
+	var checked := 0
+	for property in defaults.get_property_list():
+		if not (int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE):
+			continue
+		var field: String = property.name
+		assert_eq(shipped.get(field), defaults.get(field), "data/ai/default.tres: %s" % field)
+		checked += 1
+	assert_gt(checked, 10, "the profile should expose its weights as script variables")
 
 
 ## A controller built without a profile must behave exactly like one built with

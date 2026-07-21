@@ -9,6 +9,7 @@ display_name = "Plains"
 symbol = "."
 defense_stars = 1
 move_costs = {
+&"air": 1,
 &"boot": 1,
 &"foot": 1,
 &"tires": 2,

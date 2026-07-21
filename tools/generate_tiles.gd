@@ -14,7 +14,10 @@ const TILE := 16
 ## Atlas cells are 4x the world grid. Nearest-neighbour, so the 16px art is
 ## pixel-identical on screen at the battle scene's default zoom.
 const SCALE := 4
-const COLS := 9  # road, plains, woods, mountain, river, city, base, hq, sea
+## road, plains, woods, mountain, river, city, base, hq, sea, airport
+## Keep TERRAIN_COLS in tools/build_pixvoxel_atlases.sh in step: that script
+## checks the atlas it paints buildings into is exactly this wide.
+const COLS := 10
 const ROWS := 3  # 0 = neutral, 1 = red, 2 = blue
 
 const GRASS := Color("78c850")
@@ -31,6 +34,9 @@ const ROCK := Color("9e9e9e")
 const ROCK_DARK := Color("757575")
 const SNOW := Color("eeeeee")
 const PAVE := Color("cfcfcf")
+const ASPHALT := Color("6f747c")
+const ASPHALT_DARK := Color("585d64")
+const MARKING := Color("e4e7eb")
 const TEAM_COLORS: Array[Color] = [Color("8a9099"), Color("d84a3c"), Color("3c64d8")]
 
 var img: Image
@@ -61,6 +67,10 @@ func _generate_atlas() -> void:
 		_ground(_at(6, row), PAVE)
 		_ground(_at(7, row), PAVE)
 		_draw_sea(_at(8, row))
+		# The airport is drawn whole here, tower included, rather than left as a
+		# lot for the PixVoxel step: that pack has no hangar, and at 16px a
+		# runway reads as an airfield more clearly than a building would.
+		_draw_airport(_at(9, row), row)
 	img.resize(COLS * TILE * SCALE, ROWS * TILE * SCALE, Image.INTERPOLATE_NEAREST)
 	img.save_png("res://assets/tiles/terrain_atlas.png")
 
@@ -135,6 +145,18 @@ func _draw_sea(o: Vector2i) -> void:
 	_fill(o, 9, 6, 4, 1, WATER)
 	_fill(o, 4, 11, 4, 1, WATER)
 	_fill(o, 12, 12, 2, 1, SNOW)
+
+
+## Runway with centre dashes and a team-coloured control tower, so who owns the
+## airfield reads from the tile itself the way a city's roof does.
+func _draw_airport(o: Vector2i, row: int) -> void:
+	_ground(o, ASPHALT)
+	_fill(o, 1, 6, 14, 5, ASPHALT_DARK)
+	for x: int in [2, 6, 10]:
+		_fill(o, x, 8, 3, 1, MARKING)
+	_fill(o, 9, 1, 5, 4, TEAM_COLORS[row].darkened(0.25))
+	_fill(o, 10, 2, 3, 2, MARKING)
+	_fill(o, 2, 12, 4, 2, TEAM_COLORS[row])
 
 
 ## Semi-transparent white tile; the scene modulates it (blue = move range).

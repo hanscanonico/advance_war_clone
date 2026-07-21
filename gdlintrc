@@ -21,8 +21,10 @@ max-returns: 12
 # cannot grow without tripping the lint, and lowered each time it shrinks — 1320
 # when it held the demo driver, the whole rendering layer, and every animation;
 # 920 once BattleScenarioDriver, BattleView, BattleAnimator, and BattleSetup had
-# moved out; 863 now that BattleAiRunner (the computer's side of the interaction
-# flow) has moved out too, making room for the commander battle-identity HUD.
-# battle.gd sits at exactly 863: adding to it means moving something else out
+# moved out; 863 once BattleAiRunner (the computer's side of the interaction
+# flow) had too, making room for the commander battle-identity HUD; 825 now that
+# BattleMenus owns what each menu offers, which is where the production
+# facilities air units introduced would otherwise have landed.
+# battle.gd sits at exactly 825: adding to it means moving something else out
 # first, which is the point.
-max-file-lines: 863
+max-file-lines: 825

@@ -1,23 +1,64 @@
 class_name TurnRules
 extends RefCounted
-## Start-of-turn bookkeeping for the current team: income, resupply, paid
-## repairs on friendly properties, and readying units. Used by
+## Start-of-turn bookkeeping for the current team: income, fuel upkeep, resupply,
+## paid repairs on friendly properties, and readying units. Used by
 ## GameState.create for the first turn and by EndTurnCommand after.
 
 const REPAIR_HP := 20  # internal HP (= 2 displayed) per turn on a property
 
 
-static func begin_turn(state: GameState) -> void:
+## `opening` marks the day-one call GameState.create makes to hand out the first
+## income. Fuel upkeep is skipped there, because it is charged for a turn that
+## has passed and on day one none has — and because create() runs this for the
+## opening team alone, so charging it would hand the second player's aircraft a
+## free day of fuel over the first player's.
+static func begin_turn(state: GameState, opening: bool = false) -> void:
 	var team := state.current_team
 	_expire_power(state, team)
 	state.funds[team] += state.properties_of(team).size() * GameState.INCOME_PER_PROPERTY
 	for unit in state.units_of(team):
 		unit.acted = false
 		if unit.carrier != null:
-			continue  # passengers sit tight until dropped
-		if state.owner_at(unit.cell) == unit.team or _in_reach_of_supplier(state, unit):
+			continue  # passengers sit tight until dropped, and burn nothing
+		if not opening:
+			_burn_upkeep(unit)
+		if _serviced_here(state, unit) or _in_reach_of_supplier(state, unit):
 			unit.resupply()
+		if _lost_to_empty_tank(state, unit):
+			continue  # nothing left to repair
 		_repair(state, unit)
+
+
+## Fuel spent simply by existing, before anything refills it. Zero for ground
+## units, which is why a tank parked in a field is the same unit it was in M2.
+static func _burn_upkeep(unit: Unit) -> void:
+	unit.fuel = maxi(0, unit.fuel - unit.type.fuel_upkeep)
+
+
+## An air or sea unit whose tank reached zero is destroyed here, and its cargo
+## with it (remove_unit's rule, shared with every other death).
+##
+## The order in begin_turn is the whole mechanic and none of it is incidental:
+## upkeep is charged *before* resupply, so a plane that never lands eventually
+## falls; resupply runs before this check, so one that did land is always full
+## again and can never die on friendly tarmac; and the check sits before repair
+## because there is nothing left to mend. Nothing is banked to either Command
+## Power meter — running yourself dry is not an exchange, and paying the other
+## side charge for it would make starving your own air force a tactic.
+static func _lost_to_empty_tank(state: GameState, unit: Unit) -> bool:
+	if not unit.type.lost_when_dry() or unit.fuel > 0:
+		return false
+	state.remove_unit(unit)
+	return true
+
+
+## Whether the property `unit` stands on is one of ours *and* refits its domain.
+## The single answer to that question: repair and resupply both ask it, so no
+## property can ever refuel something it refuses to repair.
+static func _serviced_here(state: GameState, unit: Unit) -> bool:
+	if state.owner_at(unit.cell) != unit.team:
+		return false
+	return state.map.terrain_at(unit.cell).services_domain(unit.type.domain)
 
 
 ## A ROUND Command Power covers the opponent's turn and runs out the moment its
@@ -29,12 +70,13 @@ static func _expire_power(state: GameState, team: int) -> void:
 		co_state.power_active = false
 
 
-## +2 displayed HP on a friendly property, paid proportionally to unit cost.
-## Skipped (not partial) when funds don't cover the full heal.
+## +2 displayed HP on a friendly property that services this unit's domain, paid
+## proportionally to unit cost. Skipped (not partial) when funds don't cover the
+## full heal.
 static func _repair(state: GameState, unit: Unit) -> void:
 	if unit.hp >= 100:
 		return
-	if state.owner_at(unit.cell) != unit.team:
+	if not _serviced_here(state, unit):
 		return
 	var heal := mini(REPAIR_HP, 100 - unit.hp)
 	var full_price := unit.type.cost * heal / 100

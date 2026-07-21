@@ -13,6 +13,8 @@ const UNITS_ATLAS_PATH := "res://assets/tiles/units_atlas.png"
 const ACTED_TINT := Color(0.55, 0.55, 0.55)
 ## HpLabel's offset in unit_sprite.tscn, in world-grid units.
 const HP_LABEL_OFFSET := Vector2(1, 0)
+## FuelLabel sits opposite it, on the other side of the sprite.
+const FUEL_LABEL_OFFSET := Vector2(-8, 0)
 
 var unit: Unit
 ## Team whose turn it is. Only that team's units grey out when exhausted;
@@ -25,6 +27,7 @@ var active_team: int = 0
 var fogged: bool = false
 
 @onready var hp_label: Label = $HpLabel
+@onready var fuel_label: Label = $FuelLabel
 
 
 func setup(p_unit: Unit, p_active_team: int) -> void:
@@ -32,11 +35,13 @@ func setup(p_unit: Unit, p_active_team: int) -> void:
 	active_team = p_active_team
 	texture = texture_for(p_unit.type, p_unit.team)
 	scale = Vector2.ONE * SPRITE_SCALE
-	# The badge is authored against the world grid, so undo the sprite's scale
-	# rather than letting it shrink with the art. Its offset is authored in the
-	# same units and needs the same treatment, or the badge creeps toward centre.
+	# The badges are authored against the world grid, so undo the sprite's scale
+	# rather than letting them shrink with the art. Their offsets are authored in
+	# the same units and need the same treatment, or a badge creeps toward centre.
 	hp_label.scale = Vector2.ONE / SPRITE_SCALE
 	hp_label.position = HP_LABEL_OFFSET / SPRITE_SCALE
+	fuel_label.scale = Vector2.ONE / SPRITE_SCALE
+	fuel_label.position = FUEL_LABEL_OFFSET / SPRITE_SCALE
 	refresh()
 
 
@@ -65,6 +70,7 @@ func refresh() -> void:
 	modulate = ACTED_TINT if unit.acted and unit.team == active_team else Color.WHITE
 	hp_label.visible = unit.displayed_hp() < 10
 	hp_label.text = str(unit.displayed_hp())
+	fuel_label.visible = unit.running_dry()
 
 
 ## Quick white flash when taking a hit. Awaitable.

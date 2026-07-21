@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naval &amp; Air Units — Implementation Plan</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  .nav-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+  }
+  .nav-domain { border-left-width: 6px; }
+  .nav-air { border-left-color: #0369a1; }
+  .nav-sea { border-left-color: #1e3a8a; }
+  .nav-land { border-left-color: #92400e; }
+  .nav-chart td, .nav-chart th { padding: 0.3rem 0.55rem; font-size: 0.8rem; white-space: nowrap; }
+  .nav-chart td.na { opacity: 0.25; text-align: center; }
+  .nav-chart td.val { text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body class="bg-base-200 min-h-screen">
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-14">
+
+<!-- ============================= HERO ============================= -->
+<header class="text-center space-y-4">
+  <div class="flex justify-center gap-2">
+    <span class="badge badge-info badge-lg">Air</span>
+    <span class="badge badge-primary badge-lg">Naval</span>
+    <span class="badge badge-neutral badge-lg">Milestones N1–N4</span>
+  </div>
+  <h1 class="text-4xl sm:text-5xl font-bold leading-tight text-balance px-2">Naval &amp; Air Units</h1>
+  <p class="text-lg opacity-80 max-w-3xl mx-auto text-balance">
+    Nine new units across two new movement domains, five new terrains, and the fuel-upkeep rule
+    that keeps planes honest — built almost entirely as <em>data</em> on top of systems the APC,
+    the damage chart, and the movement resolver already ship.
+  </p>
+  <p class="text-sm opacity-60">Draft for review — decisions D1–D6 in §11 are proposed, not locked.</p>
+</header>
+
+<!-- ============================= 1 · CHEAPER THAN IT LOOKS ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">1 · Why this is cheaper than it looks</h2>
+  <p class="max-w-3xl">
+    The M0–M7 base game was built so that a unit is a <span class="nav-code">.tres</span> file and a
+    matchup is a dictionary entry. Nearly every mechanic air and naval units need already exists and
+    is already tested — what's genuinely new is small and listed on the right.
+  </p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Already shipped &amp; tested</h3>
+        <ul class="list-disc list-inside space-y-1 text-sm">
+          <li><b>Movement domains are data.</b> A move class is a key in each terrain's
+            <span class="nav-code">move_costs</span>; a missing key means impassable
+            (<span class="nav-code">core/terrain_type.gd:21</span>). Sea is impassable today only
+            because no class has a key there. <span class="nav-code">MovementResolver</span> needs
+            <b>zero changes</b>.</li>
+          <li><b>Targeting restrictions are data.</b> A missing damage-chart entry already means
+            "cannot attack" (<span class="nav-code">core/damage_chart.gd:14</span>) — "infantry can't
+            shoot a bomber" is an omission, not code.</li>
+          <li><b>Fuel &amp; ammo</b> per unit, spent on movement / per shot, refilled on properties and
+            by suppliers (<span class="nav-code">tests/unit/test_fuel_and_ammo.gd</span>).</li>
+          <li><b>Transports</b>: load / drop / supply commands, cargo riding along, cargo dying with
+            its carrier, and the full battle-scene UI for all of it (APC).</li>
+          <li><b>Indirect fire</b> (min/max range, no counters) — the battleship is a wet Rockets.</li>
+          <li><b>Charge, doctrines, saves</b> all key off unit ids and exported id lists, so new
+            units flow through commanders and the save codec untouched.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Genuinely new</h3>
+        <ul class="list-disc list-inside space-y-1 text-sm">
+          <li>Three move classes (<span class="nav-code">air</span>, <span class="nav-code">ship</span>,
+            <span class="nav-code">lander</span>) and five terrains (airport, port, shoal, bridge, reef).</li>
+          <li><b>Facilities</b>: which terrain builds / services which units — today
+            <span class="nav-code">&amp;"base"</span> is hardcoded in BuildCommand, the build menu,
+            and the AI (§6).</li>
+          <li><b>Fuel upkeep &amp; crash</b>: air and sea units burn fuel every day and are destroyed
+            at zero — the rule that makes a 22&nbsp;000 bomber a commitment, not a fire-and-forget.</li>
+          <li><b>Per-transport cargo rules</b>: the lander carries vehicles, the T-Copter doesn't —
+            the global "foot/boot only" constant becomes per-type data.</li>
+          <li><b>Air ignores terrain stars</b> — one gate in the damage formula.</li>
+          <li><b>Sub dive</b> (N3) — the only feature that touches vision, targeting and the save
+            format at once, so it gets its own milestone and its own go/no-go decision.</li>
+          <li><b>AI</b>: build from facilities, respect fuel, and know what it cannot use (§7 — the
+            honest risk of this whole plan).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="alert alert-info text-sm">
+    <span><b>Backwards-compatibility invariant:</b> no existing map gains an airport or a port, so on
+    every current map (and every current save) nothing new can be built and nothing changes — the
+    whole feature is opt-in per map. The existing maps stay byte-identical.</span>
+  </div>
+</section>
+
+<!-- ============================= 2 · THE ROSTER ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">2 · The roster</h2>
+  <p class="max-w-3xl">
+    Nine units: four air, four naval, plus <b>Missiles</b> — the ground-based answer to air power
+    that keeps Anti-Air from being the only counter. Stats are Advance-Wars-family baselines; the
+    balance runner tunes them in N4. Names are generic military vocabulary (no trade dress).
+  </p>
+  <div class="overflow-x-auto">
+    <table class="table table-sm bg-base-100 shadow">
+      <thead>
+        <tr><th>Unit</th><th>Sym</th><th>Domain</th><th>Move class</th><th>Cost</th><th>Move</th><th>Vision</th><th>Range</th><th>Fuel</th><th>Upkeep/day</th><th>Ammo</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr class="nav-domain nav-air"><td><b>Fighter</b></td><td class="nav-code">f</td><td>air</td><td class="nav-code">air</td><td>20 000</td><td>9</td><td>2</td><td>1</td><td>99</td><td>−5</td><td>9</td><td>Air superiority; touches nothing on the ground</td></tr>
+        <tr class="nav-domain nav-air"><td><b>Bomber</b></td><td class="nav-code">b</td><td>air</td><td class="nav-code">air</td><td>22 000</td><td>7</td><td>2</td><td>1</td><td>99</td><td>−5</td><td>9</td><td>Deletes ground and sea units; helpless vs air</td></tr>
+        <tr class="nav-domain nav-air"><td><b>B-Copter</b></td><td class="nav-code">h</td><td>air</td><td class="nav-code">air</td><td>9 000</td><td>6</td><td>3</td><td>1</td><td>99</td><td>−2</td><td>6</td><td>Versatile harasser; the first air unit worth buying</td></tr>
+        <tr class="nav-domain nav-air"><td><b>T-Copter</b></td><td class="nav-code">H</td><td>air</td><td class="nav-code">air</td><td>5 000</td><td>6</td><td>2</td><td>—</td><td>99</td><td>−2</td><td>—</td><td>Carries 1 foot/boot unit; unarmed</td></tr>
+        <tr class="nav-domain nav-land"><td><b>Missiles</b></td><td class="nav-code">M</td><td>land</td><td class="nav-code">tires</td><td>12 000</td><td>4</td><td>5</td><td>3–5</td><td>50</td><td>0</td><td>6</td><td>Indirect, air-only; area denial vs planes</td></tr>
+        <tr class="nav-domain nav-sea"><td><b>Battleship</b></td><td class="nav-code">B</td><td>sea</td><td class="nav-code">ship</td><td>28 000</td><td>5</td><td>2</td><td>2–6</td><td>99</td><td>−1</td><td>9</td><td>Longest gun in the game; cannot touch air</td></tr>
+        <tr class="nav-domain nav-sea"><td><b>Cruiser</b></td><td class="nav-code">c</td><td>sea</td><td class="nav-code">ship</td><td>18 000</td><td>6</td><td>3</td><td>1</td><td>99</td><td>−1</td><td>9</td><td>Escort: hits subs and air, nothing else</td></tr>
+        <tr class="nav-domain nav-sea"><td><b>Sub</b></td><td class="nav-code">s</td><td>sea</td><td class="nav-code">ship</td><td>20 000</td><td>5</td><td>5</td><td>1</td><td>60</td><td>−1 (−5 dived)</td><td>6</td><td>Ship-killer; dives in N3</td></tr>
+        <tr class="nav-domain nav-sea"><td><b>Lander</b></td><td class="nav-code">l</td><td>sea</td><td class="nav-code">lander</td><td>12 000</td><td>6</td><td>1</td><td>—</td><td>99</td><td>−1</td><td>—</td><td>Carries 2 land units of any class; unload on shoal/port</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-sm opacity-70">
+    Unit symbols live in the <span class="nav-code">[units]</span> namespace (taken: i m r t T a g R p);
+    terrain symbols are a separate namespace, so no clashes. Atlas columns 9–17 in
+    <span class="nav-code">tools/build_pixvoxel_atlases.sh</span>'s <span class="nav-code">UNITS</span> order.
+  </p>
+  <div class="alert text-sm">
+    <span><b>One-weapon simplification (kept):</b> this game has a single chart row per unit, not
+    Advance Wars' primary/secondary weapons. A tank strafing a copter therefore spends a cannon
+    shell. Accepted — it costs one shell of realism and saves a whole weapons subsystem.</span>
+  </div>
+</section>
+
+<!-- ============================= 3 · TERRAIN ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">3 · Terrain &amp; the movement matrix</h2>
+  <p class="max-w-3xl">
+    Five new terrains, and three new move-class columns on the nine existing ones. Everything below
+    is <span class="nav-code">.tres</span> edits — the resolver, the range overlay and fuel billing
+    all read this one matrix.
+  </p>
+  <div class="overflow-x-auto">
+    <table class="table table-sm bg-base-100 shadow">
+      <thead>
+        <tr><th>New terrain</th><th>Sym</th><th>Stars</th><th>Property</th><th>Passable by (cost)</th><th>Special</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Airport</b></td><td class="nav-code">A</td><td>3</td><td>yes — income, capturable, team-tinted</td><td>land classes 1 · air 1</td><td>Builds air units; repairs/resupplies <b>air</b></td></tr>
+        <tr><td><b>Port</b></td><td class="nav-code">P</td><td>3</td><td>yes — income, capturable, team-tinted</td><td>land 1 · air 1 · ship 1 · lander 1</td><td>Builds naval units; repairs/resupplies <b>sea</b></td></tr>
+        <tr><td><b>Shoal</b></td><td class="nav-code">_</td><td>0</td><td>no</td><td>land 1 · air 1 · lander 1</td><td>The beach a lander unloads onto; ships cannot enter</td></tr>
+        <tr><td><b>Bridge</b></td><td class="nav-code">+</td><td>0</td><td>no</td><td>land 1 · air 1</td><td>A road over river or sea; <b>blocks ships</b> — bridges are naval chokepoints</td></tr>
+        <tr><td><b>Reef</b></td><td class="nav-code">*</td><td>1</td><td>no</td><td>air 1 · ship 2 · lander 2</td><td>Conceals in fog, exactly like woods</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">New columns on existing terrain</h3>
+        <ul class="list-disc list-inside space-y-1 text-sm">
+          <li><span class="nav-code">air: 1</span> on <b>every</b> terrain — planes fly over mountains,
+            rivers and the sea, and pay 1 fuel per tile. That single data rule is the whole air
+            movement model.</li>
+          <li><span class="nav-code">ship: 1, lander: 1</span> on <b>sea</b> only (plus port and reef
+            above). River stays land-locked; land terrain stays keyless for sea classes.</li>
+          <li>Enemy units still block paths for everyone, air included — same as Advance Wars,
+            and already what the resolver does.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Two small TerrainType fields</h3>
+        <ul class="list-disc list-inside space-y-1 text-sm">
+          <li><span class="nav-code">builds: Array[StringName]</span> — move classes this terrain can
+            produce. Base = the four land classes; port = ship+lander; airport = air. Kills the
+            <span class="nav-code">&amp;"base"</span> hardcode in three places (§6).</li>
+          <li><span class="nav-code">services: Array[StringName]</span> — domains this property
+            repairs/resupplies. City/Base/HQ = land; port = sea; airport = air. A bomber parked on a
+            city gets <b>nothing</b> — that's what makes airports matter.</li>
+          <li><span class="nav-code">conceals: bool</span> — woods <em>and reef</em>; replaces the
+            hardcoded woods id in <span class="nav-code">core/rules/vision.gd:96</span>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 4 · DAMAGE CHART ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">4 · Damage chart — baseline values</h2>
+  <p class="max-w-3xl">
+    AW2-family numbers as the starting point; N4's balance runner is the tuner. An empty cell is a
+    deliberate omission — it <em>is</em> the rule "this unit cannot target that one". These two
+    tables are the single source of truth for the data work.
+  </p>
+  <h3 class="font-bold">New attackers → all defenders</h3>
+  <div class="overflow-x-auto">
+    <table class="table table-xs bg-base-100 shadow nav-chart">
+      <thead>
+        <tr><th>atk ↓ · def →</th><th>inf</th><th>mech</th><th>recon</th><th>tank</th><th>md tk</th><th>AA</th><th>arty</th><th>rkts</th><th>APC</th><th>Msl</th><th>Ftr</th><th>Bmr</th><th>B-Cop</th><th>T-Cop</th><th>Bship</th><th>Cru</th><th>Sub</th><th>Lndr</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>Fighter</th><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">55</td><td class="val">100</td><td class="val">100</td><td class="val">100</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td></tr>
+        <tr><th>Bomber</th><td class="val">110</td><td class="val">110</td><td class="val">105</td><td class="val">105</td><td class="val">95</td><td class="val">95</td><td class="val">105</td><td class="val">105</td><td class="val">105</td><td class="val">105</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">75</td><td class="val">85</td><td class="val">95</td><td class="val">95</td></tr>
+        <tr><th>B-Copter</th><td class="val">75</td><td class="val">75</td><td class="val">55</td><td class="val">55</td><td class="val">25</td><td class="val">25</td><td class="val">65</td><td class="val">65</td><td class="val">60</td><td class="val">65</td><td class="na">—</td><td class="na">—</td><td class="val">65</td><td class="val">95</td><td class="val">25</td><td class="val">55</td><td class="val">25</td><td class="val">25</td></tr>
+        <tr><th>Missiles</th><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">100</td><td class="val">100</td><td class="val">120</td><td class="val">120</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td></tr>
+        <tr><th>Battleship</th><td class="val">95</td><td class="val">90</td><td class="val">90</td><td class="val">80</td><td class="val">55</td><td class="val">85</td><td class="val">80</td><td class="val">85</td><td class="val">80</td><td class="val">90</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">50</td><td class="val">95</td><td class="val">95</td><td class="val">95</td></tr>
+        <tr><th>Cruiser</th><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">55</td><td class="val">65</td><td class="val">115</td><td class="val">115</td><td class="na">—</td><td class="na">—</td><td class="val">90</td><td class="na">—</td></tr>
+        <tr><th>Sub</th><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">55</td><td class="val">25</td><td class="val">55</td><td class="val">95</td></tr>
+        <tr><th>T-Copter / Lander</th><td class="na" colspan="18">unarmed — no chart row (like the APC today)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3 class="font-bold">Existing attackers → new defenders</h3>
+  <div class="overflow-x-auto">
+    <table class="table table-xs bg-base-100 shadow nav-chart">
+      <thead>
+        <tr><th>atk ↓ · def →</th><th>Ftr</th><th>Bmr</th><th>B-Cop</th><th>T-Cop</th><th>Msl</th><th>Bship</th><th>Cru</th><th>Sub</th><th>Lndr</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>Infantry</th><td class="na">—</td><td class="na">—</td><td class="val">7</td><td class="val">30</td><td class="val">25</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td></tr>
+        <tr><th>Mech</th><td class="na">—</td><td class="na">—</td><td class="val">9</td><td class="val">35</td><td class="val">85</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td></tr>
+        <tr><th>Recon</th><td class="na">—</td><td class="na">—</td><td class="val">10</td><td class="val">35</td><td class="val">28</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td></tr>
+        <tr><th>Tank</th><td class="na">—</td><td class="na">—</td><td class="val">10</td><td class="val">40</td><td class="val">85</td><td class="val">1</td><td class="val">5</td><td class="val">1</td><td class="val">10</td></tr>
+        <tr><th>Md Tank</th><td class="na">—</td><td class="na">—</td><td class="val">12</td><td class="val">45</td><td class="val">105</td><td class="val">10</td><td class="val">45</td><td class="val">10</td><td class="val">35</td></tr>
+        <tr><th>Anti-Air</th><td class="val">65</td><td class="val">75</td><td class="val">120</td><td class="val">120</td><td class="val">55</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td></tr>
+        <tr><th>Artillery</th><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">80</td><td class="val">40</td><td class="val">65</td><td class="val">60</td><td class="val">55</td></tr>
+        <tr><th>Rockets</th><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="val">90</td><td class="val">55</td><td class="val">85</td><td class="val">85</td><td class="val">60</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="alert alert-warning text-sm">
+    <span><b>Silent-omission risk:</b> a typo'd id or a forgotten row reads as "cannot attack" with no
+    error anywhere. N1 ships a chart lint test: every id in the chart must exist in the UnitDB, every
+    armed unit must have a row, and a per-unit expected-target-domain list catches missing columns
+    (e.g. "Anti-Air must reach every air unit"). See R2.</span>
+  </div>
+</section>
+
+<!-- ============================= 5 · FUEL ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">5 · Fuel upkeep, crashing &amp; the day cycle</h2>
+  <p class="max-w-3xl">
+    The rule that separates air/naval from "faster tanks": planes and ships burn fuel just by
+    existing, and are destroyed when the tank hits zero. Two new UnitType fields carry it:
+    <span class="nav-code">domain</span> (land / air / sea) and <span class="nav-code">fuel_upkeep</span>.
+    Land units have upkeep 0 and never crash — current behavior, untouched.
+  </p>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h3 class="card-title text-base">Per-unit order inside <span class="nav-code">TurnRules.begin_turn</span></h3>
+      <ol class="list-decimal list-inside space-y-1 text-sm">
+        <li><b>Ready</b> the unit (<span class="nav-code">acted = false</span>) — unchanged.</li>
+        <li><b>Upkeep</b>: <span class="nav-code">fuel −= fuel_upkeep</span>, floored at 0.</li>
+        <li><b>Resupply</b> if on a friendly property whose <span class="nav-code">services</span>
+          include the unit's domain, or in reach of a supplier — the existing rule, now
+          domain-gated. APC reach refuels <em>anything</em>, planes included (Advance Wars rule,
+          and it makes Gideon Holt's extended supply radius suddenly very interesting).</li>
+        <li><b>Crash check</b>: an air or sea unit at 0 fuel is destroyed via
+          <span class="nav-code">remove_unit</span> — cargo goes down with it, rout applies,
+          and <b>no charge is banked</b> on either meter (self-inflicted losses feed no power).</li>
+        <li><b>Repair</b> (+2 HP, paid) — now behind the same <span class="nav-code">services</span>
+          gate: airports repair planes, cities don't.</li>
+      </ol>
+      <p class="text-sm opacity-70 mt-2">
+        Order matters: upkeep before resupply means a bomber that <em>lands on</em> an airport is
+        always safe; resupply before the crash check means it can never die on friendly tarmac.
+        A fighter loitering in enemy airspace at 99 fuel has ~7 full-move days before the math
+        catches it.
+      </p>
+    </div>
+  </div>
+  <ul class="list-disc list-inside text-sm space-y-1 max-w-3xl">
+    <li><b>Movement fuel</b> is untouched: 1 per tile for air (all terrain costs 1), per-terrain for
+      ships — already billed by <span class="nav-code">GameState.advance_unit</span>.</li>
+    <li><b>Move budget</b> is already fuel-capped (<span class="nav-code">movement_resolver.gd:59</span>),
+      so a dry plane visibly shrinks on the range overlay before it ever crashes.</li>
+    <li><b>UI</b>: the terrain panel already shows Fuel n/max; N1 adds a low-fuel warning badge on the
+      sprite when <span class="nav-code">fuel &lt; upkeep + move_points</span> (one turn of margin).</li>
+  </ul>
+</section>
+
+<!-- ============================= 6 · CORE CHANGES ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">6 · Exact core &amp; scene changes</h2>
+  <p class="max-w-3xl">Every code touch, by file. Nothing else in <span class="nav-code">core/</span> moves.</p>
+  <div class="overflow-x-auto">
+    <table class="table table-sm bg-base-100 shadow">
+      <thead><tr><th>File</th><th>Change</th><th>Milestone</th></tr></thead>
+      <tbody>
+        <tr><td class="nav-code">core/terrain_type.gd</td><td>Consts <span class="nav-code">AIR/SHIP/LANDER</span>; <span class="nav-code">@export builds, services, conceals</span></td><td>N1/N2</td></tr>
+        <tr><td class="nav-code">core/unit_type.gd</td><td><span class="nav-code">@export domain, fuel_upkeep, cargo_classes, unload_terrain</span> (N3: <span class="nav-code">dived_fuel_upkeep</span>)</td><td>N1–N3</td></tr>
+        <tr><td class="nav-code">core/rules/turn_rules.gd</td><td>Upkeep → domain-gated resupply → crash → domain-gated repair (§5)</td><td>N1</td></tr>
+        <tr><td class="nav-code">core/commands/build_command.gd</td><td><span class="nav-code">terrain.id == &amp;"base"</span> → <span class="nav-code">unit_type.move_class in terrain.builds</span></td><td>N1</td></tr>
+        <tr><td class="nav-code">core/commands/load_command.gd</td><td>Global <span class="nav-code">TRANSPORTABLE</span> const → carrier's <span class="nav-code">cargo_classes</span></td><td>N1</td></tr>
+        <tr><td class="nav-code">core/commands/drop_command.gd</td><td>Also require carrier's terrain ∈ <span class="nav-code">unload_terrain</span> (when non-empty) — the lander unloads from shoal/port only</td><td>N2</td></tr>
+        <tr><td class="nav-code">core/rules/combat_resolver.gd</td><td>In <span class="nav-code">_damage_pct</span>: air-domain defender → terrain stars 0 (commander star bonuses still apply per the formula)</td><td>N1</td></tr>
+        <tr><td class="nav-code">core/rules/vision.gd</td><td>Woods id check → <span class="nav-code">terrain.conceals</span>; N3 adds dived-sub rules</td><td>N2/N3</td></tr>
+        <tr><td class="nav-code">core/save_codec.gd</td><td><b>No change</b> until N3 (v3: additive per-unit <span class="nav-code">dived</span> flag)</td><td>N3</td></tr>
+        <tr><td class="nav-code">core/movement_resolver.gd</td><td><b>Zero changes.</b> The design of record earns its keep here.</td><td>—</td></tr>
+        <tr><td class="nav-code">scenes/battle/battle.gd</td><td><span class="nav-code">_is_own_empty_base</span>/<span class="nav-code">_open_build_menu</span> (:517, :525): base hardcode → any owned empty terrain with non-empty <span class="nav-code">builds</span>; menu lists <span class="nav-code">unit_db</span> filtered to those classes</td><td>N1</td></tr>
+        <tr><td class="nav-code">ai/ai_controller.gd</td><td><span class="nav-code">_plan_build/_pick_build</span> (:267–:296) facility-aware; fuel-retreat goal (§7)</td><td>N1/N2</td></tr>
+        <tr><td class="nav-code">tools/build_pixvoxel_atlases.sh</td><td>9 unit sprites (cols 9–17), 5 terrain tiles (cols 9–13, port/airport team-tinted)</td><td>N1/N2</td></tr>
+        <tr><td class="nav-code">tools/run_commander_balance.gd</td><td>Mixed-domain scenario(s) in <span class="nav-code">SCENARIOS</span></td><td>N4</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-sm opacity-70 max-w-3xl">
+    Per the hook-layers lesson (rules living in both a resolver and a command's validate): every rule
+    above lands in exactly one authority — facilities in TerrainType data read by BuildCommand and
+    the menu, cargo rules in UnitType data read by Load/Drop — and N4's mixed-domain AI-vs-AI soak
+    is the integration net that catches any drift the unit tests can't see.
+  </p>
+</section>
+
+<!-- ============================= 7 · AI ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">7 · The AI — scoped honestly</h2>
+  <p class="max-w-3xl">
+    Movement, attack scoring and target selection are already generic: the planner reads the damage
+    chart and the movement matrix, so a b-copter raid or a battleship bombardment falls out of
+    existing code. Production and logistics do not. Three tiers, committed to explicitly:
+  </p>
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">In scope — N1/N2</h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li><b>Facility-aware building</b>: <span class="nav-code">_plan_build</span> iterates every
+            owned empty producing property; <span class="nav-code">build_priority</span> stays one
+            data list, walked filtered by the facility's buildable classes. Infantry-first capture
+            logic gates to land facilities.</li>
+          <li>Profile data gains air/naval entries (e.g. b_copter after tank, cruiser answer when
+            enemy fields subs/bombers is N4 tuning, not code).</li>
+          <li><b>Fuel retreat</b>: air/sea units below the one-turn fuel margin route to the nearest
+            servicing property — extends the existing damaged-retreat goal in
+            <span class="nav-code">_advance_goal</span>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">In scope — N3/N4</h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li>Sub policy, minimal: dive when an enemy who can hit a surfaced sub is in range and no
+            cruiser is; surface to attack. The AI already respects hidden units via
+            <span class="nav-code">Vision.is_hidden_from</span> — dived subs plug into that same
+            single exception.</li>
+          <li>N4: tune build priorities per profile against the balance runner; make sure Anti-Air /
+            Missiles appear once the opponent flies.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow border border-warning">
+      <div class="card-body">
+        <h3 class="card-title text-base">Explicitly out</h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li><b>Transport ferry planning</b> (lander convoys, t-copter drops). Multi-turn
+            load→sail→unload plans don't fit a greedy one-command planner; faking it badly reads
+            as a broken AI. The AI therefore <b>never builds a unit it cannot use</b>: transports
+            are skipped in its priorities.</li>
+          <li>Consequence for map design: AI-facing sea maps need direct-engagement lanes (bridges,
+            shared coastlines, port-to-port gun range). Codified as R1.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 8 · PRESENTATION ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">8 · Presentation &amp; assets</h2>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Almost free (already generic)</h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li>Build menu rows, icons, affordability graying — automatic once units are in the DB and
+            atlas (<span class="nav-code">ActionMenu</span> + <span class="nav-code">UnitSprite.texture_for</span>).</li>
+          <li>Fuel/ammo/range in the terrain panel; "Carrying" line for transports; load/drop/supply
+            flows and drop-targeting state — all shipped with the APC.</li>
+          <li>Damage preview, charge banking, victory flow: chart- and id-driven.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Real work</h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li><b>Art</b>: 9 unit sprites × team rows, 5 terrain tiles (2 team-tinted) through the
+            pixvoxel pipeline; placeholder-first so milestones never block on art.</li>
+          <li>Low-fuel badge on sprites (§5); dive/surface action + dived sub rendering (N3),
+            reusing the Vanish hidden-unit presentation.</li>
+          <li>Two new maps (§9) and map-legend docs in README.</li>
+          <li>Sfx: build/launch/splash/crash one-shots — reuse the existing Sfx pattern.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 9 · MILESTONES ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">9 · Milestones — each ends playable</h2>
+  <div class="space-y-4">
+    <div class="card bg-base-100 shadow nav-domain nav-air">
+      <div class="card-body">
+        <h3 class="card-title">N1 · Wings <span class="badge badge-info">air + the foundations</span></h3>
+        <p class="text-sm max-w-3xl">
+          Air forces the general machinery through (facilities, services, upkeep/crash, cargo
+          classes) with a visible payoff, while needing only <b>one</b> new terrain.
+        </p>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li>Core: <span class="nav-code">air</span> class · airport · builds/services · upkeep &amp;
+            crash · air-ignores-stars · cargo_classes (t-copter carries like an APC that flies).</li>
+          <li>Data: fighter, bomber, b-copter, t-copter, missiles; chart rows + lint test;
+            <span class="nav-code">air: 1</span> on all terrains.</li>
+          <li>AI: facility-aware build + fuel retreat. Map: <b>"Jet Stream"</b> — the first map with
+            airports. UI: filtered build menu, low-fuel badge.</li>
+          <li><b>Done means</b>: a full hotseat and vs-AI match on Jet Stream where air power decides
+            games and runs dry when overextended; <span class="nav-code">make verify</span> green;
+            old maps provably unchanged.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow nav-domain nav-sea">
+      <div class="card-body">
+        <h3 class="card-title">N2 · Tides <span class="badge badge-primary">the navy</span></h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li>Core: <span class="nav-code">ship</span>/<span class="nav-code">lander</span> classes ·
+            port, shoal, bridge, reef · <span class="nav-code">conceals</span> generalization ·
+            lander unload gating.</li>
+          <li>Data: battleship, cruiser, sub (surfaced — no dive yet), lander; chart rows; sea gains
+            ship/lander costs.</li>
+          <li>Map: <b>"The Straits"</b> — ports, shoals, a bridge chokepoint, sea lanes putting
+            port-to-port gun range in play (AI-viable per R1).</li>
+          <li><b>Done means</b>: naval battles work end-to-end incl. a human ferrying tanks by
+            lander; AI builds and fights with capital ships on The Straits.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow nav-domain nav-sea">
+      <div class="card-body">
+        <h3 class="card-title">N3 · Depths <span class="badge badge-secondary">sub dive — go/no-go is D5</span></h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li>Dive/Surface commands · <span class="nav-code">Unit.dived</span> · upkeep 5 while dived ·
+            targetable only by cruiser/sub · hidden except adjacent (fog <em>and</em> clear weather,
+            like AW) · AI via the existing <span class="nav-code">is_hidden_from</span> exception ·
+            save v3 (additive) · minimal AI dive policy.</li>
+          <li><b>Done means</b>: a dived sub ambushes in fog against human and AI; save/load
+            round-trips it; soak stays clean.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow nav-domain nav-land">
+      <div class="card-body">
+        <h3 class="card-title">N4 · Trim the fleet <span class="badge badge-neutral">balance &amp; doctrine pass</span></h3>
+        <ul class="list-disc list-inside text-sm space-y-1">
+          <li>Mixed-domain scenarios in the balance runner; chart/cost tuning from its CSVs.</li>
+          <li>Commander pass: extend exported id lists where doctrine says so (Cassian's
+            <span class="nav-code">heavy_ids</span> and capital ships? Orin's scouts and the
+            t-copter?) — each a one-line .tres edit, decided from runner data, not vibes.</li>
+          <li>Mixed-domain AI-vs-AI soak test joins the suite (the hook-layers integration net);
+            README/CLAUDE.md document the new classes, symbols and rules.</li>
+          <li><b>Done means</b>: no commander pairing swings past the base-game tolerance on mixed
+            maps; docs current; suite green.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 10 · RISKS ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">10 · Risks &amp; failure modes</h2>
+  <div class="overflow-x-auto">
+    <table class="table table-sm bg-base-100 shadow">
+      <thead><tr><th>#</th><th>Risk</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td><b>R1</b></td><td>The AI cannot ferry, so on island maps it builds a navy that shells nothing and loses to a human who can ferry — reads as "the AI is broken".</td><td>AI never builds transports; AI-facing sea maps guarantee direct-engagement lanes (The Straits is designed to this rule); ferry AI stays a named stretch goal, not scope.</td></tr>
+        <tr><td><b>R2</b></td><td>Damage-chart omissions are silent: one typo'd id and a matchup quietly becomes "cannot attack".</td><td>N1 chart lint test — ids must exist, armed units must have rows, per-unit expected-target-domains must be covered.</td></tr>
+        <tr><td><b>R3</b></td><td>Fuel crash feels bad or warps the charge economy (meter-feeding by starving units, doctrine interactions).</td><td>Crashes bank zero charge; one-turn-margin UI warning; upkeep values are .tres data so tuning never touches code; soak watches for AI fuel-suicide.</td></tr>
+        <tr><td><b>R4</b></td><td>Scope creep — the named top risk of the whole project. Carriers, stealth, black boats, cruiser copter-cargo, per-map unit toggles all beckon.</td><td>§12 is a hard out-of-scope list; D1 locks the roster at nine.</td></tr>
+        <tr><td><b>R5</b></td><td>Rule drift between validate / resolver / overlay, multiplied by new commands and domains (the movement-overlay bug's lesson).</td><td>Each new rule has exactly one authority (§6); N4's mixed-domain soak is the integration net.</td></tr>
+        <tr><td><b>R6</b></td><td>Art volume (9 units × teams + 5 terrains) stalls a milestone.</td><td>Pixvoxel pipeline already scales by appending to one array; placeholders ship first, art never gates a milestone.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================= 11 · DECISIONS ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">11 · Decisions — proposed, for review</h2>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">D1 · Roster: nine units</h3>
+        <p class="text-sm">4 air + 4 sea + Missiles. Missiles is included so ground players have a
+        second answer to air. Alternative: minimal six (cut sub, missiles, fighter) — cheaper but
+        the air game degenerates to bomber-rush-vs-AA.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">D2 · Fuel upkeep + crash: yes</h3>
+        <p class="text-sm">Per-day drain and destruction at zero for air/sea, in the §5 order;
+        crashes bank no charge. Alternative — no upkeep — makes air strictly-better tanks and
+        airports cosmetic.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">D3 · Facilities as data</h3>
+        <p class="text-sm">Port/airport are ordinary income properties with <span class="nav-code">builds</span>
+        and <span class="nav-code">services</span> lists on TerrainType; cities no longer service
+        planes. One mechanism replaces three hardcodes (BuildCommand, build menu, AI).</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">D4 · Transport matrix per type</h3>
+        <p class="text-sm">Lander: capacity 2, any land class, unloads on shoal/port only.
+        T-Copter: capacity 1, foot/boot, unloads anywhere the cargo can stand. Cruiser carries
+        nothing (AW2 copter-cargo is out).</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">D5 · Sub dive ships as N3</h3>
+        <p class="text-sm">Dive is the one mechanic touching vision + targeting + saves, so it is
+        isolated where it can be cut without unwinding the navy. Fallback if cut: the sub stays a
+        surfaced torpedo boat (still useful), N3 collapses into N4.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">D6 · Air defense rules</h3>
+        <p class="text-sm">Air defenders take 0 terrain stars (commander star bonuses still apply —
+        the formula stays normative). Woods/reef concealment stays cell-based, so a copter over
+        woods hides like a tank in them — a simplification we keep and document.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 12 · OUT OF SCOPE ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">12 · Out of scope — named so it stays out</h2>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <ul class="list-disc list-inside text-sm space-y-1 columns-1 sm:columns-2">
+        <li>Carriers, stealth planes, black boats, battleship-carriers — AW2+/DS roster.</li>
+        <li>Cruisers carrying copters.</li>
+        <li>AI transport-ferry planning (named stretch goal; see R1).</li>
+        <li>Weather, per-map unit bans / category toggles.</li>
+        <li>Primary/secondary weapon split (one chart row per unit stands).</li>
+        <li>Naval terrain beyond §3 (no pipes, no missile silos).</li>
+        <li>New commanders themed on air/sea — doctrine <em>extensions</em> to existing generals
+          happen in N4, new generals belong to the commanders plan.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="text-center text-sm opacity-60 pb-8">
+  Naval &amp; Air Units plan · drafted 2026-07-21 · companion to
+  <span class="nav-code">.lavish/advance-wars-clone-plan.html</span> (M0–M7) and
+  <span class="nav-code">.lavish/commanders-plan.html</span> (C1–C4)
+</footer>
+
+</main>
+</body>
+</html>

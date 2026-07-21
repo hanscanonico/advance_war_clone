@@ -4,20 +4,21 @@
 
 [resource]
 script = ExtResource("1")
-id = &"anti_air"
-display_name = "Anti-Air"
-symbol = "a"
-cost = 8000
-move_points = 6
-move_class = &"treads"
-domain = &"land"
+id = &"bomber"
+display_name = "Bomber"
+symbol = "b"
+cost = 22000
+move_points = 7
+move_class = &"air"
+domain = &"air"
 vision = 2
 can_capture = false
 min_range = 1
 max_range = 1
-max_fuel = 60
-fuel_upkeep = 0
+max_fuel = 99
+fuel_upkeep = 5
 max_ammo = 9
 transport_capacity = 0
 cargo_classes = Array[StringName]([])
-atlas_col = 5
+can_resupply = false
+atlas_col = 10

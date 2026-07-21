@@ -136,3 +136,46 @@ func test_resolve_unarmed_defender_cannot_counter() -> void:
 	state.rng.seed = 3
 	var result := CombatResolver.resolve(state, state.units[0], state.units[1])
 	assert_false(result.countered)
+
+
+## A unit in the air is over the tile rather than on it, so the ground gives it
+## nothing. Without this an aircraft parked over a mountain would be the hardest
+## target in the game, which is not what a mountain is for.
+func test_terrain_gives_aircraft_no_cover() -> void:
+	var over_plains := _state("[terrain]\n..\n[units]\n1 a 0 0\n2 h 1 0")
+	var over_mountain := _state("[terrain]\n.M\n[units]\n1 a 0 0\n2 h 1 0")
+	assert_eq(
+		(
+			CombatResolver
+			. forecast(over_plains, over_plains.units[0], Vector2i(0, 0), over_plains.units[1])
+			. attack_damage
+		),
+		(
+			CombatResolver
+			. forecast(
+				over_mountain, over_mountain.units[0], Vector2i(0, 0), over_mountain.units[1]
+			)
+			. attack_damage
+		),
+		"a helicopter takes the same damage whatever it happens to be flying over"
+	)
+
+
+## The other half of the same rule: ground units read the terrain exactly as they
+## always did, so nothing about the base game's cover changed.
+func test_terrain_still_covers_ground_units() -> void:
+	var on_plains := _state("[terrain]\n..\n[units]\n1 t 0 0\n2 t 1 0")
+	var in_woods := _state("[terrain]\n.F\n[units]\n1 t 0 0\n2 t 1 0")
+	assert_gt(
+		(
+			CombatResolver
+			. forecast(on_plains, on_plains.units[0], Vector2i(0, 0), on_plains.units[1])
+			. attack_damage
+		),
+		(
+			CombatResolver
+			. forecast(in_woods, in_woods.units[0], Vector2i(0, 0), in_woods.units[1])
+			. attack_damage
+		),
+		"woods should still soften a hit on a tank"
+	)

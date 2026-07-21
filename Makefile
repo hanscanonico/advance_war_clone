@@ -100,7 +100,7 @@ format-check:
 # same file, so running them concurrently produces a torn terrain_atlas.png.
 .NOTPARALLEL:
 
-tiles: sprites-check ground sprites import
+tiles: sprites-check ground sprites unit-placeholders import
 
 sprites-check:
 	tools/build_pixvoxel_atlases.sh --check "$(PIXVOXEL)"
@@ -110,6 +110,11 @@ ground:
 
 sprites:
 	tools/build_pixvoxel_atlases.sh "$(PIXVOXEL)"
+
+# The PixVoxel pack has no aircraft or ships, so the columns past its roster are
+# drawn here instead. Must follow `sprites`, which writes the atlas this widens.
+unit-placeholders:
+	$(GODOT) --headless --path . -s res://tools/generate_unit_placeholders.gd
 
 sfx:
 	$(GODOT) --headless --path . -s res://tools/generate_sfx.gd
@@ -139,5 +144,5 @@ gallery-screenshot: import
 	$(GODOT) --path . scenes/menu/commander_gallery.tscn -- --screenshot=$(CURDIR)/screenshot.png
 
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
-	sprites-check ground sprites sfx portraits import screenshot menu-screenshot \
-	gallery-screenshot commander-balance difficulty-check
+	sprites-check ground sprites unit-placeholders sfx portraits import screenshot \
+	menu-screenshot gallery-screenshot commander-balance difficulty-check

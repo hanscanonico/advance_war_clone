@@ -32,10 +32,35 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 @export var min_useful_score: float = 40.0
 ## What advancing is worth. Deliberately tiny: it is the fallback.
 @export var advance_score: float = 1.0
-## Build preference once enough capture units exist, strongest first.
-@export var build_priority: Array[StringName] = [&"md_tank", &"tank", &"artillery", &"mech"]
+## Build preference once enough capture units exist, strongest first. Walked at
+## every production property and filtered by what that property can actually
+## build, so one list covers bases and airports without an entry per facility.
+##
+## Transports are deliberately absent: the planner cannot plan a load-move-unload
+## across turns, and a fleet of empty carriers is worse than none.
+@export var build_priority: Array[StringName] = [
+	&"md_tank",
+	&"bomber",
+	&"fighter",
+	&"tank",
+	&"b_copter",
+	&"missiles",
+	&"artillery",
+	&"mech",
+]
 ## Infantry are bought until the team has this many capture-capable units.
 @export var capture_unit_target: int = 3
+## What to buy when the enemy is flying and we cannot reach them, best first.
+## Nothing in build_priority is guaranteed to answer air, so this is asked ahead
+## of it — otherwise an AI with a full bank watches bombers work unopposed.
+@export var air_answer_ids: Array[StringName] = [&"anti_air", &"missiles", &"fighter"]
+## How many units that can shoot at aircraft the team wants while the enemy has
+## any. Counted from the damage chart, not from this list.
+@export var air_answer_target: int = 2
+## Turns of fuel margin an air or sea unit keeps before it breaks off to refuel:
+## below this it heads for the nearest property that services it. Zero disables
+## the behaviour and lets units fly until they drop.
+@export var refuel_margin_turns: int = 1
 
 # --- Difficult-tier capabilities ---------------------------------------------
 #
