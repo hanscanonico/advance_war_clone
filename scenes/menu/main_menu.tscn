@@ -63,31 +63,6 @@ unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(140, 0)
 
-[node name="CoRow" type="HBoxContainer" parent="Center/Rows"]
-layout_mode = 2
-theme_override_constants/separation = 6
-alignment = 1
-
-[node name="RedCoLabel" type="Label" parent="Center/Rows/CoRow"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = "Red"
-
-[node name="RedCoOption" type="OptionButton" parent="Center/Rows/CoRow"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(118, 0)
-
-[node name="BlueCoLabel" type="Label" parent="Center/Rows/CoRow"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = "Blue"
-
-[node name="BlueCoOption" type="OptionButton" parent="Center/Rows/CoRow"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(118, 0)
-
 [node name="FogCheck" type="CheckButton" parent="Center/Rows"]
 unique_name_in_owner = true
 layout_mode = 2

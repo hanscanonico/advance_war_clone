@@ -99,7 +99,11 @@ func _fog_hides_unseen() -> bool:
 ## mapmenu stops at the map menu (End Turn / Save); powermenu fires a Command
 ## Power from the HUD over an open action menu; ambush and vanish are the same
 ## staged board with Sable Wren's power down and up; victory routs Blue through
-## a real attack so the victory screen comes up.
+## a real attack so the victory screen comes up. The commander-identity captures
+## (plan G3): power_ready and power_active stage the HUD chip's ready and active
+## states, power_banner fires a power so its activation card holds, commander_info
+## opens the both-sides reference from the map menu, and commander_victory wins
+## with a general so the victory lockup is fronted by a portrait.
 ##
 ## Modes that stop early return without falling through to the rest of the
 ## chain; `run` still takes the capture.
@@ -151,6 +155,16 @@ func _run_demo(mode: String) -> void:
 			await _run_power_menu_demo()
 		"ambush", "vanish":
 			_run_vanish_demo(mode)
+		"power_ready":
+			_set_red_commander(&"mara_voss", true)  # meter full -> READY + live Fire
+		"power_active":
+			_stage_active_power()  # power running -> chip ACTIVE, no banner
+		"power_banner":
+			await _stage_power_banner()  # fire it -> the activation card holds
+		"commander_info":
+			await _stage_commander_info()  # both-sides reference from the map menu
+		"commander_victory":
+			await _run_victory_demo(true)  # victory lockup fronted by the winner's face
 		"victory":
 			await _run_victory_demo()
 		"aiturn":
@@ -202,7 +216,7 @@ func _run_power_menu_demo() -> void:
 	_battle.confirm_at(Vector2i(8, 8))  # select the red tank
 	_battle.confirm_at(Vector2i(8, 8))  # stay put -> its action menu
 	await _until_state(Battle.State.MENU)
-	_battle.view.power_button.pressed.emit()
+	_battle.view.commander_chip.fire_button.pressed.emit()
 	await _until_state(Battle.State.IDLE)
 	# Waited out rather than asserted, in the same spirit as _until_state: a menu
 	# that never closes hangs the scenario and the smoke run reports the timeout.
@@ -247,9 +261,54 @@ func _run_vanish_demo(mode: String) -> void:
 	_battle.set_cursor_cell(Vector2i(5, 5))  # the panel names whatever is on the tile
 
 
+## Sets Red's commander and, optionally, fills its meter, then refreshes the HUD
+## so the chip reads the state under test. Node-free like the rest of the driver:
+## it only writes sim state the presentation then reflects.
+func _set_red_commander(id: StringName, charged: bool) -> CommanderType:
+	var co := _battle.commander_db.by_id(id)
+	_battle.game.set_commander(1, co)
+	if charged:
+		_battle.game.commander_state(1).charge = co.power_cost
+	_battle.view.refresh_hud()
+	return co
+
+
+## Raises a power directly (no fire, no banner) so the capture is the chip's
+## ACTIVE state alone. Firing is proved by `power_banner`; this isolates the HUD.
+func _stage_active_power() -> void:
+	var co := _battle.commander_db.by_id(&"alina_ward")
+	_battle.game.set_commander(1, co)
+	_battle.game.commander_state(1).power_active = true
+	_battle.view.refresh_hud()
+
+
+## Charges Red, then fires the power through the real Fire button so the
+## activation card comes up exactly as it does in play. It holds on screen while
+## capturing (see BattleAnimator.show_power_banner), so the frame is the banner.
+func _stage_power_banner() -> void:
+	_set_red_commander(&"cass_orlov", true)
+	_battle.view.commander_chip.fire_button.pressed.emit()
+	await _until_state(Battle.State.IDLE)
+
+
+## Opens the both-sides commander reference through the real map menu, the one
+## route a player reaches it by. Red and Blue get distinct commanders so the two
+## cards differ in the capture.
+func _stage_commander_info() -> void:
+	_battle.game.set_commander(1, _battle.commander_db.by_id(&"rhea_sol"))
+	_battle.game.set_commander(2, _battle.commander_db.by_id(&"viktor_draeg"))
+	_battle.confirm_at(Vector2i(10, 5))  # empty road tile -> map menu
+	await _until_state(Battle.State.MENU)
+	_battle.action_menu.choose(&"commanders")
+	await _until_state(Battle.State.INFO)
+
+
 ## Leaves Blue one nearly-dead unit, then wins through the ordinary
-## select -> Fire flow so the real victory handler runs.
-func _run_victory_demo() -> void:
+## select -> Fire flow so the real victory handler runs. `with_commander` gives
+## Red a general first, so the victory lockup is fronted by a portrait.
+func _run_victory_demo(with_commander: bool = false) -> void:
+	if with_commander:
+		_battle.game.set_commander(1, _battle.commander_db.by_id(&"viktor_draeg"))
 	for unit in _battle.game.units.duplicate():
 		if unit.team == 2 and unit.cell != Vector2i(9, 8):
 			_battle.game.remove_unit(unit)

@@ -51,10 +51,15 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # both is what keeps `vanish` honest: a board that hid those units for some
 # unrelated reason would pass on its own, but it would take `ambush` down with
 # it.
+# The commander-identity captures (power_ready/active/banner, commander_info and
+# commander_victory) are the G3 gate: the HUD chip's charging/ready/active
+# states, the activation card, the both-sides info sheet, and the victory lockup,
+# each proved to still render at native 640x360.
 DEFAULT_MODES=(
 	attack resolve capture build buildmenu endturn
 	load cargo drop transport supply mapmenu powermenu victory aiturn
 	powermenu+fog victory+fog ambush vanish
+	power_ready power_active power_banner commander_info commander_victory
 )
 
 if [[ ! -x "$GODOT" ]]; then
