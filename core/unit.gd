@@ -16,6 +16,11 @@ var ammo: int = 0
 ## The transport carrying this unit, or null when on the board. Carried units
 ## are invisible to cell lookups and can neither act nor be targeted.
 var carrier: Unit = null
+## Submerged (subs only). A dived unit is hidden from enemies that are not
+## standing next to it — with or without fog, unlike everything else the fog
+## rules hide — and only a weapon that reaches under the surface can touch it.
+## It still occupies its cell: an enemy that moves into it finds it there.
+var dived: bool = false
 
 
 static func create(p_type: UnitType, p_team: int, p_cell: Vector2i) -> Unit:
@@ -49,7 +54,14 @@ func has_ammo() -> bool:
 func running_dry(margin_turns: int = 1) -> bool:
 	if not type.lost_when_dry() or margin_turns <= 0:
 		return false
-	return fuel <= (type.fuel_upkeep + type.move_points) * margin_turns
+	return fuel <= (upkeep() + type.move_points) * margin_turns
+
+
+## Fuel this unit burns at the start of its turn. Staying under costs a submarine
+## several times what running on the surface does, which is the clock the whole
+## dive mechanic is played against: hiding is free of risk and expensive in fuel.
+func upkeep() -> int:
+	return type.dived_fuel_upkeep if dived else type.fuel_upkeep
 
 
 func resupply() -> void:

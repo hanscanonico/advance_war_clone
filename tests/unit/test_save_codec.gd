@@ -50,10 +50,20 @@ func test_encode_decode_restores_the_match_without_touching_disk() -> void:
 	assert_eq(loaded.difficulty, &"hard", "a resumed match keeps the tier it was played at")
 
 
+## The literal is a tripwire: bumping the format is a decision, and this is where
+## it gets noticed. What matters when the number does move is the line below it —
+## every version ever written still has to load, since a save on someone's disk
+## does not get upgraded when the game does.
 func test_encoded_save_declares_the_current_version() -> void:
-	assert_eq(int(_encoded()["version"]), 2)
-	assert_eq(SaveCodec.VERSION, 2)
+	assert_eq(int(_encoded()["version"]), 3)
+	assert_eq(SaveCodec.VERSION, 3)
 	assert_eq(SaveGame.VERSION, SaveCodec.VERSION, "the facade must report the codec's version")
+	for version in range(1, SaveCodec.VERSION + 1):
+		assert_has(
+			SaveCodec.READABLE_VERSIONS,
+			version,
+			"version %d saves exist in the wild and must still load" % version
+		)
 
 
 ## Every save written before difficulty existed carries no such key. Those

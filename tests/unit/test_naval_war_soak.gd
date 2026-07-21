@@ -42,6 +42,7 @@ func test_the_ai_fights_a_naval_war_without_the_rules_refusing_it() -> void:
 	var commands := 0
 	var hulls_built := 0
 	var naval_attacks := 0
+	var dives := 0
 	while state.winner == 0 and state.day <= DAYS and commands < COMMAND_CAP:
 		var command := ai.plan_next_command(state)
 		var error := command.validate(state)
@@ -58,6 +59,8 @@ func test_the_ai_fights_a_naval_war_without_the_rules_refusing_it() -> void:
 			return
 		if command is AttackCommand and _is_naval_exchange(state, command as AttackCommand):
 			naval_attacks += 1
+		if command is DiveCommand:
+			dives += 1
 		command.apply(state)
 		commands += 1
 		if (
@@ -67,8 +70,8 @@ func test_the_ai_fights_a_naval_war_without_the_rules_refusing_it() -> void:
 			hulls_built += 1
 	gut.p(
 		(
-			"the_straits.txt  %d commands, day %d, %d hulls built, %d naval exchanges"
-			% [commands, state.day, hulls_built, naval_attacks]
+			"the_straits.txt  %d commands, day %d, %d hulls, %d naval exchanges, %d dives"
+			% [commands, state.day, hulls_built, naval_attacks, dives]
 		)
 	)
 	assert_lt(commands, COMMAND_CAP, "the match never progressed — the planner is probably looping")

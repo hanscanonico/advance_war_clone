@@ -156,6 +156,7 @@ func _best_unit_plan(state: GameState, unit: Unit) -> UnitPlan:
 	var reachable := MovementResolver.reachable(state, unit)
 	_consider_attacks(state, unit, reachable, plan)
 	_consider_captures(state, unit, reachable, plan)
+	_consider_dive(state, unit, plan)
 	if plan.score < profile.min_useful_score:
 		plan.command = _advance_command(state, unit, reachable)
 		plan.score = profile.advance_score
@@ -189,7 +190,7 @@ func _consider_attacks(
 		for enemy in enemies:
 			if not AttackRange.covers(state, unit, dest, enemy.cell):
 				continue
-			if not state.damage_chart.can_attack(unit.type.id, enemy.type.id):
+			if not AttackRange.can_engage(state, unit, enemy):
 				continue
 			if dest_penalty < 0.0:
 				if threat == null and profile.threat_aversion > 0.0:
@@ -342,6 +343,57 @@ func _consider_captures(
 		if score > plan.score:
 			plan.score = score
 			plan.command = CaptureCommand.new(unit, reachable.path_to(cell))
+
+
+## A submarine's one decision: whether to be under the water.
+##
+## It goes down when something out there could shoot a boat on the surface and
+## nothing that can reach under it is close, and comes back up when that threat
+## has passed. Scored above advancing so it beats drifting, and below an attack
+## worth making — a sub with something to sink does that instead of hiding.
+##
+## Never dives on its last few points of fuel, which is not caution but the thing
+## that stops it flip-flopping: staying under costs several times what the surface
+## does, so a boat that dived while nearly dry would surface again next turn for
+## exactly that reason, and dive again the turn after.
+func _consider_dive(state: GameState, unit: Unit, plan: UnitPlan) -> void:
+	if not unit.type.can_dive:
+		return
+	var threatened := _threatened_by(state, unit, false)
+	var wants: bool
+	if unit.dived:
+		wants = not threatened or unit.running_dry(profile.refuel_margin_turns)
+	else:
+		var dive_burn := unit.type.dived_fuel_upkeep + unit.type.move_points
+		wants = (
+			threatened
+			and not _threatened_by(state, unit, true)
+			and unit.fuel > dive_burn * profile.refuel_margin_turns
+		)
+	if not wants or profile.dive_score <= plan.score:
+		return
+	plan.score = profile.dive_score
+	plan.command = DiveCommand.new(unit, [unit.cell] as Array[Vector2i], not unit.dived)
+
+
+## Whether an enemy that could damage `unit` can plausibly reach it next turn —
+## and, with `submerged`, whether it could still do so with the boat under water.
+##
+## Reach is approximated as movement plus weapon range rather than flood-filled
+## per enemy: this is asked for every enemy on the board, and the answer only has
+## to be good enough to decide whether hiding is worth a turn. It errs toward
+## seeing threats, which is the safe direction for the unit deciding.
+func _threatened_by(state: GameState, unit: Unit, submerged: bool) -> bool:
+	for enemy in _visible_enemies(state, unit.team):
+		if submerged and not enemy.type.can_hit_submerged:
+			continue
+		if not state.damage_chart.can_attack(enemy.type.id, unit.type.id):
+			continue
+		var reach := enemy.type.move_points + AttackRange.maximum(state, enemy)
+		var dist := absi(enemy.cell.x - unit.cell.x) + absi(enemy.cell.y - unit.cell.y)
+		if dist <= reach:
+			return true
+	return false
 
 
 ## Fallback when no attack or capture is worthwhile: take the best position
@@ -713,9 +765,9 @@ func _outgunned_in_the_air(state: GameState) -> bool:
 
 
 static func _can_hit_any(state: GameState, unit: Unit, targets: Array[Unit]) -> bool:
-	if unit.type.max_range <= 0 or state.damage_chart == null:
+	if unit.type.max_range <= 0:
 		return false
 	for target in targets:
-		if state.damage_chart.can_attack(unit.type.id, target.type.id):
+		if AttackRange.can_engage(state, unit, target):
 			return true
 	return false

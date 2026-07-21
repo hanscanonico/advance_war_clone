@@ -24,7 +24,9 @@ max-returns: 12
 # moved out; 863 once BattleAiRunner (the computer's side of the interaction
 # flow) had too, making room for the commander battle-identity HUD; 825 now that
 # BattleMenus owns what each menu offers, which is where the production
-# facilities air units introduced would otherwise have landed.
-# battle.gd sits at exactly 825: adding to it means moving something else out
+# facilities air units introduced would otherwise have landed; 820 once the four
+# plain unit actions — Load, Supply, Dive, Wait — collapsed into the one commit
+# helper they had each been spelling out.
+# battle.gd sits at exactly 820: adding to it means moving something else out
 # first, which is the point.
-max-file-lines: 825
+max-file-lines: 820

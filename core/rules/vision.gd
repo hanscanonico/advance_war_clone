@@ -51,23 +51,49 @@ static func visible_cells(state: GameState, team: int) -> Dictionary:
 static func can_see_unit(
 	state: GameState, viewer_team: int, unit: Unit, visible: Dictionary
 ) -> bool:
-	if not state.fog_enabled or unit.team == viewer_team:
+	if unit.team == viewer_team:
 		return true
-	if not visible.has(unit.cell):
+	# Asked before the fog check, not after it, because one of the things it
+	# answers — a submerged submarine — hides on a clear day too.
+	if is_hidden_from(state, viewer_team, unit):
 		return false
-	return not is_hidden_from(state, viewer_team, unit)
+	if not state.fog_enabled:
+		return true
+	return visible.has(unit.cell)
 
 
-## Whether a *doctrine* hides `unit` from `viewer_team` — the invisibility half
-## of Sable Wren's Vanish, and nothing else today. Split out from can_see_unit
-## because it is the one visibility rule the AI respects: the planner sees the
-## whole board deliberately, but a power that makes units unseeable would be
-## inert against it otherwise, so it asks this instead of ignoring fog wholesale.
-## Terrain, range and property sight stay invisible to that question.
+## Whether `unit` is hidden from `viewer_team` by something other than the fog
+## itself: a doctrine (the invisibility half of Sable Wren's Vanish) or a dive.
+##
+## Split out from can_see_unit because it is the one visibility rule the AI
+## respects: the planner sees the whole board deliberately, but a power that makes
+## units unseeable — or a submarine that has gone under — would be inert against it
+## otherwise, so it asks this instead of ignoring fog wholesale. Terrain, range and
+## property sight stay invisible to that question.
+##
+## The two halves differ in one way worth being explicit about. Vanish is a fog
+## power and does nothing in a clear match. A dive is not: a submerged sub is
+## unseeable whether or not the match has fog, because being under the water is
+## not a matter of how far anyone can see. Both are lifted by standing next to
+## it — hunting a submarine means closing with it.
 static func is_hidden_from(state: GameState, viewer_team: int, unit: Unit) -> bool:
-	if not state.fog_enabled or unit.team == viewer_team:
+	if unit.team == viewer_team:
+		return false
+	if unit.dived:
+		return not _has_neighbour_from(state, unit.cell, viewer_team)
+	if not state.fog_enabled:
 		return false
 	return state.commander_of(unit.team).hides_unit(state, unit)
+
+
+## True when `team` has a unit standing on a tile orthogonally adjacent to `cell`.
+static func _has_neighbour_from(state: GameState, cell: Vector2i, team: int) -> bool:
+	for other in state.units_of(team):
+		if other.carrier != null:
+			continue
+		if absi(other.cell.x - cell.x) + absi(other.cell.y - cell.y) == 1:
+			return true
+	return false
 
 
 ## How far a unit sees: its type's range, plus what its own commander adds, less

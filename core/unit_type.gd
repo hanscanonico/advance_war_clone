@@ -35,6 +35,14 @@ const SEA := &"sea"
 ## resupplied. Zero for anything that can simply park — a plane cannot, which is
 ## what makes an airport worth taking. See TurnRules.begin_turn for the order.
 @export var fuel_upkeep: int = 0
+## Upkeep while submerged, for units that can dive. Meaningfully higher than the
+## surface rate: staying down is what a sub trades fuel for.
+@export var dived_fuel_upkeep: int = 0
+## Whether this unit can submerge — the Sub, and nothing else.
+@export var can_dive: bool = false
+## Whether this unit's weapon reaches a submerged target. Everything else on the
+## board simply cannot engage a dived sub, which is the point of diving.
+@export var can_hit_submerged: bool = false
 ## Primary ammo; 0 means the weapon needs no ammo (or the unit is unarmed).
 @export var max_ammo: int = 0
 ## How many passengers this unit can carry (APC = 1).

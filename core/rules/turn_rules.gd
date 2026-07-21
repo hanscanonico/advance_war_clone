@@ -30,9 +30,11 @@ static func begin_turn(state: GameState, opening: bool = false) -> void:
 
 
 ## Fuel spent simply by existing, before anything refills it. Zero for ground
-## units, which is why a tank parked in a field is the same unit it was in M2.
+## units, which is why a tank parked in a field is the same unit it was in M2, and
+## several times the surface rate for a submarine that is under — the clock a dive
+## is played against.
 static func _burn_upkeep(unit: Unit) -> void:
-	unit.fuel = maxi(0, unit.fuel - unit.type.fuel_upkeep)
+	unit.fuel = maxi(0, unit.fuel - unit.upkeep())
 
 
 ## An air or sea unit whose tank reached zero is destroyed here, and its cargo

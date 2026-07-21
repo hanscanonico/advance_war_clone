@@ -11,6 +11,9 @@ const SPRITE_PX := 64
 const SPRITE_SCALE := float(TILE) / float(SPRITE_PX)
 const UNITS_ATLAS_PATH := "res://assets/tiles/units_atlas.png"
 const ACTED_TINT := Color(0.55, 0.55, 0.55)
+## A submerged boat is drawn faint for its own side. The enemy does not see it
+## at all — that is Vision's answer, arriving here as `fogged`.
+const DIVED_ALPHA := 0.5
 ## HpLabel's offset in unit_sprite.tscn, in world-grid units.
 const HP_LABEL_OFFSET := Vector2(1, 0)
 ## FuelLabel sits opposite it, on the other side of the sprite.
@@ -67,7 +70,9 @@ func set_active_team(team: int) -> void:
 func refresh() -> void:
 	position = Vector2(unit.cell * TILE) + Vector2(TILE, TILE) / 2.0
 	visible = unit.carrier == null and not fogged
-	modulate = ACTED_TINT if unit.acted and unit.team == active_team else Color.WHITE
+	var tint := ACTED_TINT if unit.acted and unit.team == active_team else Color.WHITE
+	tint.a *= DIVED_ALPHA if unit.dived else 1.0
+	modulate = tint
 	hp_label.visible = unit.displayed_hp() < 10
 	hp_label.text = str(unit.displayed_hp())
 	fuel_label.visible = unit.running_dry()

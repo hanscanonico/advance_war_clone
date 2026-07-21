@@ -57,7 +57,7 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # each proved to still render at native 640x360.
 DEFAULT_MODES=(
 	attack resolve capture build buildmenu endturn
-	load cargo drop transport supply mapmenu powermenu victory aiturn
+	load cargo drop transport supply divemenu dive mapmenu powermenu victory aiturn
 	powermenu+fog victory+fog ambush vanish
 	power_ready power_active power_banner commander_info commander_victory
 )
@@ -115,6 +115,10 @@ for mode in "${modes[@]}"; do
 	if [[ "$demo" != "$mode" ]]; then
 		godot_args+=(--fog)
 	fi
+	# The naval scenarios need a board with water on it; the default has none.
+	case "$demo" in
+		divemenu | dive) godot_args+=(--map=the_straits) ;;
+	esac
 	run_with_timeout "$SMOKE_TIMEOUT" "$GODOT" "${godot_args[@]}"
 	status=$?
 

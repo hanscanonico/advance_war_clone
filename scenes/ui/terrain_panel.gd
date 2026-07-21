@@ -76,6 +76,8 @@ func _show_unit(unit: Unit, carrying: String, active_team: int) -> void:
 	var extras := PackedStringArray()
 	if unit.type.min_range > 1:
 		extras.append("Rng %d-%d" % [unit.type.min_range, unit.type.max_range])
+	if unit.dived:
+		extras.append("Dived")
 	if unit.running_dry():
 		extras.append("Low fuel")
 	if carrying != "":

@@ -149,15 +149,22 @@ static func _defender_can_counter(
 ) -> bool:
 	# Deliberately the unit type's own range rather than AttackRange: countering
 	# is adjacency, and a doctrine that extends how far a unit can *initiate*
-	# must not turn an indirect into something that shoots back.
+	# must not turn an indirect into something that shoots back. Only the
+	# distance is decided here, though — whether the shot is possible at all is
+	# AttackRange's, below.
 	if defender.type.max_range != 1:
 		return false  # unarmed and indirect units never counter
 	if not defender.has_ammo():
 		return false
+	if defender.dived:
+		return false  # a submarine that is hiding does not give itself away
 	var dist := absi(attacker_cell.x - defender.cell.x) + absi(attacker_cell.y - defender.cell.y)
 	if dist != 1:
 		return false  # an indirect attacker fires from beyond counter reach
-	return state.damage_chart.can_attack(defender.type.id, attacker.type.id)
+	# The same authority the opening shot went through, which is what gives the
+	# dive its edge: a submerged attacker is countered only by a hunter that can
+	# reach under the surface, and shrugged at by everything else.
+	return AttackRange.can_engage(state, defender, attacker)
 
 
 ## One luck roll, from the attacking commander's range. Always exactly one draw

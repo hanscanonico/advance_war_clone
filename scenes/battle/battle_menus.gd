@@ -41,6 +41,17 @@ static func unit_actions(
 		and not SupplyCommand.new(unit, path).friendlies_in_reach(game, dest).is_empty()
 	):
 		actions.append({"id": &"supply", "label": "Supply"})
+	if unit.type.can_dive:
+		# One row, whichever way the boat is not currently facing. DiveCommand
+		# validates the same flag, so the menu cannot offer a dive to something
+		# already under.
+		actions.append(
+			(
+				{"id": &"surface", "label": "Surface"}
+				if unit.dived
+				else {"id": &"dive", "label": "Dive"}
+			)
+		)
 	actions.append({"id": &"wait", "label": "Wait"})
 	actions.append(CANCEL)
 	return actions

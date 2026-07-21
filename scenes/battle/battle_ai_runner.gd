@@ -93,6 +93,13 @@ func _execute(command: Command) -> void:
 			EventBus.property_captured.emit(dest, capture.unit.team)
 			view.repaint_property(dest)
 		view.refresh_sprite(capture.unit)
+	elif command is DiveCommand:
+		var dive := command as DiveCommand
+		_battle.set_cursor_cell(dive.path[dive.path.size() - 1])
+		await animator.animate_path(view.sprite_for(dive.unit), dive.path)
+		command.apply(game)
+		EventBus.unit_moved.emit(dive.unit)
+		view.refresh_sprite(dive.unit)
 	elif command is MoveCommand:
 		var move := command as MoveCommand
 		_battle.set_cursor_cell(move.path[move.path.size() - 1])

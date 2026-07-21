@@ -344,17 +344,17 @@ func _handle_unit_action(action: StringName) -> void:
 		&"drop":
 			_enter_drop_targeting()
 		&"load":
-			var command := LoadCommand.new(selected, planned_path)
-			var error := command.validate(game)
-			if error != "":
-				push_error("LoadCommand rejected: %s" % error)
-				_undo_move_preview()
-				return
-			command.apply(game)
-			EventBus.unit_moved.emit(selected)
-			view.refresh_sprite(selected)  # hides the boarded sprite
-			_clear_selection()
-			_refresh_panel()
+			# The refresh inside _commit hides the boarded sprite.
+			_commit(action, LoadCommand.new(selected, planned_path))
+		&"supply":
+			_commit(action, SupplyCommand.new(selected, planned_path))
+		&"dive", &"surface":
+			# Going under changes what the *other* side can see, so the fog pass
+			# _commit ends with is load-bearing here rather than incidental:
+			# without it the boat would keep the look it had.
+			_commit(action, DiveCommand.new(selected, planned_path, action == &"dive"))
+		&"wait":
+			_commit(action, MoveCommand.new(selected, planned_path))
 		&"join":
 			var command := JoinCommand.new(selected, planned_path)
 			var error := command.validate(game)
@@ -367,18 +367,6 @@ func _handle_unit_action(action: StringName) -> void:
 			command.apply(game)
 			mover_sprite.die()  # fade the merged-away sprite; fire and forget
 			view.refresh_sprite(game.unit_at(dest))
-			_clear_selection()
-			_refresh_panel()
-		&"supply":
-			var command := SupplyCommand.new(selected, planned_path)
-			var error := command.validate(game)
-			if error != "":
-				push_error("SupplyCommand rejected: %s" % error)
-				_undo_move_preview()
-				return
-			command.apply(game)
-			EventBus.unit_moved.emit(selected)
-			view.refresh_sprite(selected)
 			_clear_selection()
 			_refresh_panel()
 		&"capture":
@@ -401,21 +389,28 @@ func _handle_unit_action(action: StringName) -> void:
 			_refresh_hud()
 			if game.winner != 0:
 				_enter_victory()
-		&"wait":
-			var command := MoveCommand.new(selected, planned_path)
-			var error := command.validate(game)
-			if error != "":
-				# The UI only offers legal paths, so this is a bug guard.
-				push_error("MoveCommand rejected: %s" % error)
-				_undo_move_preview()
-				return
-			command.apply(game)
-			EventBus.unit_moved.emit(selected)
-			view.refresh_sprite(selected)
-			_clear_selection()
-			_refresh_panel()
 		&"cancel":
 			_undo_move_preview()
+
+
+## The shape every plain unit action shares: refuse to run a command the rules
+## turn down, then apply it and put the board back in step. The menu only offers
+## legal actions, so a rejection here is a bug rather than a player mistake — it
+## is reported and the uncommitted move is rolled back rather than half-applied.
+##
+## Capture and Join are not routed through this: each has work of its own between
+## the apply and the refresh, which is the only reason they read differently.
+func _commit(action: StringName, command: Command) -> void:
+	var error := command.validate(game)
+	if error != "":
+		push_error("%s rejected: %s" % [action, error])
+		_undo_move_preview()
+		return
+	command.apply(game)
+	EventBus.unit_moved.emit(selected)
+	view.refresh_sprite(selected)
+	_clear_selection()
+	_refresh_panel()
 
 
 func _handle_build_action(action: StringName) -> void:
@@ -688,7 +683,7 @@ func _attackable_cells(unit: Unit, dest: Vector2i, moved: bool) -> Array[Vector2
 			continue  # the player cannot target what they cannot see
 		if not AttackRange.covers(game, unit, dest, other.cell):
 			continue
-		if game.damage_chart.can_attack(unit.type.id, other.type.id):
+		if AttackRange.can_engage(game, unit, other):
 			cells.append(other.cell)
 	cells.sort()
 	return cells

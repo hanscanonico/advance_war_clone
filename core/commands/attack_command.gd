@@ -33,7 +33,7 @@ func validate(state: GameState) -> String:
 		return "cannot attack a friendly unit"
 	if not AttackRange.covers(state, unit, path[path.size() - 1], target_cell):
 		return "target out of range"
-	if not state.damage_chart.can_attack(unit.type.id, target.type.id):
+	if not AttackRange.can_engage(state, unit, target):
 		return "cannot damage the target"
 	return ""
 

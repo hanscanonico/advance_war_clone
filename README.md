@@ -137,6 +137,12 @@ jumps to that team's first property.
   start of your turn every unit standing on a property that services it, or in reach of one of your
   APCs, is refilled. Which property services what is the point: a city refits vehicles, an airport
   aircraft, a port hulls, and none of them does another's job
+- A submarine adds one row of its own: **Dive** takes it under, **Surface** brings
+  it back. Submerged, only a Cruiser or another Sub can engage it, and it is
+  invisible to the other side unless one of their units is standing right next to
+  it — with or without fog, since being under the water is not a question of how
+  far anyone can see. It does not shoot back while hiding, and staying under costs
+  it five times the fuel, so a dive is a decision rather than a default
 - Aircraft and ships burn fuel simply by existing — a few points every turn, before anything
   refills them — and are **destroyed** when the tank runs dry. A warning badge appears on any unit
   inside its last turn's worth of fuel. Ground units have no upkeep: an empty tank strands them and
@@ -200,6 +206,9 @@ adjacent tile, and units riding a transport see nothing. A commander can bend al
 lengthen their own units' sight, see into cover at range, jam the enemy's sight shorter, or hide
 their units outright on a tile you can otherwise see. Vision is recomputed after each committed
 action and turn change, not as the cursor moves.
+
+A submerged submarine is the one thing hidden with fog switched off entirely —
+see Dive above. Everything else here needs fog to be on.
 
 The view is always *your* team's, including while the AI plays. The AI itself sees the whole
 board — an openly cheating opponent, not a guessing one — with one deliberate exception: a unit a

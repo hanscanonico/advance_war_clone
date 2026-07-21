@@ -73,6 +73,10 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 ## a treasury that never passes ten thousand. Zero restores the spend-it-all
 ## behaviour; large values stall production waiting for units out of reach.
 @export var save_up_turns: int = 3
+## What taking a submarine under (or bringing it back up) is worth. Above
+## advance_score so it beats drifting, and well below what an attack scores, so a
+## boat with a target sinks it rather than hiding from the escort beside it.
+@export var dive_score: float = 200.0
 ## Turns of fuel margin an air or sea unit keeps before it breaks off to refuel:
 ## below this it heads for the nearest property that services it. Zero disables
 ## the behaviour and lets units fly until they drop.

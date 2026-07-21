@@ -144,6 +144,8 @@ func _run_demo(mode: String) -> void:
 			await tree.process_frame
 		"load", "cargo", "drop", "transport":
 			await _run_transport_demo(mode)
+		"divemenu", "dive":
+			await _run_dive_demo(mode)
 		"supply":
 			_battle.confirm_at(Vector2i(3, 3))  # select the red APC
 			_battle.confirm_at(Vector2i(3, 3))  # stay put -> menu offers Supply
@@ -201,6 +203,27 @@ func _run_transport_demo(mode: String) -> void:
 	_battle.confirm_at(_battle.cursor_cell)  # drop at the first offered cell
 	await _until_state(Battle.State.IDLE)
 	_battle.set_cursor_cell(Vector2i(3, 5))  # show the APC in the panel
+
+
+## Select the submarine, offer it the Dive row, and take it under. Runs on
+## the_straits rather than the default board, since the default has no water —
+## tools/smoke_scenarios.sh passes the map for these two modes.
+##
+## `divemenu` stops with the menu open, which is what proves the row is offered at
+## all; `dive` goes through with it and captures the boat drawn submerged, faint
+## for its own side. Together they are the whole new interaction: a menu entry that
+## exists only for one unit, and a command behind it that changes what the other
+## side can see.
+func _run_dive_demo(mode: String) -> void:
+	var sub := Vector2i(11, 5)
+	_battle.confirm_at(sub)  # select the red sub
+	_battle.confirm_at(sub)  # stay put -> the action menu
+	await _until_state(Battle.State.MENU)
+	if mode == "divemenu":
+		return
+	_battle.action_menu.choose(&"dive")
+	await _until_state(Battle.State.IDLE)
+	_battle.set_cursor_cell(sub)  # panel shows the boat as Dived
 
 
 ## Fires a Command Power from the HUD button with a unit's action menu already

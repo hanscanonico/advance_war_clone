@@ -17,6 +17,7 @@ min_range = 1
 max_range = 1
 max_fuel = 99
 fuel_upkeep = 1
+can_hit_submerged = true
 max_ammo = 9
 transport_capacity = 0
 cargo_classes = Array[StringName]([])
