@@ -21,3 +21,9 @@ reports/
 # Agent scratch space. .claude/worktrees holds nested checkouts of this repo,
 # which git would otherwise offer to commit as embedded repositories.
 .claude/
+
+# Lavish review artifacts — in-progress plans and the screenshots they cite are
+# scratch by default. The designs of record CLAUDE.md points at are already
+# tracked and stay that way: ignoring a path git already tracks changes nothing.
+# A new plan worth keeping is promoted with `git add -f .lavish/<name>.html`.
+.lavish/
