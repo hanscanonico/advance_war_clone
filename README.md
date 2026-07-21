@@ -1,9 +1,10 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. Two plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
-game (architecture, mechanics, milestones M0–M7) and `.lavish/commanders-plan.html` for
-Commanders and Command Powers (milestones C1–C4).
+typed GDScript. Three plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
+game (architecture, mechanics, milestones M0–M7), `.lavish/commanders-plan.html` for
+Commanders and Command Powers (milestones C1–C4), and `.lavish/difficulty-modes-plan.html`
+for the Easy/Normal/Difficult tiers (milestones DF1–DF4).
 
 ## Running
 
@@ -25,7 +26,7 @@ target fails with "Godot binary not found". Symlink the one you already have:
 Then:
 
 ```sh
-make run             # boot the game — the main menu (map, commanders, fog, 1P / 2P / Continue)
+make run             # boot the game — the menu (map, difficulty, commanders, fog, 1P / 2P / Continue)
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
 make verify          # the merge gate: check + lint + format-check + test, in one command
 make smoke           # drive the battle scene's demo scenarios; prove each still renders
@@ -199,9 +200,11 @@ vision.
 ## Difficulty
 
 Pick **Easy**, **Normal** or **Difficult** in the menu, or pass `--difficulty=easy|normal|hard`.
-It steers exactly one thing: which `AIProfile` the computer plans with. **The AI never cheats at
-any tier** — same income, same vision, same fog boundary, same dice, same damage formula as you.
-It is inert in a 2-Player hot-seat, and a save records the tier it was played at.
+It steers exactly one thing: which `AIProfile` the computer plans with. **No tier is handed an
+advantage** — income, dice, the damage formula, and what the AI is allowed to see (the standing
+board-wide sight described under Fog of war) are identical at Easy and at Difficult, so a harder
+opponent is only ever a better-judging one. It is inert in a 2-Player hot-seat, and a save
+records the tier it was played at.
 
 - **Easy** — timid. It over-weights danger, retreats early, refuses good trades, passes up
   marginal plays, and never fields an md tank. It loses on judgement, so beating it teaches the

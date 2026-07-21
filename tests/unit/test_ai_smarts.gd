@@ -207,6 +207,50 @@ func test_an_unreachable_enemy_threatens_nothing() -> void:
 	)
 
 
+## The map measures a cell by standing the unit on it — the terrain it would move
+## onto is exactly what changes the damage — and puts it straight back. The read
+## is restored, so nothing about it may survive the call.
+func test_measuring_a_cell_puts_the_unit_straight_back() -> void:
+	var state := _state(ARTILLERY_RING_BOARD)
+	var tank := state.units_of(1)[0]
+	var origin := tank.cell
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_gt(
+		map.incoming_damage(state, tank, Vector2i(7, 0)), 0, "the ring must actually threaten"
+	)
+	assert_eq(tank.cell, origin, "the measured unit is stood on the cell and put back")
+	assert_eq(state.unit_at(origin), tank, "and the board still finds it where it was")
+
+
+## The same guarantee across a whole Difficult turn on a real board: the sim
+## changes when a command is *applied*, never while one is being planned. Guards
+## the restored read above from anything a future capability adds beside it.
+func test_planning_a_difficult_turn_leaves_the_board_untouched() -> void:
+	var map := MapData.load_from_file("res://maps/first_steps.txt", terrain_db)
+	var state := GameState.create(map, unit_db, chart)
+	state.rng.seed = 7
+	EndTurnCommand.new().apply(state)  # Blue, the AI side, is to move
+	var ai := AIController.new(unit_db, DifficultyDB.load_default().by_id(&"hard").profile())
+	var planned := 0
+	for i in 60:
+		var before := _board_snapshot(state)
+		var command := ai.plan_next_command(state)
+		assert_eq(_board_snapshot(state), before, "planning moved or hurt something")
+		command.apply(state)
+		planned += 1
+		if command is EndTurnCommand:
+			break
+	assert_gt(planned, 3, "the reference turn should be more than a formality")
+
+
+## Every unit's side, kind, position and HP, in the order the sim holds them.
+func _board_snapshot(state: GameState) -> Array[String]:
+	var rows: Array[String] = []
+	for unit in state.units:
+		rows.append("%d %s %s hp=%d" % [unit.team, unit.type.id, unit.cell, unit.hp])
+	return rows
+
+
 # --- S2 · focus fire ----------------------------------------------------------
 
 

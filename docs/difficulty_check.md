@@ -111,15 +111,15 @@ planner and the rules disagree.
 ## 4. What the measurement says
 
 > **Every number in this section predates the `advance_threat_tiles` split
-> described in §2, and predates the threat-map lookup being hoisted out of the
-> per-cell advance loop.** It was measured against a build where Difficult's
-> advance path could not give up a single tile for safety, and where Easy and
-> Difficult rebuilt the visible-enemy list and its cache key once per candidate
-> cell. Both tiers now plan differently, so **the ladder has to be re-run before
-> any of the standings below mean anything again.** They are kept as the record
-> of what was measured, not as a current claim. Nothing here has been re-scored
-> by estimate — `make difficulty-check` is the only thing allowed to write these
-> numbers.
+> described in §2, its rescaling against the HP a unit has left, and the
+> threat-map lookup being hoisted out of the per-cell attack and advance
+> loops.** It was measured against a build where Difficult's advance path could
+> not give up a single tile for safety, and where Easy and Difficult rebuilt the
+> visible-enemy list and its cache key once per candidate cell. Both tiers now
+> plan differently, so **the ladder has to be re-run before any of the standings
+> below mean anything again.** They are kept as the record of what was measured,
+> not as a current claim. Nothing here has been re-scored by estimate —
+> `make difficulty-check` is the only thing allowed to write these numbers.
 
 **Standing result — 120 matches, 15 seeds, default 20-day cap:**
 
@@ -213,11 +213,12 @@ its high `min_useful_score` sends more units down the advance path, which
 evaluates threat for every reachable cell, while Difficult's lower one usually
 finds an attack first.
 
-Most of that gap was avoidable and has since been closed: the advance loop asked
-for the threat map once per *candidate cell*, and each ask rebuilt the
-visible-enemy array and a formatted cache-key string only to conclude the cached
-map was still valid. The lookup now happens once per advance. The table above was
-measured before that, so the two tier costs should be re-read on the next run.
+Most of that gap was avoidable and has since been closed: the advance loop and
+the attack sweep both asked for the threat map once per *candidate cell*, and
+each ask rebuilt the visible-enemy array and a formatted cache-key string only to
+conclude the cached map was still valid. The lookup now happens once per sweep,
+not once per cell. The table above was measured before that, so the two tier
+costs should be re-read on the next run.
 
 ## 5. Where this leaves the feature
 
