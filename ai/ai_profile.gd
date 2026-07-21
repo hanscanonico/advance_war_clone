@@ -72,7 +72,15 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 ## rare — it makes it unreachable, since a 20 000 airframe cannot be bought out of
 ## a treasury that never passes ten thousand. Zero restores the spend-it-all
 ## behaviour; large values stall production waiting for units out of reach.
-@export var save_up_turns: int = 3
+##
+## Two rather than three deliberately, and the difference is measured: banking is
+## what lets the AI field aircraft and hulls at all, but it also hands whoever
+## moves first a timing edge, since they cross a price threshold a turn earlier.
+## `make commander-balance --scenarios=clash,ridge --seeds=3` reports a first-side
+## bias of +5.6 pp with no banking, +14.9 at two turns, +20.2 at three — and both
+## the air and naval soaks still build their expensive rosters at two. Raising it
+## buys nothing the game needs and costs first-move fairness.
+@export var save_up_turns: int = 2
 ## What taking a submarine under (or bringing it back up) is worth. Above
 ## advance_score so it beats drifting, and well below what an attack scores, so a
 ## boat with a target sinks it rather than hiding from the escort beside it.

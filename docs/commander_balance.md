@@ -35,8 +35,8 @@ make commander-balance BAL="--commanders=alina_ward,cass_orlov --seeds=2"  # foc
 Flags (after `--`): `--commanders=`, `--scenarios=`, `--seeds=`, `--neutral`
 (adds each commander vs No Commander), `--days=`, `--out=`.
 
-- **Full batch:** 12×12 ordered pairs (mirrors included) × 2 scenarios × 4 seeds
-  = **1,152 matches**. Ordered pairs already side-swap every non-mirror matchup.
+- **Full batch:** 12×12 ordered pairs (mirrors included) × 3 scenarios × 4 seeds
+  = **1,728 matches**. Ordered pairs already side-swap every non-mirror matchup.
   It is deliberately out of `make verify`/`make test`.
 - **Focused mode** is the fast iteration loop while tuning one commander.
 - Output: `reports/commander_balance/matches.csv` (one row per match) and
@@ -48,7 +48,16 @@ Both boards are 180° rotationally symmetric with the teams swapped, and the
 runner **asserts** that symmetry on startup (`_assert_symmetric`) — a typo that
 broke fairness fails the run rather than biasing it. A first-side bias in the
 results is therefore the doctrines' doing, not the map's. `clash` is open and
-decisive; `ridge` puts more terrain between the lines.
+decisive; `ridge` puts more terrain between the lines; `combined` adds an
+airfield, a port and a shared lake, because a doctrine tuned only against tanks
+is tuned against a third of the game — several hooks read a unit's move class or
+domain, and they behave differently when half the army is not on the ground.
+
+A fixture also has to **resolve**. The first version of `combined` separated the
+armies with water: it ground to the day cap in 430 of 432 matches and produced a
+twenty-point first-side bias out of the tiebreak alone. The shipped version puts a
+small lake in the middle instead, so the land armies walk past it and meet on day
+one. Its measured first-side bias is 0.0 pp — the fairest of the three.
 
 ### Timed matches are decided on score
 
@@ -99,9 +108,41 @@ change and its rationale below.
 
 The runner and its scenarios are in place and verified (symmetry asserted,
 determinism byte-identical, hard invariants clean on focused runs). The **full
-1,152-match batch and the 24-session human deck are release tasks** to be run
-against the candidate build; their results and any resulting `.tres` tuning are
-recorded here when that pass happens.
+batch and the 24-session human deck are release tasks** to be run against the
+candidate build; their results and any resulting `.tres` tuning are recorded here
+when that pass happens.
+
+### Measured while adding the air and naval domains (N4)
+
+864 matches, `clash` + `ridge`, 3 seeds, run before and after the change so the
+two are comparable. No commander `.tres` was touched: the point of the exercise
+was to find out whether the new domains had moved the roster, and the answer is
+that the AI's *production* moved it, in both directions.
+
+| | base (`c6f103f`) | with air/naval |
+|---|---|---|
+| Win-rate spread | 25.0 – 77.1 % (52 pp, 6 WARN) | 31.2 – 68.8 % (38 pp, 4 WARN) |
+| First-side bias | +5.6 pp | +14.9 pp |
+| Rejected commands / cap stalls | 0 / 0 | 0 / 0 |
+
+The spread **tightened**, which is the expected effect of an AI that fields a
+mixed army instead of whatever one unit its priority list happens to favour: a
+doctrine that answers tanks well has less to feed on.
+
+The first-side bias **worsened**, and that is a real cost of `save_up_turns`.
+Banking is what makes a 20 000 airframe or a 28 000 hull reachable at all — with
+no banking the AI's treasury never passes about ten thousand and the expensive
+half of the roster is not rare but *unbuyable* — and it hands whoever moves first
+a timing edge, since they cross a price threshold a turn earlier. Measured at
++5.6 pp with no banking, +14.9 at a two-turn window, +20.2 at three. Two is
+shipped: the air and naval soaks build their full rosters there, so three buys
+nothing and costs another five points of first-move fairness.
+
+Everything above is the *base game's* balance seen through a better-playing AI.
+The out-of-band commanders are the same names as before (Gideon Holt and Tomas
+Reed high, Cass Orlov and Rhea Sol low), which makes them a base-game tuning pass
+rather than anything the air and naval rosters introduced — and per the rule at
+the top of this document, a review trigger rather than an automatic nerf.
 
 ### Balance changelog
 

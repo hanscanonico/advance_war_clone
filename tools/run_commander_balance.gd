@@ -79,7 +79,20 @@ const DIFFICULTY_CSV_COLUMNS: Array[String] = [
 ##
 ## clash: open and decisive — both armies in reach on day one, so games resolve
 ## rather than stall into day-cap draws. ridge: the same fairness with more
-## terrain between the lines (woods, mountains, four contested cities).
+## terrain between the lines (woods, mountains, four contested cities). combined:
+## all three domains at once — an airfield, a port and a shared channel — because
+## a doctrine tuned only against tanks is tuned against a third of the game, and
+## the hooks that read a unit's move class or domain (Viktor Draeg's breakthrough,
+## Nia Rowan's terrain discount, Cassian Rook's heavies) behave differently when
+## half the army is not on the ground.
+##
+## Its lake is centred, which is what keeps it self-symmetric under the rotation
+## while both fleets share one basin — and it is small enough that the land armies
+## walk past it rather than around a coast. That last part is not decoration: an
+## earlier, larger version of this board separated the armies with water, ground
+## to the day cap in 430 of 432 matches, and produced a twenty-point first-side
+## bias out of the tiebreak alone. A fixture that does not resolve measures the
+## clock, not the doctrines.
 const SCENARIOS := {
 	"clash":
 	"""
@@ -134,6 +147,41 @@ C..F....B.Q.
 2 r 6 5
 2 m 9 5
 """,
+	"combined":
+	"""
+[terrain]
+.QB.A........
+.....CS......
+.....SSS...C.
+C...FSSSS....
+...PSSSSSP...
+....SSSSF...C
+.C...SSS.....
+......SC.....
+........A.BQ.
+[owners]
+1 1 0
+2 11 8
+1 2 0
+2 10 8
+1 4 0
+2 8 8
+1 3 4
+2 9 4
+[units]
+1 i 2 3
+2 i 10 5
+1 m 3 3
+2 m 9 5
+1 t 4 3
+2 t 8 5
+1 r 2 5
+2 r 10 3
+1 h 4 5
+2 h 8 3
+1 c 5 4
+2 c 7 4
+"""
 }
 
 const CSV_COLUMNS: Array[String] = [

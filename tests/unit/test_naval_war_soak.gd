@@ -1,6 +1,11 @@
 extends GutTest
 ## AI vs AI on the naval board, played long enough that fleets are built and meet.
 ##
+## It is also the suite's mixed-domain soak, because The Straits has a base, an
+## airport *and* a port on each side: an army, an air force and a fleet all
+## planned by the same planner against each other, which is the only place the
+## three domains' rules meet outside the balance runner.
+##
 ## The sibling of test_air_war_soak.gd, and there for the same reason: naval rules
 ## live in more than one layer each — passability in terrain data and in
 ## MovementResolver's fill and in MoveCommand's re-validation of the path it

@@ -18,6 +18,6 @@ capture_unit_target = 3
 air_answer_ids = Array[StringName]([&"anti_air", &"missiles", &"fighter", &"cruiser"])
 air_answer_target = 2
 duplicate_priority_cost = 3
-save_up_turns = 3
+save_up_turns = 2
 dive_score = 200.0
 refuel_margin_turns = 1

@@ -43,7 +43,7 @@
     that keeps planes honest — built almost entirely as <em>data</em> on top of systems the APC,
     the damage chart, and the movement resolver already ship.
   </p>
-  <p class="text-sm opacity-60">Draft for review — decisions D1–D6 in §11 are proposed, not locked.</p>
+  <p class="text-sm opacity-60">All four milestones shipped. Decisions D1–D6 in §11 held; §13 records where the build diverged from this plan and why.</p>
 </header>
 
 <!-- ============================= 1 · CHEAPER THAN IT LOOKS ============================= -->
@@ -419,7 +419,7 @@
   <div class="space-y-4">
     <div class="card bg-base-100 shadow nav-domain nav-air">
       <div class="card-body">
-        <h3 class="card-title">N1 · Wings <span class="badge badge-info">air + the foundations</span></h3>
+        <h3 class="card-title">N1 · Wings <span class="badge badge-info">air + the foundations</span> <span class="badge badge-success">shipped</span></h3>
         <p class="text-sm max-w-3xl">
           Air forces the general machinery through (facilities, services, upkeep/crash, cargo
           classes) with a visible payoff, while needing only <b>one</b> new terrain.
@@ -439,7 +439,7 @@
     </div>
     <div class="card bg-base-100 shadow nav-domain nav-sea">
       <div class="card-body">
-        <h3 class="card-title">N2 · Tides <span class="badge badge-primary">the navy</span></h3>
+        <h3 class="card-title">N2 · Tides <span class="badge badge-primary">the navy</span> <span class="badge badge-success">shipped</span></h3>
         <ul class="list-disc list-inside text-sm space-y-1">
           <li>Core: <span class="nav-code">ship</span>/<span class="nav-code">lander</span> classes ·
             port, shoal, bridge, reef · <span class="nav-code">conceals</span> generalization ·
@@ -455,7 +455,7 @@
     </div>
     <div class="card bg-base-100 shadow nav-domain nav-sea">
       <div class="card-body">
-        <h3 class="card-title">N3 · Depths <span class="badge badge-secondary">sub dive — go/no-go is D5</span></h3>
+        <h3 class="card-title">N3 · Depths <span class="badge badge-secondary">sub dive — go/no-go is D5</span> <span class="badge badge-success">shipped</span></h3>
         <ul class="list-disc list-inside text-sm space-y-1">
           <li>Dive/Surface commands · <span class="nav-code">Unit.dived</span> · upkeep 5 while dived ·
             targetable only by cruiser/sub · hidden except adjacent (fog <em>and</em> clear weather,
@@ -468,7 +468,7 @@
     </div>
     <div class="card bg-base-100 shadow nav-domain nav-land">
       <div class="card-body">
-        <h3 class="card-title">N4 · Trim the fleet <span class="badge badge-neutral">balance &amp; doctrine pass</span></h3>
+        <h3 class="card-title">N4 · Trim the fleet <span class="badge badge-neutral">balance &amp; doctrine pass</span> <span class="badge badge-success">shipped</span></h3>
         <ul class="list-disc list-inside text-sm space-y-1">
           <li>Mixed-domain scenarios in the balance runner; chart/cost tuning from its CSVs.</li>
           <li>Commander pass: extend exported id lists where doctrine says so (Cassian's
@@ -573,6 +573,74 @@
           happen in N4, new generals belong to the commanders plan.</li>
       </ul>
     </div>
+  </div>
+</section>
+
+
+<!-- ============================= 13 · WHAT SHIPPED ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">13 · What shipped, and what the build taught</h2>
+  <p class="max-w-3xl">
+    All four milestones landed with decisions D1–D6 intact. Three things the plan did
+    not anticipate are recorded here, because each was a real defect or a real
+    constraint rather than a change of mind.
+  </p>
+  <div class="space-y-4">
+    <div class="card bg-base-100 shadow border border-warning">
+      <div class="card-body">
+        <h3 class="card-title text-base">The AI could not afford the roster at all</h3>
+        <p class="text-sm">
+          Found by N2's naval soak: twenty-four days on a board with a port each and not
+          one hull laid down. The cause was neither naval nor new — the planner spent
+          whatever it held every turn, so its treasury never passed about eleven thousand
+          and <em>every</em> unit above that was unbuyable. N1's aircraft were already
+          affected: the only one that had ever appeared was the 9 000 B-Copter, never a
+          fighter or a bomber. Production now compares candidates across every facility
+          rather than taking the first, banks a turn when a better unit is close
+          (<span class="nav-code">save_up_turns</span>), and charges each copy already
+          fielded places in the priority list
+          (<span class="nav-code">duplicate_priority_cost</span>) so the strongest thing a
+          base makes cannot win every decision while a port and an airfield sit idle.
+        </p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Banking costs first-move fairness, and the trade is measured</h3>
+        <p class="text-sm">
+          The same fix hands whoever moves first a timing edge: they cross a price
+          threshold a turn earlier. Measured over 864 matches on the two original
+          fixtures — first-side bias +5.6 pp with no banking, +14.9 at a two-turn window,
+          +20.2 at three. Two is shipped, because both soaks build their full rosters
+          there and three buys nothing. The same runs showed the commander win-rate spread
+          <em>tightening</em> (52 pp to 38 pp, six warnings to four) against a better-playing
+          AI. No commander <span class="nav-code">.tres</span> was touched: the out-of-band
+          names are the same ones the base game already had, so that is a base-game tuning
+          pass and not this one. Full numbers in
+          <span class="nav-code">docs/commander_balance.md</span>.
+        </p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">One port is one dock doing two jobs</h3>
+        <p class="text-sm">
+          The Straits shipped with two ports a side and eight more cities than drafted.
+          With a single port the fleet came home to refuel and parked on top of the yard
+          that would have replaced it — the port was occupied 73% of the time and naval
+          production simply never happened. The balance fixture had the mirror-image
+          problem: its first version separated the armies with water and ground to the day
+          cap in 430 of 432 matches, so it measured the clock rather than the doctrines. A
+          centred lake fixed it, and it is now the fairest of the three boards at 0.0 pp.
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="alert text-sm">
+    <span><b>R1 still stands.</b> The AI never builds transports, because it still cannot plan
+    a load-move-unload across turns. Both shipped naval boards are designed around that:
+    the strait is one body of water and the land wraps around it, so fleets and armies each
+    reach the enemy without a ferry. Ferry planning remains the named stretch goal.</span>
   </div>
 </section>
 
