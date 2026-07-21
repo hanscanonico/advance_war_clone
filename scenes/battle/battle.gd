@@ -544,18 +544,8 @@ func _begin_turn() -> void:
 		_enter_victory()
 		return
 	Sfx.play(&"fanfare", -8.0)
-	(
-		animator
-		. show_banner(
-			(
-				"Day %d - %s"
-				% [
-					game.day,
-					TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
-				]
-			)
-		)
-	)
+	var team_name: String = TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team))
+	animator.show_banner("Day %d - %s" % [game.day, team_name])
 	var homes := game.properties_of(game.current_team)
 	if not homes.is_empty():
 		set_cursor_cell(homes[0])
@@ -624,7 +614,11 @@ func _refresh_fog() -> void:
 	view.refresh_fog(_viewing_team(), state == State.HANDOFF)
 
 
+## Idempotent: a rout resolved inside _begin_turn is seen again by whatever was
+## driving that turn, and the match is only won once however many callers notice.
 func _enter_victory() -> void:
+	if state == State.VICTORY:
+		return
 	state = State.VICTORY
 	animator.hide_banner()
 	Sfx.play(&"fanfare")
@@ -705,11 +699,12 @@ func _exit_targeting_to_menu() -> void:
 
 
 ## Adjacent cells where the selected transport (previewed at `dest`) could
-## unload its passenger. The vacated origin cell counts as free.
+## unload its passenger, empty when it is somewhere it cannot unload from at all.
+## The vacated origin cell counts as free.
 func _drop_cells(dest: Vector2i) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	var cargo := game.cargo_of(selected)
-	if cargo.is_empty():
+	if cargo.is_empty() or not selected.type.can_unload_from(map.terrain_at(dest).id):
 		return cells
 	for dir in MovementResolver.DIRECTIONS:
 		var cell := dest + dir

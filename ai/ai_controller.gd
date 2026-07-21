@@ -357,7 +357,7 @@ func _consider_captures(
 ## does, so a boat that dived while nearly dry would surface again next turn for
 ## exactly that reason, and dive again the turn after.
 func _consider_dive(state: GameState, unit: Unit, plan: UnitPlan) -> void:
-	if not unit.type.can_dive:
+	if not unit.type.can_dive or state.damage_chart == null:
 		return
 	var threatened := _threatened_by(state, unit, false)
 	var wants: bool

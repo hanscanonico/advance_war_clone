@@ -7,12 +7,12 @@ extends RefCounted
 const REPAIR_HP := 20  # internal HP (= 2 displayed) per turn on a property
 
 
-## `opening` marks the day-one call GameState.create makes to hand out the first
-## income. Fuel upkeep is skipped there, because it is charged for a turn that
-## has passed and on day one none has — and because create() runs this for the
-## opening team alone, so charging it would hand the second player's aircraft a
-## free day of fuel over the first player's.
-static func begin_turn(state: GameState, opening: bool = false) -> void:
+## Every turn is charged the same, day one included. That is what keeps the two
+## sides even: create() opens the match with this for the first team, and the
+## second team gets its own call through EndTurnCommand before it acts, so both
+## have paid exactly once by the time they move. Skipping the opening day would
+## have charged the first player one fewer time over any equal count of turns.
+static func begin_turn(state: GameState) -> void:
 	var team := state.current_team
 	_expire_power(state, team)
 	state.funds[team] += state.properties_of(team).size() * GameState.INCOME_PER_PROPERTY
@@ -20,8 +20,7 @@ static func begin_turn(state: GameState, opening: bool = false) -> void:
 		unit.acted = false
 		if unit.carrier != null:
 			continue  # passengers sit tight until dropped, and burn nothing
-		if not opening:
-			_burn_upkeep(unit)
+		_burn_upkeep(unit)
 		if _serviced_here(state, unit) or _in_reach_of_supplier(state, unit):
 			unit.resupply()
 		if _lost_to_empty_tank(state, unit):

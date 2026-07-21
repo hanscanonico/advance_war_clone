@@ -19,7 +19,11 @@ var carrier: Unit = null
 ## Submerged (subs only). A dived unit is hidden from enemies that are not
 ## standing next to it — with or without fog, unlike everything else the fog
 ## rules hide — and only a weapon that reaches under the surface can touch it.
-## It still occupies its cell: an enemy that moves into it finds it there.
+## It still occupies its cell: an enemy that moves into it finds it there. That
+## blocking is visible even when the boat is not — with fog off the move-range
+## overlay shows a one-tile hole where it sits, which gives its position away.
+## Known and accepted: the proper answer is the trap behaviour a hidden unit has
+## in Advance Wars, where moving into one halts you there, and that is deferred.
 var dived: bool = false
 
 

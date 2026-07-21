@@ -170,3 +170,15 @@ func test_a_sub_low_on_fuel_stays_up() -> void:
 	sub.fuel = sub.type.dived_fuel_upkeep + sub.type.move_points
 	var command := ai.plan_next_command(state)
 	assert_false(command is DiveCommand, "a boat this dry cannot afford to be under")
+
+
+## The damage chart is optional on a GameState, so every question the planner
+## asks of it is guarded — deciding whether to dive is a threat question, and a
+## state that resolves no combat has no threats to weigh.
+func test_planning_without_a_damage_chart_asks_the_chart_nothing() -> void:
+	var map := MapData.parse("[terrain]\nSSSSSSSSSSSS\n[units]\n1 s 0 0\n2 B 8 0", terrain_db)
+	var state := GameState.create(map, unit_db)
+	assert_not_null(state)
+	var command := ai.plan_next_command(state)
+	assert_false(command is DiveCommand, "nothing known to be dangerous is worth hiding from")
+	assert_eq(command.validate(state), "")

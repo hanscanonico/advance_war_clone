@@ -26,7 +26,8 @@ max-returns: 12
 # BattleMenus owns what each menu offers, which is where the production
 # facilities air units introduced would otherwise have landed; 820 once the four
 # plain unit actions — Load, Supply, Dive, Wait — collapsed into the one commit
-# helper they had each been spelling out.
-# battle.gd sits at exactly 820: adding to it means moving something else out
+# helper they had each been spelling out; 815 once the day banner stopped being
+# a twelve-line formatted expression, which paid for the victory guard.
+# battle.gd sits at exactly 815: adding to it means moving something else out
 # first, which is the point.
-max-file-lines: 820
+max-file-lines: 815

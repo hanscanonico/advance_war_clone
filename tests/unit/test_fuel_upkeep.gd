@@ -41,13 +41,16 @@ func test_ground_units_burn_no_fuel_standing_still() -> void:
 	assert_eq(state.units[0].fuel, 40, "a parked tank costs nothing to keep")
 
 
+## Day one is charged like any other, for both sides: create() opens the match
+## with the first team's begin_turn, and the second team pays on its own first.
 func test_aircraft_burn_upkeep_every_turn() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 b 0 0")
 	var bomber := state.units[0]
-	assert_eq(bomber.fuel, 99)
+	var upkeep := bomber.type.fuel_upkeep
+	assert_eq(bomber.fuel, 99 - upkeep, "the opening day costs a day of fuel too")
 	EndTurnCommand.new().apply(state)
 	EndTurnCommand.new().apply(state)
-	assert_eq(bomber.fuel, 99 - bomber.type.fuel_upkeep, "a bomber pays to stay up")
+	assert_eq(bomber.fuel, 99 - upkeep * 2, "a bomber pays to stay up")
 
 
 func test_aircraft_is_lost_when_the_tank_runs_dry() -> void:

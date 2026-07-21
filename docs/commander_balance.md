@@ -138,6 +138,15 @@ a timing edge, since they cross a price threshold a turn earlier. Measured at
 shipped: the air and naval soaks build their full rosters there, so three buys
 nothing and costs another five points of first-move fairness.
 
+Stated plainly, because it is easy to read the table above as a pass: **the
+shipped configuration sits outside this document's own ≤ 5 pp first-side-bias
+threshold**, roughly threefold, and the runner flags it REVIEW. That is a
+deliberate accepted trade, not an oversight — without banking the expensive half
+of the roster never reaches the board at all — and closing it belongs to the
+base-game balance pass, alongside the out-of-band commanders, not to the air and
+naval work. How much it bites depends strongly on the board: +14.9 pp is the
+`clash` + `ridge` average, while the `combined` fixture measured +0.0 pp.
+
 Everything above is the *base game's* balance seen through a better-playing AI.
 The out-of-band commanders are the same names as before (Gideon Holt and Tomas
 Reed high, Cass Orlov and Rhea Sol low), which makes them a base-game tuning pass
