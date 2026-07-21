@@ -1,28 +1,39 @@
 # Two coasts pinched to a diagonal neck; the neck's city is the choke.
 # symmetric
-# Sea is a hard wall in this game, which makes coastline the strongest
-# shaping tool there is: one road links the shelves, so APC ferry loops
-# pay and artillery covers the crossing. Mirrors on (x, y) -> (19 - x, 11 - y).
-# Symbols: . plains  F woods  M mountain  = road  ~ river
-#          C city  B base  Q HQ  S sea
+# Sea was a hard wall here until hulls could sail it, and the neck is now only
+# the *land* route. Each port opens onto its own pocket of water and the pockets
+# meet nowhere a short-ranged hull can swim, so the one thing that crosses the
+# isthmus without touching the road is a battleship's gun: the two pockets come
+# within five tiles of each other beside the neck, which is inside a battleship's
+# 2-6 arc and outside everything else's. The beaches at (10, 3) and (9, 8) are
+# where a lander puts armour ashore behind the far line — they are coastal *road*
+# cells, which cost every land class exactly what road did, so the crossing stays
+# the crossing and no hull can sail through them.
+# Mirrors on (x, y) -> (19 - x, 11 - y).
+# Symbols: . plains  F woods  M mountain  = road  ~ river  _ shoal
+#          C city  B base  Q HQ  P port  S sea
 [terrain]
 SSSSSSSSSSSSSSSSSSSS
 SBQ========SSSSSSSSS
 S.....C..M=SSSSSSSSS
-S.C.F...C.=SSSSSSSSS
+S.C.F...C._SSSSSSSSS
 SF...CMF..=SSSSSSSSS
-S...SSSS.C=.SSSSSSSS
-SSSSSSSS.=C.SSSS...S
+S.P.SSSS.C=.SSSSSSSS
+SSSSSSSS.=C.SSSS.P.S
 SSSSSSSSS=..FMC...FS
-SSSSSSSSS=.C...F.C.S
+SSSSSSSSS_.C...F.C.S
 SSSSSSSSS=M..C.....S
 SSSSSSSSS========QBS
 SSSSSSSSSSSSSSSSSSSS
 [owners]
+# team x y — HQ, base and port start owned, so both sides can put a hull to sea
+# without walking an infantry across the map first.
 1 1 1
 1 2 1
+1 2 5
 2 17 10
 2 18 10
+2 17 6
 [units]
 1 r 4 1
 1 p 6 1

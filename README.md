@@ -70,8 +70,12 @@ Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes
 Nine maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
 `riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`, `the_straits`, `ironworks` — so it
 opens on `scrimmage`, the quick match, and shows each one's size, property count and a one-line
-pitch as a tooltip. The last two are the boards air and naval units were added for: `jet_stream`
-puts an airfield behind each front, and `the_straits` a port on each coast of one shared channel.
+pitch as a tooltip. `jet_stream` and `the_straits` are the boards air and naval units were added
+for: the first puts an airfield behind each front, the second a port on each coast of one shared
+channel. Three of the older boards have since been retrofitted with the domains that suit them —
+`isthmus` gained a port and a landing beach per side, `ironworks` and `crossfire` an airfield each —
+while `first_steps`, `scrimmage`, `timberline` and `riverline` deliberately stay land-only, because
+each is built on a barrier that wings or hulls would simply erase.
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
 `--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
 second; either side may be left blank for no commander) — e.g.
@@ -79,8 +83,12 @@ second; either side may be left blank for no commander) — e.g.
 
 Adding a map is dropping a `.txt` in `maps/` — the menu auto-discovers it and `tests/unit/`
 holds it to the playability invariants (one HQ and a base per side, reachable HQs, a claimed
-`# symmetric` tag that actually mirrors) and plays an AI-vs-AI match on it. See the format at the
-top of `core/map_data.gd`; the first comment line is the tooltip description.
+`# symmetric` tag that actually mirrors) and plays an AI-vs-AI match on it. Boards that use the
+water get four more: every port opens onto sailable sea, all of a map's ports share one body of it
+(the AI cannot ferry, so a fleet it cannot sail to is a fleet it can never fight), every beach is
+reachable by a lander, and no beach chain quietly joins two landmasses — a shoal costs every land
+class exactly what road does, so a careless one is a bridge. See the format at the top of
+`core/map_data.gd`; the first comment line is the tooltip description.
 
 Any Godot 4.7+ works too — open the project folder in the editor.
 
