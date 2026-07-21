@@ -39,11 +39,11 @@ MODES ?=
 smoke:
 	tools/smoke_scenarios.sh $(MODES)
 
-# Offline commander balance: plays AI-vs-AI across every pairing on two
+# Offline commander balance: plays AI-vs-AI across every pairing on three
 # rotationally-symmetric scenarios and writes a per-match CSV + a JSON summary to
-# reports/ (gitignored). The full batch (no args) is ~1,152 headless matches and
-# is a release task, deliberately out of `make verify` and `make test`. Narrow it
-# for iteration, e.g.:
+# reports/ (gitignored). The full batch (no args) is a long headless release task,
+# deliberately out of `make verify` and `make test` — docs/commander_balance.md has
+# its exact size and every flag. Narrow it for iteration, e.g.:
 #   make commander-balance BAL="--commanders=alina_ward,cass_orlov --seeds=2"
 # The committed artifacts of a balance pass are tuned data/commanders/*.tres and
 # docs/commander_balance.md, never the generated report.

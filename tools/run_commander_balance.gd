@@ -15,14 +15,15 @@ extends SceneTree
 ## Usage (headless; see `make commander-balance`):
 ##   Godot --headless --path . -s res://tools/run_commander_balance.gd -- [flags]
 ##     --commanders=alina_ward,viktor_draeg   subset (default: all twelve)
-##     --scenarios=clash,ridge                subset (default: both)
+##     --scenarios=clash,ridge                subset (default: all three)
 ##     --seeds=4                              paired seed count (default: 4)
 ##     --neutral                              add each commander vs No Commander
 ##     --days=20                              day cap before a match is a draw
 ##     --out=reports/commander_balance        output directory (default shown)
 ##
-## The full batch (no flags) is 12x12 ordered pairs x 2 scenarios x 4 seeds =
-## 1,152 matches — an explicit release task, deliberately out of `make test`.
+## The full batch (no flags) is every ordered pair on every scenario at four
+## seeds — an explicit release task, deliberately out of `make test`; its size
+## and the thresholds it is read against are in docs/commander_balance.md.
 ## A focused `--commanders`/`--scenarios`/`--seeds` run is the fast iteration loop.
 ##
 ## `--difficulty-check` (see `make difficulty-check`) is a second, opt-in mode
@@ -73,7 +74,7 @@ const DIFFICULTY_CSV_COLUMNS: Array[String] = [
 	"cap_stall",
 ]
 
-## Two 180-degree rotationally-symmetric boards (see _assert_symmetric), so
+## Three 180-degree rotationally-symmetric boards (see _assert_symmetric), so
 ## neither side gets a terrain or income edge and a first-side bias in the
 ## results is the doctrines' doing, not the map's.
 ##

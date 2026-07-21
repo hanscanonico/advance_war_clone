@@ -1,10 +1,11 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. Three plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
+typed GDScript. Four plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
 game (architecture, mechanics, milestones M0–M7), `.lavish/commanders-plan.html` for
-Commanders and Command Powers (milestones C1–C4), and `.lavish/difficulty-modes-plan.html`
-for the Easy/Normal/Difficult tiers (milestones DF1–DF4).
+Commanders and Command Powers (milestones C1–C4), `.lavish/difficulty-modes-plan.html`
+for the Easy/Normal/Difficult tiers (milestones DF1–DF4), and
+`.lavish/naval-air-units-plan.html` for the air and naval domains (milestones N1–N4).
 
 ## Running
 
@@ -34,7 +35,7 @@ make test            # run the GUT unit test suite (headless)
 make check           # parse + type check every .gd file (fast; no scene tree)
 make lint            # gdlint — style and smells (config: gdlintrc)
 make format          # gdformat — reformat in place; format-check only reports
-make tiles           # rebuild the art: generated ground tiles + PixVoxel units/buildings, then import
+make tiles           # rebuild the art: ground tiles, PixVoxel units/buildings, placeholders, import
 make unit-placeholders    # redraw the aircraft/fleet sprites the PixVoxel pack has no art for
 make sprites-check   # verify the atlas build inputs without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
@@ -262,10 +263,10 @@ result, including one capability that measured *negative* and ships switched off
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
-- `tools/` — the art and sound build scripts: the headless ground-tile, sound, and portrait
-  generators, plus the PixVoxel atlas builder (see Assets below); and the offline AI-vs-AI runner,
-  which serves both the commander-balance matrix (`docs/commander_balance.md`) and the difficulty
-  ladder gate (`docs/difficulty_check.md`).
+- `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
+  and portrait generators, plus the PixVoxel atlas builder (see Assets below); and the offline
+  AI-vs-AI runner, which serves both the commander-balance matrix (`docs/commander_balance.md`)
+  and the difficulty ladder gate (`docs/difficulty_check.md`).
 - `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 

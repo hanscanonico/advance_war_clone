@@ -28,7 +28,7 @@ replaces the other:
 ## Running the automated matrix
 
 ```sh
-make commander-balance                 # full batch — a release task, ~1,152 matches
+make commander-balance                 # full batch — a release task, ~1,728 matches
 make commander-balance BAL="--commanders=alina_ward,cass_orlov --seeds=2"  # focused
 ```
 
@@ -44,7 +44,7 @@ Flags (after `--`): `--commanders=`, `--scenarios=`, `--seeds=`, `--neutral`
 
 ### The scenarios are fair by construction
 
-Both boards are 180° rotationally symmetric with the teams swapped, and the
+All three boards are 180° rotationally symmetric with the teams swapped, and the
 runner **asserts** that symmetry on startup (`_assert_symmetric`) — a typo that
 broke fairness fails the run rather than biasing it. A first-side bias in the
 results is therefore the doctrines' doing, not the map's. `clash` is open and
