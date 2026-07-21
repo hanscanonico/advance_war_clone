@@ -24,8 +24,8 @@ func validate(state: GameState) -> String:
 	if unit_type == null:
 		return "unknown unit type"
 	var terrain := state.map.terrain_at(cell)
-	if terrain == null or not unit_type.buildable_at(terrain.id):
-		return "can only build at a %s" % unit_type.built_at
+	if terrain == null or terrain.id != &"base":
+		return "can only build at a base"
 	if state.owner_at(cell) != team:
 		return "base is not owned"
 	if state.unit_at(cell) != null:

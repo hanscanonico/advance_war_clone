@@ -58,36 +58,6 @@ func test_non_base_rejected() -> void:
 	assert_eq(command.validate(state), "can only build at a base")
 
 
-## A base builds what the roster says a base builds. Every land unit names one,
-## so this is inert for today's nine — but it is the rule that keeps a ship off a
-## land base the day the roster grows one, and it is the same answer the AI's
-## candidate filter reads.
-func test_a_unit_the_terrain_cannot_produce_is_rejected() -> void:
-	var state := _state("[terrain]\nB.\n[owners]\n1 0 0")
-	state.funds[1] = 9999
-	var boat := UnitType.new()
-	boat.id = &"gunboat"
-	boat.display_name = "Gunboat"
-	boat.cost = 1000
-	boat.built_at = &"port"
-	var command := BuildCommand.new(1, boat, Vector2i(0, 0))
-	assert_eq(command.validate(state), "can only build at a port")
-
-
-## The rejection is about the terrain, not about the unit being unusual: the same
-## unit at its own site passes every guard it should.
-func test_a_unit_at_its_own_build_site_is_accepted() -> void:
-	var state := _state("[terrain]\nB.\n[owners]\n1 0 0")
-	state.funds[1] = 9999
-	var digger := UnitType.new()
-	digger.id = &"digger"
-	digger.display_name = "Digger"
-	digger.cost = 1000
-	digger.built_at = &"base"
-	var command := BuildCommand.new(1, digger, Vector2i(0, 0))
-	assert_eq(command.validate(state), "")
-
-
 func test_occupied_base_rejected() -> void:
 	var state := _state("[terrain]\nB.\n[owners]\n1 0 0\n[units]\n1 i 0 0")
 	state.funds[1] = 9999

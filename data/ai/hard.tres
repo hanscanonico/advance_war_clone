@@ -14,9 +14,9 @@
 ; threat_aversion's ladder-safe 0.1 is worth a hundredth of a tile there and
 ; could only ever break ties, which left the tier's flagship "refuses a kill
 ; zone" inert where nobody was attacking. 2.0 buys two tiles of retreat from a
-; shot that would kill outright; below ~1.6 it cannot buy even one against a
-; plain artillery shot and is inert again, so that is the floor. A starting
-; value: it has not been through the ladder yet.
+; shot that would kill outright, and proportionally less from one that would not;
+; below ~1.6 a healthy unit cannot buy even one against a plain artillery shot,
+; so that is the floor. A starting value: it has not been through the ladder yet.
 ;
 ; focus_fire_bonus ships at 0. The capability is implemented and tested, but it
 ; measured negative in every shape tried — the planner already re-plans after

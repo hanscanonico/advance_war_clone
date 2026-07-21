@@ -123,6 +123,38 @@ func test_advance_threat_tiles_are_priced_in_tiles() -> void:
 	)
 
 
+## Lethality, not HP loss. The same shot on the same cell is a scratch to a fresh
+## tank and certain death to a hurt one, and the dial has to read it that way
+## round — a unit already down to its last points is the one that must give
+## ground. Measured at a weight deliberately between the two: enough for the
+## wounded tank, not enough for the healthy one, so the test fails if the penalty
+## ever goes back to being a fraction of a full HP bar.
+func test_a_wounded_unit_flinches_harder_than_a_healthy_one() -> void:
+	var dial := _profile()
+	dial.advance_threat_tiles = 1.2
+
+	var healthy := _state(ARTILLERY_RING_BOARD)
+	var healthy_move := AIController.new(unit_db, dial).plan_next_command(healthy)
+	var healthy_path: Array[Vector2i] = (healthy_move as MoveCommand).path
+	assert_eq(
+		healthy_path[healthy_path.size() - 1],
+		Vector2i(6, 0),
+		"63 of a full 100 is worth 0.76 tiles at this dial — the fresh tank presses on"
+	)
+
+	var hurt := _state(ARTILLERY_RING_BOARD)
+	hurt.units[0].hp = 49  # still above retreat_hp, so it is advancing, not fleeing
+	var hurt_move := AIController.new(unit_db, dial).plan_next_command(hurt)
+	assert_true(hurt_move is MoveCommand, "expected an advance, got %s" % hurt_move)
+	var hurt_path: Array[Vector2i] = (hurt_move as MoveCommand).path
+	assert_eq(
+		hurt_path[hurt_path.size() - 1],
+		Vector2i(5, 0),
+		"the same shot takes every point it has left, so it is worth the whole dial"
+	)
+	assert_eq(hurt_move.validate(hurt), "")
+
+
 ## The two dials are independent: the attack-path one must not move an advancing
 ## unit, which is exactly the confusion that shipped a Difficult tier whose
 ## advance never flinched.
@@ -283,57 +315,17 @@ func test_reactive_building_falls_back_to_the_list_with_no_enemy_seen() -> void:
 ## Plans the one build the given profile makes on `map_text` with 15,000 in the
 ## bank — enough for everything but the md_tank, which is where counter-building
 ## has anything to say.
-func _build_pick(map_text: String, profile: AIProfile, db: UnitDB = null) -> StringName:
-	var roster := db if db != null else unit_db
-	var state := GameState.create(MapData.parse(map_text, terrain_db), roster, chart)
-	assert_not_null(state)
+func _build_pick(map_text: String, profile: AIProfile) -> StringName:
+	var state := _state(map_text)
 	state.funds[1] = 15000
 	for unit in state.units:
 		unit.acted = true
-	var command := AIController.new(roster, profile).plan_next_command(state)
+	var command := AIController.new(unit_db, profile).plan_next_command(state)
 	assert_true(command is BuildCommand, "expected a build, got %s" % command)
 	if not (command is BuildCommand):
 		return &""
 	assert_eq(command.validate(state), "")
 	return (command as BuildCommand).unit_type.id
-
-
-## The planner must never propose a build the rules would refuse. A build list
-## naming a unit this site cannot produce skips it rather than handing
-## BuildCommand something it rejects — the guard that matters the day the roster
-## grows a naval or air unit, since a base is then no longer "everything".
-func test_the_planner_never_picks_a_unit_the_site_cannot_produce() -> void:
-	var map_text := (
-		"[terrain]\nB.......\n[owners]\n1 0 0\n"
-		+ "[units]\n1 i 1 0\n1 i 2 0\n1 i 3 0\n2 t 5 0\n2 t 6 0\n2 t 7 0"
-	)
-	var db := UnitDB.load_default()
-	db.register(_gunboat())
-
-	var listed := _profile()
-	listed.build_priority = [&"gunboat", &"tank"] as Array[StringName]
-	var static_pick := _build_pick(map_text, listed, db)
-	assert_eq(static_pick, &"tank", "a base skips the port unit at the head of its own build list")
-
-	var reactive := _profile()
-	reactive.build_priority = [&"gunboat", &"tank"] as Array[StringName]
-	reactive.build_reactivity = 1.0
-	assert_ne(_build_pick(map_text, reactive, db), &"gunboat", "counter-building sees it no more")
-
-
-## A cheap, well-armed unit that no base can build. Deliberately the sort of
-## thing every candidate filter would otherwise reach for first.
-func _gunboat() -> UnitType:
-	var boat := UnitType.new()
-	boat.id = &"gunboat"
-	boat.display_name = "Gunboat"
-	boat.symbol = "z"
-	boat.cost = 1000
-	boat.move_points = 7
-	boat.min_range = 1
-	boat.max_range = 1
-	boat.built_at = &"port"
-	return boat
 
 
 # --- the Normal pin -----------------------------------------------------------

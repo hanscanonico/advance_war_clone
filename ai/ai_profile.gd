@@ -60,13 +60,14 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 ## whole integers of distance, so a value-denominated dial small enough to keep
 ## threat_aversion sane on the attack path can only ever break ties here. That
 ## scale difference is the entire reason this is a second field rather than a
-## second use of threat_aversion. A shot forecast to take half a unit's HP costs
-## half this many tiles.
+## second use of threat_aversion. A shot forecast to take half of the HP a unit
+## has left costs half this many tiles; one that would finish it costs all of
+## them, so a wounded unit flinches harder than a fresh one.
 ##
-## Below ~1.6 the dial cannot buy even one tile against a full-strength
-## artillery shot (63 damage through the plains defence), so it is inert; that is
-## the floor a tuned value has to clear. >0 builds the threat map on its own,
-## with or without threat_aversion.
+## Below ~1.6 the dial cannot buy even one tile for a healthy unit against a
+## full-strength artillery shot (63 of its 100 points, through the plains
+## defence), so it is inert there; that is the floor a tuned value has to clear.
+## >0 builds the threat map on its own, with or without threat_aversion.
 @export var advance_threat_tiles: float = 0.0
 ## Bonus for attacking a target other ready friendlies can still add damage to
 ## this turn, so the AI piles fire to finish a unit instead of scattering it

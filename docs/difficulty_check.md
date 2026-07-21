@@ -65,14 +65,18 @@ which compares a full AI turn command for command.
     small; see below.
   - **`advance_threat_tiles` — advances, in tiles.** A destination a unit is
     merely walking to scores as `-distance`, stepping by whole integers, so the
-    penalty is `advance_threat_tiles × damage fraction` *tiles* of forward
-    progress. Reusing the value-denominated dial here was a real defect: at
+    penalty is `advance_threat_tiles × lethality` *tiles* of forward progress,
+    where lethality is the forecast damage over the HP the unit has left — `1.0`
+    means the shot kills it, so a hurt unit gives up more ground than a fresh one
+    for the same incoming fire. Reusing the value-denominated dial here was a
+    real defect: at
     Difficult's ladder-safe `0.1` the advance penalty maxes out at a hundredth of
     a tile and could only break ties, so the tier's headline "refuses a kill
     zone" never once cost it a step. Cost-scaling the advance term instead is not
     the fix — that is the R2 coward the 0.5 row below measures at 88% losses.
-    The floor for a live value is ~1.6: below that it cannot buy even one tile
-    against a full-strength artillery shot (63 damage), i.e. it is inert again.
+    The floor for a live value is ~1.6: below that a healthy unit cannot buy even
+    one tile against a full-strength artillery shot (63 of its 100 points), i.e.
+    it is inert where nothing is hurt yet.
     `data/ai/hard.tres` ships `2.0` and `easy.tres` `3.0` as **starting values —
     neither has been through the ladder.**
 - **S2 `focus_fire_bonus` — focus fire.** Boosts a target other ready friendlies
