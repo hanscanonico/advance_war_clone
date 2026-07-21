@@ -13,6 +13,12 @@ extends RefCounted
 ## file, so tuning and difficulty are data edits. This class decides *how* to
 ## choose; the profile decides *what it is worth*.
 
+## Spacing between the tiers production ranks candidates in; see _build_rank.
+## Wide enough that no tier's own ordering can reach into the next.
+const TIER_STRIDE := 1000
+## "Never buy this" — above every tier, so it loses every comparison.
+const RANK_NONE := TIER_STRIDE * 100
+
 
 class UnitPlan:
 	var command: Command
@@ -24,6 +30,42 @@ class UnitPlan:
 class AdvanceGoal:
 	var cell: Vector2i
 	var stand_off := false
+
+
+## The board-wide questions production asks, worked out once per decision rather
+## than once per candidate unit — each scans every unit on the board, and the
+## ranking below asks them for each of a dozen unit types at each of several
+## facilities.
+class _BuildWants:
+	var outgunned_in_the_air := false
+	var short_of_capture_units := false
+	## How many of each unit type the team already fields, by id.
+	var owned: Dictionary = {}
+	## S3's counter-build order — unit id to its place in the standing tier, best
+	## first. Empty whenever reactivity is off or there is nothing to answer, and
+	## then the profile's own build_priority order decides instead.
+	var reactive_order: Dictionary = {}
+
+	static func of(ai: AIController, state: GameState) -> _BuildWants:
+		var wants := _BuildWants.new()
+		wants.outgunned_in_the_air = ai._outgunned_in_the_air(state)
+		var capture_units := 0
+		for unit in state.units_of(state.current_team):
+			var id := unit.type.id
+			wants.owned[id] = int(wants.owned.get(id, 0)) + 1
+			if unit.type.can_capture:
+				capture_units += 1
+		wants.short_of_capture_units = capture_units < ai.profile.capture_unit_target
+		wants.reactive_order = ai._reactive_order(state)
+		return wants
+
+	func count_of(id: StringName) -> int:
+		return int(owned.get(id, 0))
+
+	## The rank at which the standing priority list starts — the boundary between
+	## what is urgent and what can wait for a better turn.
+	func first_priority_rank() -> int:
+		return TIER_STRIDE * 2
 
 
 var unit_db: UnitDB
@@ -444,102 +486,160 @@ static func _nearest(from: Vector2i, cells: Array[Vector2i]) -> Vector2i:
 	return best
 
 
-## One build per call, at the first empty owned property that can produce
-## something we can afford. Every facility gets asked in turn rather than only
-## the first: an airport too expensive to use this turn must not stop the base
-## beside it from building infantry.
+## One build per call: the best unit any empty owned facility can produce, or
+## nothing at all when banking one more turn buys something better.
+##
+## Both halves of that matter. Taking the *best* build across every facility
+## rather than the first facility's — production is chosen the way a unit's
+## action is, by comparing candidates — is what stops the base nearest the top-left
+## corner spending the treasury before the airfield is ever asked.
+##
+## And the AI has to be able to save, or the expensive half of the roster does not
+## exist for it. Left to spend whatever it holds every turn, income never banks
+## past a few thousand, and a 20 000 airframe or an 18 000 hull is not "rarely
+## bought" but unbuyable — it would buy mechs forever on a board built around
+## ports. See _worth_waiting_for.
 func _plan_build(state: GameState) -> Command:
-	for cell in state.properties_of(state.current_team):
+	var team := state.current_team
+	var funds: int = state.funds[team]
+	var wants := _BuildWants.of(self, state)
+	var best_cell := Vector2i.ZERO
+	var best_choice: UnitType = null
+	var best_rank := RANK_NONE
+	var facilities: Array[TerrainType] = []
+	for cell in state.properties_of(team):
 		var terrain := state.map.terrain_at(cell)
 		if terrain.builds.is_empty() or state.unit_at(cell) != null:
 			continue
-		var choice := _pick_build(state, terrain)
+		facilities.append(terrain)
+		var choice := _pick_build(terrain, wants, funds)
 		if choice == null:
 			continue
-		return BuildCommand.new(state.current_team, choice, cell)
-	return null
+		var rank := _build_rank(choice, wants)
+		if rank < best_rank:
+			best_rank = rank
+			best_choice = choice
+			best_cell = cell
+	if best_choice == null:
+		return null
+	if _worth_waiting_for(state, facilities, wants, funds, best_rank):
+		return null
+	return BuildCommand.new(team, best_choice, best_cell)
 
 
-## What to buy at one facility: an answer to enemy aircraft first, then capture
-## units, then the strongest affordable thing this property builds.
-##
-## Every candidate is filtered through `terrain.can_build`, which is why one
-## priority list serves a base and an airport both — and why the infantry
+## The best unit this facility can produce for the money, or null. Every
+## candidate is filtered through `terrain.can_build`, which is why one priority
+## list serves a base, an airport and a port alike — and why the capture-unit
 ## fallback cannot conjure a rifleman out of a hangar.
-func _pick_build(state: GameState, terrain: TerrainType) -> UnitType:
-	var funds: int = state.funds[state.current_team]
-	if _outgunned_in_the_air(state):
-		for id in profile.air_answer_ids:
-			var answer := unit_db.by_id(id)
-			if answer != null and terrain.can_build(answer.move_class) and funds >= answer.cost:
-				return answer
-	var infantry := unit_db.by_id(&"infantry")
-	var capture_units := 0
-	for unit in state.units_of(state.current_team):
-		if unit.type.can_capture:
-			capture_units += 1
-	if _affordable_here(terrain, infantry, funds) and capture_units < profile.capture_unit_target:
-		return infantry
-	if profile.build_reactivity > 0.0:
-		var reactive := _reactive_build(state, terrain, funds)
-		if reactive != null:
-			return reactive
-	var listed := _static_build(terrain, funds)
-	if listed != null:
-		return listed
-	if _affordable_here(terrain, infantry, funds):
-		return infantry
-	return null
+func _pick_build(terrain: TerrainType, wants: _BuildWants, funds: int) -> UnitType:
+	var best: UnitType = null
+	var best_rank := RANK_NONE
+	for unit_type in unit_db.all():
+		if not terrain.can_build(unit_type.move_class) or funds < unit_type.cost:
+			continue
+		var rank := _build_rank(unit_type, wants)
+		if rank < best_rank:
+			best_rank = rank
+			best = unit_type
+	return best
 
 
-## The strongest affordable unit on the profile's build list. The whole of
-## Normal's and Easy's buying, and the fallback whenever counter-building has
-## nothing to say.
-func _static_build(terrain: TerrainType, funds: int) -> UnitType:
-	for id in profile.build_priority:
-		var unit_type := unit_db.by_id(id)
-		if _affordable_here(terrain, unit_type, funds):
-			return unit_type
-	return null
-
-
-## S3. Picks the affordable combat unit that best answers the enemy's actual,
-## cost-weighted roster, blended with the static build_priority order by
-## build_reactivity. At reactivity 0 this is never reached (the static list runs
-## instead); at 1 the matchup decides outright. Both components are normalised to
-## 0..1 so the blend mixes like with like. Only the *choice* changes — the unit
-## it returns is built by the same BuildCommand as any other.
+## True when the team should bank this turn instead of buying `best_rank`.
 ##
-## Null when there is nothing to react to — no roster in sight, or none of it
+## Only ever for the standing priority list: an answer to aircraft overhead and a
+## capture unit while we are short of them are both urgent, and saving through
+## either is how an AI loses while holding a full treasury. And only when the
+## better unit is genuinely close — within the profile's window of income — so
+## the planner can never sit on its hands for something it will not reach.
+func _worth_waiting_for(
+	state: GameState, facilities: Array[TerrainType], wants: _BuildWants, funds: int, best_rank: int
+) -> bool:
+	if best_rank < wants.first_priority_rank() or profile.save_up_turns <= 0:
+		return false
+	var income := state.properties_of(state.current_team).size() * GameState.INCOME_PER_PROPERTY
+	var budget := funds + income * profile.save_up_turns
+	for terrain in facilities:
+		for unit_type in unit_db.all():
+			if not terrain.can_build(unit_type.move_class) or unit_type.cost > budget:
+				continue
+			if _build_rank(unit_type, wants) < best_rank:
+				return true
+	return false
+
+
+## How much the team wants `unit_type`, lower being more wanted. Four tiers, in
+## order: an answer to enemy aircraft, a capture unit while we are short, the
+## standing build priority, and finally any capture unit at all — the last being
+## what keeps a base with a thousand in the bank turning out infantry.
+##
+## The standing tier is ordered by the profile's build_priority, or by S3's
+## counter-build blend where reactivity has re-ranked it. Only the *order inside
+## that tier* changes: reactivity never promotes a buy past an answer to aircraft
+## overhead, and never reaches the two urgent tiers above it at all.
+##
+## RANK_NONE is "never buy this", which is where transports land: nothing puts
+## them in a tier, because the planner cannot plan a ferry (see the profile).
+func _build_rank(unit_type: UnitType, wants: _BuildWants) -> int:
+	if wants.outgunned_in_the_air:
+		var answer := profile.air_answer_ids.find(unit_type.id)
+		if answer >= 0:
+			return answer
+	if unit_type.can_capture and wants.short_of_capture_units:
+		return TIER_STRIDE
+	# Each copy already fielded costs the type places in the tier, so the
+	# strongest thing a base makes does not win every decision the team ever
+	# takes while a port and an airfield sit idle beside it.
+	var duplicates := wants.count_of(unit_type.id) * profile.duplicate_priority_cost
+	if wants.reactive_order.has(unit_type.id):
+		return TIER_STRIDE * 2 + int(wants.reactive_order[unit_type.id]) + duplicates
+	var priority := profile.build_priority.find(unit_type.id)
+	if priority >= 0:
+		return TIER_STRIDE * 2 + priority + duplicates
+	if unit_type.can_capture:
+		return TIER_STRIDE * 3
+	return RANK_NONE
+
+
+## S3. Orders every combat unit by how well it answers the enemy's actual,
+## cost-weighted roster, blended with the static build_priority order by
+## build_reactivity. At reactivity 0 this returns nothing (the static list runs
+## instead); at 1 the matchup decides outright. Both components are normalised to
+## 0..1 so the blend mixes like with like. Only the *order* changes — whatever
+## comes out is built by the same BuildCommand as any other buy.
+##
+## Empty when there is nothing to react to — no roster in sight, or none of it
 ## takable damage — and the static list decides instead. Without that, full
 ## reactivity would score every candidate at zero and buy whichever the database
 ## happened to list first.
-func _reactive_build(state: GameState, terrain: TerrainType, funds: int) -> UnitType:
-	# The candidate set is wider than profile.build_priority, so producibility is
-	# asked of TerrainType.builds via _affordable_here rather than assumed: the
-	# planner keeps no second opinion on what a property can turn out, and a
-	# counter-build can never name a hull the base beside it cannot lay down.
-	var candidates: Array[UnitType] = []
-	for unit_type in unit_db.all():
-		if unit_type.max_range > 0 and _affordable_here(terrain, unit_type, funds):
-			candidates.append(unit_type)
-	if candidates.is_empty():
-		return null
+##
+## Scored across the whole roster rather than only what this turn's purse and
+## this facility can produce, because a rank has to mean the same thing at every
+## facility and under _worth_waiting_for's larger hypothetical budget. Producing
+## the winner is still TerrainType.builds' call: _pick_build filters before it
+## ever compares ranks, so a counter-build can never name a hull a base cannot
+## lay down.
+func _reactive_order(state: GameState) -> Dictionary:
+	if profile.build_reactivity <= 0.0:
+		return {}
 	var roster := _enemy_roster(state)
 	if roster.is_empty():
-		return null
-	var max_eff := 0.0
+		return {}
+	var candidates: Array[UnitType] = []
 	var effectiveness: Dictionary = {}
-	for cand in candidates:
-		var value := _effectiveness(state, cand, roster)
-		effectiveness[cand.id] = value
+	var max_eff := 0.0
+	for unit_type in unit_db.all():
+		if unit_type.max_range <= 0:
+			continue  # transports answer nothing; they stay off the list entirely
+		candidates.append(unit_type)
+		var value := _effectiveness(state, unit_type, roster)
+		effectiveness[unit_type.id] = value
 		max_eff = maxf(max_eff, value)
 	if max_eff <= 0.0:
-		return null  # nothing affordable can hurt what is out there; let the list decide
+		return {}  # nothing in the roster can be hurt; let the list decide
 	var priority := profile.build_priority
-	var best: UnitType = null
-	var best_score := -INF
-	for cand in candidates:
+	var scored: Array = []
+	for i in candidates.size():
+		var cand := candidates[i]
 		var static_norm := 0.0
 		var rank := priority.find(cand.id)
 		if rank >= 0:
@@ -548,10 +648,20 @@ func _reactive_build(state: GameState, terrain: TerrainType, funds: int) -> Unit
 		var score := (
 			(1.0 - profile.build_reactivity) * static_norm + profile.build_reactivity * eff_norm
 		)
-		if score > best_score:
-			best_score = score
-			best = cand
-	return best
+		scored.append([score, i, cand.id])
+	scored.sort_custom(_by_score_then_scan_order)
+	var order: Dictionary = {}
+	for i in scored.size():
+		order[scored[i][2]] = i
+	return order
+
+
+## Best score first, ties broken by database order so the ranking is as
+## deterministic as every other decision this planner makes.
+static func _by_score_then_scan_order(a: Array, b: Array) -> bool:
+	if a[0] != b[0]:
+		return a[0] > b[0]
+	return a[1] < b[1]
 
 
 ## The visible enemy roster as [cost, type id] pairs, the raw material S3 weighs a
@@ -579,12 +689,6 @@ func _effectiveness(state: GameState, cand: UnitType, roster: Array) -> float:
 	if total_weight <= 0.0:
 		return 0.0
 	return weighted / total_weight
-
-
-static func _affordable_here(terrain: TerrainType, unit_type: UnitType, funds: int) -> bool:
-	if unit_type == null or not terrain.can_build(unit_type.move_class):
-		return false
-	return funds >= unit_type.cost
 
 
 ## Whether the enemy is flying and we field fewer units that can shoot back at

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="UnitType" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/unit_type.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"sub"
+display_name = "Sub"
+symbol = "s"
+cost = 20000
+move_points = 5
+move_class = &"ship"
+domain = &"sea"
+vision = 5
+can_capture = false
+min_range = 1
+max_range = 1
+max_fuel = 60
+fuel_upkeep = 1
+max_ammo = 6
+transport_capacity = 0
+cargo_classes = Array[StringName]([])
+unload_terrain = Array[StringName]([])
+can_resupply = false
+atlas_col = 16

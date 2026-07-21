@@ -9,7 +9,9 @@ display_name = "Sea"
 symbol = "S"
 defense_stars = 0
 move_costs = {
-&"air": 1
+&"air": 1,
+&"lander": 1,
+&"ship": 1
 }
 is_property = false
 atlas_col = 8

@@ -69,7 +69,7 @@ UNITS=(Infantry Infantry_T Supply_T Tank Tank_P Artillery_S Artillery Artillery_
 BUILDINGS=(City Factory Castle)
 BLDG_COLS=(5 6 7)
 # COLS in tools/generate_tiles.gd; rows are the team rows above.
-TERRAIN_COLS=10
+TERRAIN_COLS=14
 TERRAIN_ROWS=${#ROW_PALETTE[@]}
 
 # Paved lot under a building, matching _ground(o, PAVE) in tools/generate_tiles.gd:

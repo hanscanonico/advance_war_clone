@@ -66,9 +66,11 @@ so two scenarios run both ways by default.
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
-Seven maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
-`riverline`, `isthmus`, `crossfire`, `first_steps`, `ironworks` — so it opens on `scrimmage`, the
-quick match, and shows each one's size, property count and a one-line pitch as a tooltip.
+Nine maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
+`riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`, `the_straits`, `ironworks` — so it
+opens on `scrimmage`, the quick match, and shows each one's size, property count and a one-line
+pitch as a tooltip. The last two are the boards air and naval units were added for: `jet_stream`
+puts an airfield behind each front, and `the_straits` a port on each coast of one shared channel.
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
 `--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
 second; either side may be left blank for no commander) — e.g.
@@ -123,18 +125,26 @@ jumps to that team's first property.
 - Confirming onto a reachable cell held by one of *your* units offers **Load** (board a transport
   with room) or **Join** (merge into a damaged unit of the same type, adding up HP, fuel, and
   ammo). Cancel snaps the mover back, as with any uncommitted move
-- A loaded APC offers **Drop**, which enters a cell picker: the legal unload cells get the blue
-  overlay, and confirming on one puts the passenger out there, exhausted for the turn. **Supply**
-  refills every friendly unit within the APC's supply reach — normally the adjacent tiles, further
-  under a commander who says so
+- A loaded transport offers **Drop**, which enters a cell picker: the legal unload cells get the
+  blue overlay, and confirming on one puts the passenger out there, exhausted for the turn. What a
+  transport carries is its own: an APC or a T-Copter takes infantry, a Lander takes two of anything
+  that drives — and unloads only onto a shoal or a port, since a landing craft cannot tip a tank
+  over the side mid-channel. **Supply** refills every friendly unit within the APC's supply reach —
+  normally the adjacent tiles, further under a commander who says so
 - Moving spends fuel equal to the terrain cost of each step, discounted by any doctrine that makes
   that step cheaper, so you are never billed more than the range overlay showed; attacking spends
   one ammo, and so does each counter-attack, so a dry unit can neither fire nor counter. At the
-  start of your turn every unit standing on one of your properties or in reach of one of your APCs
-  is refilled
-- Confirm on one of your empty bases: the build menu lists units cheapest first, each row drawing
-  the unit's artwork in your team's colours beside its name and cost; rows you can't afford are
-  greyed out. A bought unit spawns exhausted and acts next turn
+  start of your turn every unit standing on a property that services it, or in reach of one of your
+  APCs, is refilled. Which property services what is the point: a city refits vehicles, an airport
+  aircraft, a port hulls, and none of them does another's job
+- Aircraft and ships burn fuel simply by existing — a few points every turn, before anything
+  refills them — and are **destroyed** when the tank runs dry. A warning badge appears on any unit
+  inside its last turn's worth of fuel. Ground units have no upkeep: an empty tank strands them and
+  nothing worse. That is what makes airfields and ports worth taking rather than decoration
+- Confirm on one of your empty production properties — a base, an airport or a port: the build menu
+  lists what *that* facility makes, cheapest first, each row drawing the unit's artwork in your
+  team's colours beside its name and cost; rows you can't afford are greyed out. A bought unit
+  spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
   team (the day counter advances when the rotation wraps back to Red), and **Save**, which writes
   the whole match — map, day, funds, ownership, every unit, both commanders, and the RNG stream —
@@ -147,8 +157,8 @@ jumps to that team's first property.
   their maximums (no ammo row for units that need none), its range when it is an indirect,
   `Carrying …` when it is a loaded transport, and a `Waited` badge — dimming the card — once it
   has acted this turn. Below that sits a compact terrain card: the tile's artwork, name, defense
-  stars, the move cost for the occupant's movement class (all four classes when the tile is
-  empty), and the owner, with `capture: N left` while a capture is in progress
+  stars, the move cost for the occupant's movement class (every class that can enter, when the
+  tile is empty), and the owner, with `capture: N left` while a capture is in progress
 - Taking the enemy HQ or destroying every enemy unit ends the match on a victory screen naming
   the winner and the day, with **Rematch** (same map, fog, commanders, and sides) and **Main Menu**
 
@@ -185,11 +195,11 @@ meter is shown while it plays, but the button stays disabled — it is not yours
 Off by default; turn it on in the menu or with `--fog`. Fogged cells are darkened and the units
 in them are hidden — you can neither target nor inspect an enemy you cannot see. You see through
 your own units (each unit type has its own vision range) and out to two tiles around every
-property you own. Woods only give themselves up from an adjacent tile, and units riding a
-transport see nothing. A commander can bend all of that: lengthen their own units' sight, see
-into woods at range, jam the enemy's sight shorter, or hide their units outright on a tile you
-can otherwise see. Vision is recomputed after each committed action and turn change, not as the
-cursor moves.
+property you own. Concealing terrain — woods, and reefs at sea — only gives itself up from an
+adjacent tile, and units riding a transport see nothing. A commander can bend all of that:
+lengthen their own units' sight, see into cover at range, jam the enemy's sight shorter, or hide
+their units outright on a tile you can otherwise see. Vision is recomputed after each committed
+action and turn change, not as the cursor moves.
 
 The view is always *your* team's, including while the AI plays. The AI itself sees the whole
 board — an openly cheating opponent, not a guessing one — with one deliberate exception: a unit a

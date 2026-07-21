@@ -18,6 +18,8 @@ const CLASS_LABELS: Array = [
 	[TerrainType.TIRES, "Tires"],
 	[TerrainType.TREADS, "Treads"],
 	[TerrainType.AIR, "Air"],
+	[TerrainType.SHIP, "Ship"],
+	[TerrainType.LANDER, "Lander"],
 ]
 
 @onready var unit_rows: VBoxContainer = %UnitRows

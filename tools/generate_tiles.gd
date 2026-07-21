@@ -14,10 +14,11 @@ const TILE := 16
 ## Atlas cells are 4x the world grid. Nearest-neighbour, so the 16px art is
 ## pixel-identical on screen at the battle scene's default zoom.
 const SCALE := 4
-## road, plains, woods, mountain, river, city, base, hq, sea, airport
+## road, plains, woods, mountain, river, city, base, hq, sea, airport, port,
+## shoal, bridge, reef
 ## Keep TERRAIN_COLS in tools/build_pixvoxel_atlases.sh in step: that script
 ## checks the atlas it paints buildings into is exactly this wide.
-const COLS := 10
+const COLS := 14
 const ROWS := 3  # 0 = neutral, 1 = red, 2 = blue
 
 const GRASS := Color("78c850")
@@ -37,6 +38,8 @@ const PAVE := Color("cfcfcf")
 const ASPHALT := Color("6f747c")
 const ASPHALT_DARK := Color("585d64")
 const MARKING := Color("e4e7eb")
+const SAND := Color("e0d3a4")
+const SAND_DARK := Color("c4b585")
 const TEAM_COLORS: Array[Color] = [Color("8a9099"), Color("d84a3c"), Color("3c64d8")]
 
 var img: Image
@@ -67,10 +70,14 @@ func _generate_atlas() -> void:
 		_ground(_at(6, row), PAVE)
 		_ground(_at(7, row), PAVE)
 		_draw_sea(_at(8, row))
-		# The airport is drawn whole here, tower included, rather than left as a
-		# lot for the PixVoxel step: that pack has no hangar, and at 16px a
-		# runway reads as an airfield more clearly than a building would.
+		# The airport and port are drawn whole here, buildings included, rather
+		# than left as lots for the PixVoxel step: that pack has no hangar and no
+		# quay, and at 16px a runway and a jetty read more clearly anyway.
 		_draw_airport(_at(9, row), row)
+		_draw_port(_at(10, row), row)
+		_draw_shoal(_at(11, row))
+		_draw_bridge(_at(12, row))
+		_draw_reef(_at(13, row))
 	img.resize(COLS * TILE * SCALE, ROWS * TILE * SCALE, Image.INTERPOLATE_NEAREST)
 	img.save_png("res://assets/tiles/terrain_atlas.png")
 
@@ -157,6 +164,51 @@ func _draw_airport(o: Vector2i, row: int) -> void:
 	_fill(o, 9, 1, 5, 4, TEAM_COLORS[row].darkened(0.25))
 	_fill(o, 10, 2, 3, 2, MARKING)
 	_fill(o, 2, 12, 4, 2, TEAM_COLORS[row])
+
+
+## Deep water with a team-coloured warehouse on a quay: the naval factory, and
+## the only place hulls repair.
+func _draw_port(o: Vector2i, row: int) -> void:
+	_ground(o, WATER_DARK)
+	_fill(o, 0, 0, TILE, 7, PAVE.darkened(0.12))
+	_fill(o, 1, 1, TILE - 2, 5, PAVE)
+	_fill(o, 2, 1, 6, 5, TEAM_COLORS[row].darkened(0.2))
+	_fill(o, 3, 2, 4, 2, MARKING)
+	_fill(o, 10, 2, 4, 4, ASPHALT)
+	_fill(o, 7, 7, 3, 6, ASPHALT_DARK)  # the jetty, running out into the water
+	_fill(o, 2, 10, 4, 1, WATER)
+	_fill(o, 11, 12, 3, 1, WATER)
+
+
+## Sand meeting water: the beach a lander puts vehicles ashore on.
+func _draw_shoal(o: Vector2i) -> void:
+	_ground(o, SAND)
+	_fill(o, 0, 10, TILE, 6, WATER)
+	_fill(o, 0, 10, TILE, 1, SAND_DARK)
+	for p: Vector2i in [Vector2i(3, 3), Vector2i(9, 5), Vector2i(6, 8), Vector2i(12, 2)]:
+		_fill(o, p.x, p.y, 1, 1, SAND_DARK)
+	_fill(o, 3, 13, 5, 1, WATER_LIGHT)
+
+
+## A road carried over the water. Ground crosses it; hulls do not fit under it,
+## which is what makes a bridge a naval chokepoint as well as a land one.
+func _draw_bridge(o: Vector2i) -> void:
+	_ground(o, WATER)
+	_fill(o, 0, 3, TILE, 10, ROAD)
+	_fill(o, 0, 3, TILE, 1, ROAD_DARK)
+	_fill(o, 0, 12, TILE, 1, ROAD_DARK)
+	_fill(o, 3, 7, 3, 2, ROAD_DARK)
+	_fill(o, 10, 7, 3, 2, ROAD_DARK)
+
+
+## Shallow rock: passable to hulls at a price, and cover in fog the way woods are.
+func _draw_reef(o: Vector2i) -> void:
+	_ground(o, WATER_DARK)
+	for p: Vector2i in [Vector2i(3, 4), Vector2i(9, 3), Vector2i(5, 9), Vector2i(11, 10)]:
+		_fill(o, p.x, p.y, 3, 2, ROCK)
+		_fill(o, p.x, p.y + 2, 3, 1, ROCK_DARK)
+	_fill(o, 2, 12, 4, 1, WATER)
+	_fill(o, 10, 1, 3, 1, WATER)
 
 
 ## Semi-transparent white tile; the scene modulates it (blue = move range).

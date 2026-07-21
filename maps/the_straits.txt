@@ -1,0 +1,59 @@
+# A strait between two coasts: the fleets meet in it, the armies walk around it.
+# symmetric
+# The naval board. The water runs corner to corner but stops short of both ends,
+# so the two homes are joined by land at the top right and the bottom left — the
+# armies can reach each other on foot, and the strait stays one body of water
+# that every hull afloat can sail. That is deliberate: a bridge across the middle
+# would connect the coasts and cut the sea in two, leaving two fleets that can
+# never meet. The bridge on this board carries the home road over a river instead.
+# Ports are the only place hulls repair, and they sit on the near shore of the
+# strait, so a fleet that pushes past the reefs is a fleet a long way from a dock.
+# Reefs conceal under fog exactly as woods do; shoals are where a lander beaches.
+# Mirrors on (x, y) -> (19 - x, 15 - y).
+# Symbols: . plains  F woods  M mountain  = road  ~ river  + bridge
+#          C city  B base  Q HQ  A airport  P port  S sea  _ shoal  * reef
+[terrain]
+.....F.M............
+.QB=A.C...M.........
+...=....C...._......
+.B~+~~.....M_SS.....
+...=...F..__S*SS....
+.C.==....PSSSSSS_...
+........_SS*SSS_....
+...C..__SSSSS__..F..
+..F..__SSSSS__..C...
+...._SSS*SS_........
+..._SSSSSSP....==.C.
+....SS*S__..F...=...
+.....SS_M.....~~+~B.
+......_....C....=...
+.........M...C.A=BQ.
+............M.F.....
+[owners]
+1 1 1
+2 18 14
+1 2 1
+2 17 14
+1 1 3
+2 18 12
+1 4 1
+2 15 14
+1 9 5
+2 10 10
+[units]
+1 i 5 1
+2 i 14 14
+1 i 6 2
+2 i 13 13
+1 m 5 4
+2 m 14 11
+1 r 6 5
+2 r 13 10
+1 t 4 6
+2 t 15 9
+1 a 2 6
+2 a 17 9
+1 g 7 3
+2 g 12 12
+1 c 10 5
+2 c 9 10

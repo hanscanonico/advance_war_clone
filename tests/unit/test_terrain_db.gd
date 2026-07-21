@@ -121,3 +121,51 @@ func _resource_count(dir_path: String) -> int:
 		if file.trim_suffix(".remap").ends_with(".tres"):
 			count += 1
 	return count
+
+
+## Sea admits hulls and nothing else that drives. This is the whole naval
+## movement model, exactly as `air: 1` everywhere is the air one.
+func test_sea_carries_hulls_only() -> void:
+	var sea := db.by_id(&"sea")
+	assert_eq(sea.move_cost(TerrainType.SHIP), 1)
+	assert_eq(sea.move_cost(TerrainType.LANDER), 1)
+	for move_class: StringName in [
+		TerrainType.FOOT, TerrainType.BOOT, TerrainType.TIRES, TerrainType.TREADS
+	]:
+		assert_false(sea.is_passable(move_class), "%s should not cross open water" % move_class)
+
+
+## A shoal is the beach a lander runs onto: land units and the landing craft,
+## never a warship. A bridge is the mirror image — everything that drives, and no
+## hull at all, which is what makes it a chokepoint on the water as well as a
+## crossing on land.
+func test_shoals_and_bridges_split_the_fleet_from_the_army() -> void:
+	var shoal := db.by_id(&"shoal")
+	assert_true(shoal.is_passable(TerrainType.TREADS))
+	assert_true(shoal.is_passable(TerrainType.LANDER))
+	assert_false(shoal.is_passable(TerrainType.SHIP), "a warship cannot beach itself")
+	var bridge := db.by_id(&"bridge")
+	assert_true(bridge.is_passable(TerrainType.TREADS))
+	assert_false(bridge.is_passable(TerrainType.SHIP), "hulls do not fit under a bridge")
+	assert_false(bridge.is_passable(TerrainType.LANDER))
+
+
+func test_reefs_slow_hulls_and_hide_them() -> void:
+	var reef := db.by_id(&"reef")
+	assert_eq(reef.move_cost(TerrainType.SHIP), 2)
+	assert_false(reef.is_passable(TerrainType.FOOT), "a reef is still open water to an army")
+	assert_true(reef.conceals, "a reef is the sea's woods")
+	assert_true(db.by_id(&"woods").conceals, "and woods still conceal, now that it is a flag")
+	assert_false(db.by_id(&"plains").conceals)
+
+
+func test_port_builds_and_services_only_hulls() -> void:
+	var port := db.by_id(&"port")
+	assert_true(port.is_property)
+	assert_true(port.can_build(TerrainType.SHIP))
+	assert_true(port.can_build(TerrainType.LANDER))
+	assert_false(port.can_build(TerrainType.TREADS), "a dockyard does not turn out tanks")
+	assert_true(port.services_domain(UnitType.SEA))
+	assert_false(port.services_domain(UnitType.LAND))
+	assert_true(port.is_passable(TerrainType.SHIP), "a hull has to be able to tie up at it")
+	assert_true(port.is_passable(TerrainType.FOOT), "and an infantryman to walk up and take it")

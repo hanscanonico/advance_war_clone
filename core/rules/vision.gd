@@ -7,12 +7,12 @@ extends RefCounted
 ## Simplified Advance Wars rules:
 ## - Each unit on the board sees cells within its type's vision range
 ##   (Manhattan distance). Carried units see nothing.
-## - Woods are hiding spots: revealed only from distance <= 1, regardless
-##   of the viewer's range.
+## - Concealing terrain (woods, reefs) hides what stands on it: revealed only
+##   from distance <= 1, regardless of the viewer's range.
 ## - Owned properties watch their surroundings out to PROPERTY_VISION.
 ##
 ## Commanders bend all three: a doctrine can lengthen a unit's sight, let it see
-## into woods at range, jam an enemy's sight shorter, or hide its own units from
+## into cover at range, jam an enemy's sight shorter, or hide its own units from
 ## a viewer who can otherwise see the cell they stand on. Because of that last
 ## one, seeing a *cell* and seeing the *unit* on it are now separate questions —
 ## see can_see_unit.
@@ -33,7 +33,7 @@ static func visible_cells(state: GameState, team: int) -> Dictionary:
 			continue
 		var co := state.commander_of(team)
 		_reveal_around(
-			state, cells, unit.cell, _sight_of(state, unit), co.sees_into_woods(state, unit)
+			state, cells, unit.cell, _sight_of(state, unit), co.sees_into_cover(state, unit)
 		)
 	for cell in state.properties_of(team):
 		_reveal_around(state, cells, cell, PROPERTY_VISION, false)
@@ -82,7 +82,7 @@ static func _sight_of(state: GameState, unit: Unit) -> int:
 
 
 static func _reveal_around(
-	state: GameState, cells: Dictionary, from: Vector2i, radius: int, through_woods: bool
+	state: GameState, cells: Dictionary, from: Vector2i, radius: int, through_cover: bool
 ) -> void:
 	for dy in range(-radius, radius + 1):
 		var span: int = radius - absi(dy)
@@ -90,9 +90,12 @@ static func _reveal_around(
 			var cell := from + Vector2i(dx, dy)
 			if not state.map.in_bounds(cell):
 				continue
-			if through_woods:
+			if through_cover:
 				cells[cell] = true
 				continue
-			if state.map.terrain_at(cell).id == &"woods" and absi(dx) + absi(dy) > 1:
-				continue  # woods hide anything not right next to a viewer
+			# Which terrain conceals is the terrain's own flag rather than a name
+			# checked here, so a reef hides a submarine exactly as woods hide a
+			# tank, and adding cover is a data edit.
+			if state.map.terrain_at(cell).conceals and absi(dx) + absi(dy) > 1:
+				continue  # cover hides anything not right next to a viewer
 			cells[cell] = true

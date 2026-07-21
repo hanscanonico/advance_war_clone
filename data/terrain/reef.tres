@@ -4,18 +4,18 @@
 
 [resource]
 script = ExtResource("1")
-id = &"woods"
-display_name = "Woods"
-symbol = "F"
-defense_stars = 2
+id = &"reef"
+display_name = "Reef"
+symbol = "*"
+defense_stars = 1
 move_costs = {
 &"air": 1,
-&"boot": 1,
-&"foot": 1,
-&"tires": 3,
-&"treads": 2
+&"lander": 2,
+&"ship": 2
 }
 is_property = false
+builds = Array[StringName]([])
+services = Array[StringName]([])
 conceals = true
-atlas_col = 2
+atlas_col = 13
 team_tinted = false

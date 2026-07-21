@@ -153,9 +153,10 @@ func enemy_vision_bonus(_state: GameState, _unit: Unit) -> int:
 	return 0
 
 
-## True when `unit` sees into woods at range, ignoring the standing rule that
-## woods are only revealed from an adjacent tile.
-func sees_into_woods(_state: GameState, _unit: Unit) -> bool:
+## True when `unit` sees into concealing terrain at range, ignoring the standing
+## rule that cover is only revealed from an adjacent tile. Woods and reefs both,
+## since which terrain conceals is TerrainType.conceals and not a fixed list.
+func sees_into_cover(_state: GameState, _unit: Unit) -> bool:
 	return false
 
 

@@ -11,6 +11,8 @@ const BOOT := &"boot"  # mech: crosses mountains and rivers at cost 1
 const TIRES := &"tires"  # recon, rockets, missiles
 const TREADS := &"treads"  # tanks, artillery, anti-air, APC
 const AIR := &"air"  # everything that flies: costs 1 on every terrain
+const SHIP := &"ship"  # warships: deep water only
+const LANDER := &"lander"  # transports that also beach on shoals
 
 @export var id: StringName
 @export var display_name: String
@@ -34,6 +36,9 @@ const AIR := &"air"  # everything that flies: costs 1 on every terrain
 ## / SEA). A city refits what drives and nothing else, so a bomber parked on one
 ## gets no fuel out of it — which is the whole reason airports are worth taking.
 @export var services: Array[StringName] = []
+## Hides whatever stands here from more than one tile away, under fog. Woods and
+## reefs; see Vision, which asks this rather than naming woods.
+@export var conceals: bool = false
 ## Column of this terrain in the generated atlas texture.
 @export var atlas_col: int = 0
 ## Properties have team-colored variants on rows 1+ of the atlas.

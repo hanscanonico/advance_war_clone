@@ -33,7 +33,7 @@ func vision_bonus(state: GameState, unit: Unit) -> int:
 	return march_vision_bonus if _marching(state, unit) else 0
 
 
-func sees_into_woods(state: GameState, unit: Unit) -> bool:
+func sees_into_cover(state: GameState, unit: Unit) -> bool:
 	return _marching(state, unit)
 
 

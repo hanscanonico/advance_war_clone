@@ -196,3 +196,77 @@ func test_a_gunship_carries_nothing() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 h 0 0\n1 i 1 0")
 	var command := LoadCommand.new(state.units[1], _path([Vector2i(1, 0), Vector2i(0, 0)]))
 	assert_eq(command.validate(state), "destination unit is not a transport")
+
+
+# --- the lander --------------------------------------------------------------
+#
+# The transport that changed the shape of the rules: it carries what drives, and
+# it can only put it ashore where a landing craft could actually beach.
+
+
+func test_a_lander_carries_vehicles() -> void:
+	# The lander lies at the beach and the tank walks aboard. It has to be that
+	# way round: a tank cannot step onto open water, so a lander in the channel
+	# can pick up nothing — which is what makes shoals worth putting on a map.
+	var state := _state("[terrain]\n._\nSS\n[units]\n1 l 1 0\n1 t 0 0")
+	var command := LoadCommand.new(state.units[1], _path([Vector2i(0, 0), Vector2i(1, 0)]))
+	assert_eq(command.validate(state), "")
+	command.apply(state)
+	assert_eq(state.units[1].carrier, state.units[0])
+
+
+func test_a_lander_in_open_water_cannot_be_boarded() -> void:
+	var state := _state("[terrain]\n.S\nSS\n[units]\n1 l 1 0\n1 t 0 0")
+	var command := LoadCommand.new(state.units[1], _path([Vector2i(0, 0), Vector2i(1, 0)]))
+	assert_eq(command.validate(state), "path crosses impassable terrain")
+
+
+func test_a_lander_carries_two() -> void:
+	var state := _state("[terrain]\n._.\nSSS\n[units]\n1 l 1 0\n1 t 0 0\n1 i 2 0")
+	LoadCommand.new(state.units[1], _path([Vector2i(0, 0), Vector2i(1, 0)])).apply(state)
+	var second := LoadCommand.new(state.units[2], _path([Vector2i(2, 0), Vector2i(1, 0)]))
+	assert_eq(second.validate(state), "", "a lander holds two")
+	second.apply(state)
+	assert_eq(state.cargo_of(state.units[0]).size(), 2)
+
+
+func test_a_full_lander_takes_no_more() -> void:
+	var state := _state("[terrain]\n._.\n...\n[units]\n1 l 1 0\n1 t 0 0\n1 i 2 0\n1 m 1 1")
+	LoadCommand.new(state.units[1], _path([Vector2i(0, 0), Vector2i(1, 0)])).apply(state)
+	LoadCommand.new(state.units[2], _path([Vector2i(2, 0), Vector2i(1, 0)])).apply(state)
+	var third := LoadCommand.new(state.units[3], _path([Vector2i(1, 1), Vector2i(1, 0)]))
+	assert_eq(third.validate(state), "transport is full")
+
+
+## A landing craft beaches on a shoal or ties up at a port. Anywhere else the
+## cargo would be going over the side into open water.
+func test_a_lander_unloads_from_a_shoal() -> void:
+	var state := _state("[terrain]\n_.\nSS\n[units]\n1 l 0 0\n1 t 1 0")
+	LoadCommand.new(state.units[1], _path([Vector2i(1, 0), Vector2i(0, 0)])).apply(state)
+	var drop := DropCommand.new(state.units[0], _path([Vector2i(0, 0)]), Vector2i(1, 0))
+	assert_eq(drop.validate(state), "")
+	drop.apply(state)
+	assert_eq(state.unit_at(Vector2i(1, 0)).type.id, &"tank")
+	assert_true(state.unit_at(Vector2i(1, 0)).acted, "cargo comes out exhausted")
+
+
+func test_a_lander_cannot_unload_in_open_water() -> void:
+	var state := _state("[terrain]\n_S.\nSSS\n[units]\n1 l 0 0\n1 t 2 0")
+	LoadCommand.new(state.units[1], _path([Vector2i(2, 0), Vector2i(1, 0), Vector2i(0, 0)])).apply(
+		state
+	)
+	state.units[0].acted = false
+	var drop := DropCommand.new(
+		state.units[0], _path([Vector2i(0, 0), Vector2i(1, 0)]), Vector2i(2, 0)
+	)
+	assert_eq(drop.validate(state), "cannot unload here")
+
+
+## The rule is the transport's own, so the two that shipped before it are
+## untouched: an APC still drops wherever its passenger can stand.
+func test_an_apc_still_unloads_anywhere() -> void:
+	var state := _state("[terrain]\n...\n[units]\n1 p 1 0\n1 i 0 0")
+	LoadCommand.new(state.units[1], _path([Vector2i(0, 0), Vector2i(1, 0)])).apply(state)
+	state.units[0].acted = false
+	var drop := DropCommand.new(state.units[0], _path([Vector2i(1, 0)]), Vector2i(2, 0))
+	assert_eq(drop.validate(state), "")

@@ -23,9 +23,10 @@ var chart: DamageChart
 const EXPECTED_REACH := {
 	&"anti_air": [UnitType.AIR, UnitType.LAND],
 	&"fighter": [UnitType.AIR],
-	&"bomber": [UnitType.LAND],
-	&"b_copter": [UnitType.LAND],
+	&"bomber": [UnitType.LAND, UnitType.SEA],
+	&"b_copter": [UnitType.LAND, UnitType.SEA],
 	&"missiles": [UnitType.AIR],
+	&"battleship": [UnitType.LAND, UnitType.SEA],
 }
 
 ## Aircraft that fly beyond the reach of anything but a dedicated air weapon.
@@ -37,7 +38,10 @@ const HIGH_FLYING: Array[StringName] = [&"fighter", &"bomber"]
 ## Everything in the roster that can shoot upward at a fixed-wing aircraft. The
 ## price of a Bomber buys immunity to everything outside this list, so the list
 ## growing by accident is a balance change nobody decided to make.
-const AIR_ANSWERS: Array[StringName] = [&"anti_air", &"fighter", &"missiles"]
+##
+## The Cruiser is on it deliberately: it is the fleet's anti-air escort, and a
+## navy with no answer to bombers is a navy that cannot leave port.
+const AIR_ANSWERS: Array[StringName] = [&"anti_air", &"fighter", &"missiles", &"cruiser"]
 
 
 func before_each() -> void:

@@ -13,6 +13,12 @@ extends GutTest
 ## test_map_soak.gd plays every board for ten days, which proves each is
 ## navigable but ends before anyone can afford a 20 000 airframe. This one plays
 ## the one board built for aircraft, for long enough that they fly.
+##
+## What it deliberately does *not* assert is anything about the route a plane
+## takes. Whether the AI happens to fly one over a mountain in a given match is
+## emergent, and a gate that depends on it fails for reasons that have nothing to
+## do with what it guards. That air units cross ground others cannot is a rule,
+## so it is pinned as one, deterministically, in test_movement_resolver.gd.
 
 ## Long enough for four properties of income to buy airframes and for those to
 ## reach the far side and start running low. Roughly twice the general soak.
@@ -42,7 +48,6 @@ func test_the_ai_fights_an_air_war_without_the_rules_refusing_it() -> void:
 	var ai := AIController.new(unit_db)
 	var commands := 0
 	var aircraft_seen := 0
-	var flew_over_impassable := false
 	while state.winner == 0 and state.day <= DAYS and commands < COMMAND_CAP:
 		var command := ai.plan_next_command(state)
 		var error := command.validate(state)
@@ -64,9 +69,6 @@ func test_the_ai_fights_an_air_war_without_the_rules_refusing_it() -> void:
 			and (command as BuildCommand).built_unit.type.domain == UnitType.AIR
 		):
 			aircraft_seen += 1
-		flew_over_impassable = (
-			flew_over_impassable or _crossed_ground_it_could_not_walk(state, command)
-		)
 	gut.p(
 		(
 			"jet_stream.txt   %d commands, day %d, %d aircraft built, winner %d"
@@ -82,30 +84,3 @@ func test_the_ai_fights_an_air_war_without_the_rules_refusing_it() -> void:
 			+ "Production, the build list or the AI's facility handling has come apart."
 		)
 	)
-	assert_true(
-		flew_over_impassable,
-		(
-			"no aircraft ever crossed ground its move class could not walk. Air movement "
-			+ "is one row of terrain data; if it were missing, planes would still fly but "
-			+ "only where tanks can drive, and nothing else would notice."
-		)
-	)
-
-
-## True when `command` moved an air unit across a cell no ground unit could have
-## entered — the observable proof that flying over terrain actually works, rather
-## than aircraft merely being fast tanks.
-func _crossed_ground_it_could_not_walk(state: GameState, command: Command) -> bool:
-	if not (command is MoveCommand):
-		return false
-	var move := command as MoveCommand
-	if move.unit.type.domain != UnitType.AIR:
-		return false
-	for cell in move.path:
-		var terrain := state.map.terrain_at(cell)
-		if (
-			not terrain.is_passable(TerrainType.TREADS)
-			and not terrain.is_passable(TerrainType.FOOT)
-		):
-			return true
-	return false

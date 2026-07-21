@@ -4,22 +4,22 @@
 
 [resource]
 script = ExtResource("1")
-id = &"t_copter"
-display_name = "T-Copter"
-symbol = "H"
-cost = 5000
+id = &"cruiser"
+display_name = "Cruiser"
+symbol = "c"
+cost = 18000
 move_points = 6
-move_class = &"air"
-domain = &"air"
-vision = 2
+move_class = &"ship"
+domain = &"sea"
+vision = 3
 can_capture = false
-min_range = 0
-max_range = 0
+min_range = 1
+max_range = 1
 max_fuel = 99
-fuel_upkeep = 2
-max_ammo = 0
-transport_capacity = 1
-cargo_classes = Array[StringName]([&"foot", &"boot"])
+fuel_upkeep = 1
+max_ammo = 9
+transport_capacity = 0
+cargo_classes = Array[StringName]([])
 unload_terrain = Array[StringName]([])
 can_resupply = false
-atlas_col = 12
+atlas_col = 15

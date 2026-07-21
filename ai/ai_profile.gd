@@ -41,7 +41,10 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 @export var build_priority: Array[StringName] = [
 	&"md_tank",
 	&"bomber",
+	&"battleship",
 	&"fighter",
+	&"sub",
+	&"cruiser",
 	&"tank",
 	&"b_copter",
 	&"missiles",
@@ -53,10 +56,23 @@ const DEFAULT_PATH := "res://data/ai/default.tres"
 ## What to buy when the enemy is flying and we cannot reach them, best first.
 ## Nothing in build_priority is guaranteed to answer air, so this is asked ahead
 ## of it — otherwise an AI with a full bank watches bombers work unopposed.
-@export var air_answer_ids: Array[StringName] = [&"anti_air", &"missiles", &"fighter"]
+@export var air_answer_ids: Array[StringName] = [&"anti_air", &"missiles", &"fighter", &"cruiser"]
 ## How many units that can shoot at aircraft the team wants while the enemy has
 ## any. Counted from the damage chart, not from this list.
 @export var air_answer_target: int = 2
+## How many places down the build priority each copy already fielded pushes a
+## unit. Without it the list has exactly one winner and the AI buys that unit and
+## nothing else — the strongest thing a base makes, forever, while the port and
+## the airfield it owns never produce at all. This is the diminishing return a
+## player applies without thinking: a sixth tank is worth less than a first hull.
+@export var duplicate_priority_cost: int = 3
+## How many turns of income the planner will bank for a better unit than the one
+## it could buy today. Without it the AI spends whatever it holds every turn and
+## never accumulates, which does not merely make the expensive half of the roster
+## rare — it makes it unreachable, since a 20 000 airframe cannot be bought out of
+## a treasury that never passes ten thousand. Zero restores the spend-it-all
+## behaviour; large values stall production waiting for units out of reach.
+@export var save_up_turns: int = 3
 ## Turns of fuel margin an air or sea unit keeps before it breaks off to refuel:
 ## below this it heads for the nearest property that services it. Zero disables
 ## the behaviour and lets units fly until they drop.

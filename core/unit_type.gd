@@ -43,6 +43,10 @@ const SEA := &"sea"
 ## a Lander takes anything that drives. Empty means it carries nothing, which
 ## `transport_capacity` also has to agree with before a load is legal.
 @export var cargo_classes: Array[StringName] = []
+## Terrain ids this transport may unload onto. Empty means anywhere its cargo can
+## stand, which is every transport but the Lander — a landing craft puts vehicles
+## ashore on a beach or a quay, never over the side into open water.
+@export var unload_terrain: Array[StringName] = []
 ## Supply units (APC) refill adjacent friendlies at turn start and on demand.
 @export var can_resupply: bool = false
 ## Column of this unit in the generated units atlas texture.
@@ -61,3 +65,10 @@ func lost_when_dry() -> bool:
 ## not a transport whatever its capacity says.
 func can_carry(carried_class: StringName) -> bool:
 	return transport_capacity > 0 and carried_class in cargo_classes
+
+
+## True when this transport may put cargo ashore while standing on `terrain_id`.
+## An empty `unload_terrain` means anywhere — the APC and the T-Copter, which
+## unload wherever the passenger can stand.
+func can_unload_from(terrain_id: StringName) -> bool:
+	return unload_terrain.is_empty() or terrain_id in unload_terrain
