@@ -63,18 +63,26 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # states, the activation card, the both-sides info sheet, and the victory lockup,
 # each proved to still render at native 640x360.
 #
-# `cutin` is the odd one out: every other mode drives the flow and photographs
-# what it produces, but the battle cut-in is deliberately suppressed while
-# capturing (a mid-tween frame is what made the camera shake undeterministic), so
-# that mode poses the overlay at a fixed moment of its own clock instead. It is
-# still a real check — the pose runs the real resolver and the real staging, so a
-# cut-in that stopped rendering, or a unit or terrain it could not draw, fails
-# here rather than in play.
+# The `cutin` family is the odd one out: every other mode drives the flow and
+# photographs what it produces, but the battle cut-in is deliberately suppressed
+# while capturing (a mid-tween frame is what made the camera shake
+# undeterministic), so these pose the overlay at a fixed moment of its own clock
+# instead. They are still real checks — each runs the real resolver and the real
+# staging, so a cut-in that stopped rendering, or a unit or terrain it could not
+# draw, fails here rather than in play.
+#
+# `cutin[_ko][:<attacker>:<defender>]` stages any matchup on whatever board the
+# run was launched with, which is what makes "all eighteen units stage
+# correctly" checkable. The five below are one per branch that has its own code:
+# survival and the kill, then the three domains — a bombing run from the air, a
+# torpedo across the water, and an indirect shot, which is the only one that
+# frames a volley with no counter coming back.
 DEFAULT_MODES=(
-	attack resolve cutin cutin_ko capture build buildmenu endturn
+	attack resolve capture build buildmenu endturn
 	load cargo drop transport supply divemenu dive mapmenu powermenu victory aiturn
 	powermenu+fog victory+fog ambush vanish
 	power_ready power_active power_banner commander_info commander_victory
+	cutin cutin_ko cutin:bomber:tank cutin:sub:cruiser cutin:artillery:mech
 )
 
 if [[ ! -x "$GODOT" ]]; then
@@ -121,7 +129,9 @@ run_with_timeout() {
 
 failed=0
 for mode in "${modes[@]}"; do
-	shot="$out_dir/$mode.png"
+	# A cut-in mode carries its matchup in the name; colons are legal in a POSIX
+	# filename but a menace in one, so they become dashes for the capture only.
+	shot="$out_dir/${mode//:/-}.png"
 	printf 'smoke: %-14s ' "$mode"
 	# `victory+fog` is the victory demo with fog on; anything else is the demo
 	# name as written.
@@ -132,7 +142,9 @@ for mode in "${modes[@]}"; do
 	fi
 	# The naval scenarios need a board with water on it; the default has none.
 	case "$demo" in
-		divemenu | dive) godot_args+=(--map=the_straits) ;;
+		divemenu | dive | *:sub:* | *:cruiser | *:battleship | *:lander)
+			godot_args+=(--map=the_straits)
+			;;
 	esac
 	run_with_timeout "$SMOKE_TIMEOUT" "$GODOT_GUI" "${godot_args[@]}"
 	status=$?

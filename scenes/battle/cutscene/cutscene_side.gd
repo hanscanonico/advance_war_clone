@@ -43,6 +43,12 @@ const SLOTS: Array[Vector2] = [
 ]
 ## How far apart, in fall progress, consecutive figures start toppling.
 const TOPPLE_STAGGER := 0.13
+## How high aircraft ride above their own ground, and the bob they hold there.
+## The phase step keeps a flight of four from pulsing in unison.
+const HOVER_HEIGHT := 34.0
+const HOVER_SWING := 4.0
+const HOVER_RATE := 4.4
+const HOVER_PHASE := 1.1
 
 const INK := Color(0.078, 0.090, 0.102)
 const SLATE_800 := Color(0.161, 0.184, 0.212)
@@ -104,9 +110,17 @@ var flash := 0.0
 var squad_alpha := 1.0
 ## 0 -> 1 as the plates slide in and their text appears.
 var plate_p := 0.0
+## The cut-in's clock, in seconds, for the one thing here that is a function of
+## time rather than of a beat: an aircraft's hover bob. Written by the director
+## like everything else, so a posed still is still a pure function of `_t`.
+var clock := 0.0
 
 var _art: AtlasTexture
 var _ridge_tint := Color.SLATE_GRAY
+## Cached off the unit's domain at bind time — asked once per cut-in rather than
+## once per figure per frame.
+var _flying := false
+var _floating := false
 
 
 func _ready() -> void:
@@ -123,6 +137,8 @@ func bind(p_unit: Unit, p_terrain: TerrainType, p_owner_team: int, p_mirror: boo
 	mirror = p_mirror
 	_art = UnitSprite.texture_for(p_unit.type, p_unit.team)
 	_ridge_tint = _ground_tint(p_terrain.atlas_col, _atlas_row())
+	_flying = p_unit.type.domain == UnitType.AIR
+	_floating = p_unit.type.domain == UnitType.SEA
 
 
 ## Advance Wars' squad rule: one figure per two displayed HP, capped at five.
@@ -139,7 +155,8 @@ func muzzle_points() -> PackedVector2Array:
 	var points := PackedVector2Array()
 	var arena := _arena()
 	for slot in squad_now:
-		points.append(figure_point(arena, slot) + Vector2(_inward(22.0), -34.0))
+		var at := figure_point(arena, slot) + Vector2(_inward(22.0), -34.0)
+		points.append(at + Vector2(0.0, _altitude(slot, 0.0)))
 	return points
 
 
@@ -161,9 +178,14 @@ func figure_point(arena: Rect2, slot: int) -> Vector2:
 ## the kill blast goes off: the middle of the squad, at body height rather than
 ## down at its feet. Fixed for the whole cut-in, so nothing anchored here drifts
 ## sideways as figures fall out from under it.
+## Deliberately without the hover bob: a shot aimed at a bobbing point, or a
+## damage number pinned to one, would judder for the whole beat.
 func center_point() -> Vector2:
 	var arena := _arena()
-	return Vector2(_outward_px(SQUAD_CENTER), arena.position.y + arena.size.y * FEET_RATIO - 28.0)
+	var cruise := HOVER_HEIGHT if _flying else 0.0
+	return Vector2(
+		_outward_px(SQUAD_CENTER), arena.position.y + arena.size.y * FEET_RATIO - 28.0 - cruise
+	)
 
 
 func _arena() -> Rect2:
@@ -309,22 +331,46 @@ func _draw_squad(arena: Rect2) -> void:
 	# closes, so the run has to be long enough for all of them to finish it.
 	var reach := 1.0 + TOPPLE_STAGGER * maxf(posted - squad_now - 1, 0.0)
 	for slot in range(posted - 1, -1, -1):
-		var feet := figure_point(arena, slot)
+		var ground := figure_point(arena, slot)
 		var toppling := slot >= squad_now
 		var fall := 0.0
 		if toppling:
 			fall = clampf(fall_p * reach - (slot - squad_now) * TOPPLE_STAGGER, 0.0, 1.0)
 		if fall >= 1.0:
 			continue
-		_draw_shadow(feet, 1.0 - fall)
-		_draw_figure(feet + Vector2(_inward(lunge), 0.0), fall, not toppling)
+		# The shadow stays on the ground whatever the figure is doing above it —
+		# which is exactly what makes an aircraft read as flying rather than as a
+		# tank drawn too high.
+		_draw_shadow(ground, 1.0 - fall)
+		_draw_figure(ground + Vector2(_inward(lunge), _altitude(slot, fall)), fall, not toppling)
 
 
-## A flattened disc, not a circle: the light is high and the ground is a plane,
-## so the contact shadow has to lie down on it.
-func _draw_shadow(feet: Vector2, strength: float) -> void:
-	draw_set_transform(feet + Vector2(0.0, -2.0), 0.0, Vector2(1.0, 0.3))
-	draw_circle(Vector2.ZERO, 22.0, Color(0.078, 0.102, 0.133, 0.3 * strength * squad_alpha))
+## How far above its own patch of ground a figure sits. Aircraft ride high and
+## bob, each on its own phase so a flight of four does not pulse in unison;
+## everything else stands on the deck. A falling figure loses its lift as it
+## goes: a shot-down plane comes down.
+func _altitude(slot: int, fall: float) -> float:
+	if not _flying:
+		return 0.0
+	var bob := sin(clock * HOVER_RATE + slot * HOVER_PHASE) * HOVER_SWING
+	return (-HOVER_HEIGHT + bob) * (1.0 - fall)
+
+
+## Ground units get a flattened contact shadow — the light is high and the
+## ground is a plane, so it lies down on it. A hull gets a pale wake instead: a
+## dark disc under a ship reads as a hole in the water.
+func _draw_shadow(ground: Vector2, strength: float) -> void:
+	var tint := Color(0.078, 0.102, 0.133, 0.3 * strength * squad_alpha)
+	var reach := 22.0
+	if _floating:
+		tint = Color(1.0, 1.0, 1.0, 0.28 * strength * squad_alpha)
+		reach = 26.0
+	elif _flying:
+		# Cast from height: wider, fainter, and further from the thing casting it.
+		tint.a *= 0.55
+		reach = 26.0
+	draw_set_transform(ground + Vector2(0.0, -2.0), 0.0, Vector2(1.0, 0.3))
+	draw_circle(Vector2.ZERO, reach, tint)
 	draw_set_transform(Vector2.ZERO)
 
 

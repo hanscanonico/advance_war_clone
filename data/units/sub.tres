@@ -26,4 +26,4 @@ cargo_classes = Array[StringName]([])
 unload_terrain = Array[StringName]([])
 can_resupply = false
 atlas_col = 16
-battle_style = &"small_arms"
+battle_style = &"torpedo"

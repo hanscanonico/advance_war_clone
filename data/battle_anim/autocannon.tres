@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BattleStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/cutscene/battle_style.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"autocannon"
+projectile = &"flak"
+shots_per_figure = 2
+sfx = &"shot"
+travel_scale = 0.95
+arc = 10.0
+tint = Color(1, 0.88, 0.55, 1)
+muzzle = 12.0

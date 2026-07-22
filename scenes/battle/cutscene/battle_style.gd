@@ -19,6 +19,10 @@ extends Resource
 const NONE := &"none"  # unarmed — nothing leaves the barrel, ever
 const TRACER := &"tracer"  # rapid dashes, several per volley
 const SHELL := &"shell"  # one heavy round on a lobbed arc
+const FLAK := &"flak"  # rounds that burst in the air short of the target
+const ROCKET := &"rocket"  # a dart dragging a column of its own smoke
+const BOMB := &"bomb"  # dropped from above, accelerating into the ground
+const TORPEDO := &"torpedo"  # a wake running flat under the waterline
 
 @export var id: StringName
 @export var projectile: StringName = NONE

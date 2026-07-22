@@ -46,6 +46,12 @@ const SLIDE_PX := 60.0
 ## Push-in over the exchange, and the shake an impact adds.
 const PUSH_SCALE := 0.03
 const SHAKE_PX := 5.0
+## How much higher an indirect weapon lobs its round than the same style fired
+## flat. Artillery, Rockets and Missiles all share a style with something that
+## shoots straight, and the arc is what tells them apart at a glance — so it is
+## asked of AttackRange, the single authority on who is indirect, rather than
+## re-derived from min_range here.
+const INDIRECT_LOB := 2.6
 
 
 ## The windows every beat is read out of, in seconds from the wipe. A window of
@@ -273,6 +279,7 @@ func _apply() -> void:
 	var def_gone := _window(_beats.def_death)
 	var atk_gone := _window(_beats.atk_death)
 
+	_atk.clock = _t
 	_atk.plate_p = plates
 	_atk.lunge = _lunge(atk_ready)
 	_atk.flash = maxf(0.0, 1.0 - atk_hit / 0.3) if atk_hit > 0.0 else 0.0
@@ -281,6 +288,7 @@ func _apply() -> void:
 	_atk.squad_alpha = 1.0 - atk_gone
 	_atk.queue_redraw()
 
+	_def.clock = _t
 	_def.plate_p = plates
 	_def.lunge = _lunge(ctr_ready)
 	_def.flash = maxf(0.0, 1.0 - def_hit / 0.3) if def_hit > 0.0 else 0.0
@@ -372,6 +380,7 @@ func _aim(from: CutsceneSide, at: CutsceneSide, progress: float, style: BattleSt
 	_fx.volley_p = progress
 	_fx.volley_style = style
 	_fx.volley_figures = maxi(barrels.size(), 1)
+	_fx.volley_arc = style.arc * (INDIRECT_LOB if AttackRange.is_indirect(from.unit) else 1.0)
 	_fx.volley_from = origin
 	_fx.volley_to = at.position + at.center_point()
 

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BattleStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/cutscene/battle_style.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"rocket"
+projectile = &"rocket"
+shots_per_figure = 1
+sfx = &"shot"
+travel_scale = 1.25
+arc = 18.0
+tint = Color(1, 0.72, 0.42, 1)
+muzzle = 13.0
