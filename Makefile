@@ -96,19 +96,25 @@ format-check:
 
 # generate_tiles.gd draws only the ground; it leaves city/base/hq as bare lots
 # and no longer writes units_atlas.png, so the PixVoxel step must follow it.
-# `sprites-check` runs first because `ground` is destructive: it replaces the
-# committed building art with bare lots that only `sprites` can finish painting,
-# so a missing ImageMagick or source sprite has to fail while the tree is clean.
+# The two `*-check` preflights run first because `ground` is destructive: it
+# replaces the committed building art with bare lots that only `sprites` can
+# finish painting, so a missing ImageMagick, source sprite, or iso air/sea PNG
+# has to fail while the tree is clean.
 # `import` runs last because Godot caches image imports by size: without it a
 # rebuild that changes the atlas dimensions renders a blank map.
 # .NOTPARALLEL keeps that order under `make -j` — the two atlas steps write the
 # same file, so running them concurrently produces a torn terrain_atlas.png.
 .NOTPARALLEL:
 
-tiles: sprites-check ground sprites unit-sprites unit-placeholders import
+tiles: sprites-check unit-sprites-check ground sprites unit-sprites unit-placeholders import
 
 sprites-check:
 	tools/build_pixvoxel_atlases.sh --check "$(PIXVOXEL)"
+
+# Preflight for `unit-sprites`: proves the vendored iso air/sea sources exist,
+# are the right size, and map onto the roster, without writing anything.
+unit-sprites-check:
+	$(GODOT) --headless --path . -s res://tools/paste_unit_sprites.gd -- --check
 
 ground:
 	$(GODOT) --headless --path . -s res://tools/generate_tiles.gd
@@ -156,5 +162,6 @@ gallery-screenshot: import
 	$(GODOT_GUI) --path . scenes/menu/commander_gallery.tscn -- --screenshot=$(CURDIR)/screenshot.png
 
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
-	sprites-check ground sprites unit-sprites unit-placeholders sfx portraits import \
+	sprites-check unit-sprites-check ground sprites unit-sprites unit-placeholders \
+	sfx portraits import \
 	screenshot menu-screenshot gallery-screenshot commander-balance difficulty-check

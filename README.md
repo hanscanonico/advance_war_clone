@@ -32,9 +32,11 @@ make test            # run the GUT unit test suite (headless)
 make check           # parse + type check every .gd file (fast; no scene tree)
 make lint            # gdlint — style and smells (config: gdlintrc)
 make format          # gdformat — reformat in place; format-check only reports
-make tiles           # rebuild the art: ground tiles, PixVoxel units/buildings, placeholders, import
-make unit-placeholders    # redraw the aircraft/fleet sprites the PixVoxel pack has no art for
-make sprites-check   # verify the atlas build inputs without writing anything
+make tiles           # rebuild the art: ground tiles, PixVoxel + iso air/sea units, placeholders, import
+make unit-sprites    # re-paste the hand-authored iso air/sea sprites into the units atlas
+make unit-placeholders    # redraw the placeholder sprites real art has not replaced (just Missiles)
+make sprites-check   # verify the PixVoxel build inputs without writing anything
+make unit-sprites-check   # verify the iso air/sea sources without writing anything
 make sfx             # regenerate the placeholder sound effects (headless)
 make portraits       # regenerate the placeholder commander portraits + faction emblems
 make import          # (re)import assets headless
@@ -279,7 +281,8 @@ result, including one capability that measured *negative* and ships switched off
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
 - `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
-  and portrait generators, plus the PixVoxel atlas builder (see Assets below); and the offline
+  and portrait generators, the air/naval sprite paste step, plus the PixVoxel atlas builder (see
+  Assets below); and the offline
   AI-vs-AI runner, which serves both the commander-balance matrix (`docs/commander_balance.md`)
   and the difficulty ladder gate (`docs/difficulty_check.md`).
 - `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
@@ -289,25 +292,29 @@ result, including one capability that measured *negative* and ships switched off
 
 Ground units and the city/base/hq buildings come from the CC0 [PixVoxel Revised Wargame
 Sprites](https://opengameart.org/content/pixvoxel-revised-isometric-wargame-sprites); the ground
-tiles, the airport, and the aircraft are generated programmer art. The commander portraits and
-faction emblems are generated placeholder art too (`make portraits`) — project-original, no
-third-party pixels — until the final portrait pass. All sound is generated placeholder chiptune
-(`make sfx`). There is no music yet — it needs licensed tracks. Third-party asset licenses must be
-tracked in `assets/LICENSES.md`. No Nintendo assets or names may ever be used.
+tiles and the airport are generated programmer art. The aircraft and the fleet are original
+hand-authored isometric sprites, vendored under `assets/sprites/iso_air_sea`; only Missiles is
+still a generated placeholder. The commander portraits and faction emblems are generated
+placeholder art too (`make portraits`) — project-original, no third-party pixels — until the final
+portrait pass. All sound is generated placeholder chiptune (`make sfx`). There is no music yet — it
+needs licensed tracks. Third-party asset licenses must be tracked in `assets/LICENSES.md`. No
+Nintendo assets or names may ever be used.
 
-`make tiles` rebuilds the art in five ordered steps: `sprites-check` verifies the build inputs,
-`ground` draws the terrain headless, `sprites` composites the PixVoxel art over it,
-`unit-placeholders` draws the units that pack has no sprite for, and `import` reimports the result
-— Godot caches image imports by size, so skipping the last step after a rebuild that changes atlas
-dimensions renders a blank map. The check runs first because `ground` is destructive: it replaces
-the committed building art with bare lots that only `sprites` can finish painting, so a failure has
-to happen while the tree is still clean.
+`make tiles` rebuilds the art in seven ordered steps: `sprites-check` and `unit-sprites-check`
+verify the build inputs, `ground` draws the terrain headless, `sprites` composites the PixVoxel art
+over it, `unit-sprites` re-pastes the hand-authored air and naval sprites, `unit-placeholders`
+draws the units still lacking real art, and `import` reimports the result — Godot caches image
+imports by size, so skipping the last step after a rebuild that changes atlas dimensions renders a
+blank map. The checks run first because `ground` is destructive: it replaces the committed building
+art with bare lots that only `sprites` can finish painting, so a failure has to happen while the
+tree is still clean.
 
-The pack has no aircraft and no ships, so those columns of the units atlas are flat 16px
-silhouettes drawn by `tools/generate_unit_placeholders.gd` from ASCII grids in its own source — a
-shape you can read and edit in place. They are deliberately placeholder, so that no milestone is
-ever blocked on art; the step widens the atlas to whatever `data/units/*.tres` asks for and leaves
-the PixVoxel columns untouched.
+The pack has no aircraft and no ships. Those columns of the units atlas hold the original isometric
+air and naval art, re-pasted from its vendored 64×64 sources by `tools/paste_unit_sprites.gd` on
+every rebuild — except Missiles, still a flat 16px silhouette drawn by
+`tools/generate_unit_placeholders.gd` from an ASCII grid in its own source, deliberately
+placeholder so that no milestone is ever blocked on art. Both steps widen the atlas to whatever
+`data/units/*.tres` asks for and leave the PixVoxel columns untouched.
 
 The only external requirement is ImageMagick 7 (`brew install imagemagick`). The 36 CC0 source
 sprites are vendored under `assets/sprites/pixvoxel_src`, so a fresh clone rebuilds with no

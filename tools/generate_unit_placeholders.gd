@@ -69,6 +69,7 @@ func _init() -> void:
 		return
 	var types := _placeholder_types()
 	if types.is_empty():
+		_warn_missing_art(atlas)
 		print("generate_unit_placeholders: every column has real art, nothing to draw")
 		quit()
 		return
@@ -77,7 +78,14 @@ func _init() -> void:
 	if painted == null:
 		quit(1)
 		return
-	painted.save_png(ATLAS_PATH)
+	var err := painted.save_png(ATLAS_PATH)
+	if err != OK:
+		push_error(
+			"generate_unit_placeholders: cannot write %s: %s" % [ATLAS_PATH, error_string(err)]
+		)
+		quit(1)
+		return
+	_warn_missing_art(painted)
 	print(
 		(
 			"generate_unit_placeholders: wrote %d placeholder column(s), atlas now %dx%d"
@@ -113,6 +121,25 @@ func _atlas_columns() -> int:
 	for unit_type in UnitDB.load_default().all():
 		last = maxi(last, unit_type.atlas_col)
 	return last + 1
+
+
+## The last set of eyes on the finished atlas: warns about any roster column past
+## the PixVoxel nine that ended up fully transparent — a unit neither the paste
+## step nor PLACEHOLDER_IDS supplies art for, which would otherwise ship as an
+## invisible unit and only be noticed at run time.
+func _warn_missing_art(painted: Image) -> void:
+	var cell := TILE * SCALE
+	for unit_type in UnitDB.load_default().all():
+		if unit_type.atlas_col < PIXVOXEL_COLS:
+			continue
+		var column := painted.get_region(Rect2i(unit_type.atlas_col * cell, 0, cell, ROWS * cell))
+		if column.is_invisible():
+			push_warning(
+				(
+					"generate_unit_placeholders: column %d ('%s') has no art — the unit is invisible"
+					% [unit_type.atlas_col, unit_type.id]
+				)
+			)
 
 
 ## Copies the existing atlas across unchanged and redraws only our columns over
