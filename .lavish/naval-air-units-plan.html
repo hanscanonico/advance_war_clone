@@ -104,6 +104,19 @@
     every current map (and every current save) nothing new can be built and nothing changes — the
     whole feature is opt-in per map. The existing maps stay byte-identical.</span>
   </div>
+  <div class="alert alert-warning text-sm">
+    <span><b>Superseded 2026-07-21 — the control group did its job.</b> The invariant above was a
+    shipping constraint for the duration of N1–N4, not a permanent rule: while fuel, hulls and the
+    facility-aware AI were unproven, the untouched boards were what proved the feature was additive.
+    All four milestones are merged and the soaks are green, so <span class="nav-code">isthmus</span>,
+    <span class="nav-code">ironworks</span> and <span class="nav-code">crossfire</span> have now
+    exercised the "opt-in per map" this clause was written to allow. It is replaced by a
+    <em>conversion</em> rule — cells may change class, land stays passable to every land class, sea
+    is never carved, coastlines are never redrawn — which keeps saves (stored by
+    <span class="nav-code">map_path</span> and reloaded from <span class="nav-code">res://</span>)
+    safe across the edit. Audit, verdicts and per-map reasoning:
+    <span class="nav-code">.lavish/map-retrofit-plan.html</span>.</span>
+  </div>
 </section>
 
 <!-- ============================= 2 · THE ROSTER ============================= -->
@@ -433,7 +446,15 @@
             airports. UI: filtered build menu, low-fuel badge.</li>
           <li><b>Done means</b>: a full hotseat and vs-AI match on Jet Stream where air power decides
             games and runs dry when overextended; <span class="nav-code">make verify</span> green;
-            old maps provably unchanged.</li>
+            old maps provably unchanged <span class="badge badge-warning badge-sm">clause
+            superseded 2026-07-21</span> — that last clause was N1's gate at the time and it held:
+            Jet Stream carried the new domain alone and the untouched boards are what proved it was
+            additive. With N1–N4 merged the invariant behind it retired with them, and
+            <span class="nav-code">isthmus</span>, <span class="nav-code">ironworks</span> and
+            <span class="nav-code">crossfire</span> have since gained facilities under the
+            conversion rule in §1. Kept as the record of what this milestone was judged against;
+            the audit and per-map reasoning are in
+            <span class="nav-code">.lavish/map-retrofit-plan.html</span>.</li>
         </ul>
       </div>
     </div>

@@ -1,15 +1,19 @@
 # City-rich, two bases a side: the economy map, and the roster's biggest.
 # symmetric
-# 22 properties and a double road ring — income snowballs, production
+# 24 properties and a double road ring — income snowballs, production
 # splits between two fronts, and md tanks and rockets get the late game
-# they never reach elsewhere. Mirrors on (x, y) -> (23 - x, 15 - y).
+# they never reach elsewhere. This is also the only board where a 20k airframe
+# is a routine buy rather than a gamble, so each side's airfield sits inland
+# between its two bases: far enough back that a bomber which overstays at the
+# front runs its tank dry on the way home.
+# Mirrors on (x, y) -> (23 - x, 15 - y).
 # Symbols: . plains  F woods  M mountain  = road  ~ river
-#          C city  B base  Q HQ  S sea
+#          C city  B base  Q HQ  A airport  S sea
 [terrain]
 SSSSSSSSSSSSSSSSSSSSSSSS
 S.Q=..C....C.....C...F.S
 SB.=================..FS
-S...=....C....C....=...S
+S.A.=....C....C....=...S
 SB..=.......F...MM.=C..S
 S...=.C............=...S
 S.C.=...========..F=.MMS
@@ -18,17 +22,20 @@ S.M.=...=...F..=..F=...S
 SMM.=F..========...=.C.S
 S...=............C.=...S
 S..C=.MM...F.......=..BS
-S...=....C....C....=...S
+S...=....C....C....=.A.S
 SF..=================.BS
 S.F...C.....C....C..=Q.S
 SSSSSSSSSSSSSSSSSSSSSSSS
 [owners]
+# team x y — HQ, both bases and the airfield start owned; every city is contested.
 1 2 1
 1 1 2
 1 1 4
+1 2 3
 2 22 11
 2 22 13
 2 21 14
+2 21 12
 [units]
 1 p 3 2
 1 t 5 2

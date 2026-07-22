@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Retrofit — Ports &amp; Airfields on the Base Roster</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  .rf-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+  .rf-map {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.95rem; line-height: 1.35; letter-spacing: 0.18em;
+    overflow-x: auto; padding: 0.9rem 1.1rem; border-radius: 0.5rem;
+  }
+  .rf-map .sea { opacity: 0.35; }
+  .rf-map .new {
+    background: #16a34a; color: #fff; border-radius: 2px;
+    padding: 0 1px; margin: 0 -1px; font-weight: 700;
+  }
+  .rf-map .ctx { background: #fbbf24; color: #422006; border-radius: 2px; }
+  .rf-verdict td, .rf-verdict th { padding: 0.45rem 0.6rem; font-size: 0.85rem; }
+  .rf-left { border-left-width: 6px; }
+  .rf-go   { border-left-color: #16a34a; }
+  .rf-stay { border-left-color: #92400e; }
+  .rf-own  { border-left-color: #0369a1; }
+</style>
+</head>
+<body class="bg-base-200 min-h-screen">
+<main class="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-14">
+
+<!-- ============================= HERO ============================= -->
+<header class="text-center space-y-4">
+  <div class="flex justify-center gap-2 flex-wrap">
+    <span class="badge badge-neutral badge-lg">Proposal</span>
+    <span class="badge badge-success badge-lg">3 retrofits</span>
+    <span class="badge badge-warning badge-lg">4 deliberate no's</span>
+    <span class="badge badge-info badge-lg">2 already own a domain</span>
+  </div>
+  <h1 class="text-4xl sm:text-5xl font-bold leading-tight text-balance px-2">Map Retrofit — Ports &amp; Airfields on the Base Roster</h1>
+  <p class="text-lg opacity-80 max-w-3xl mx-auto text-balance">
+    The naval/air work shipped nine units and five terrains, then deliberately touched only its own
+    two new boards. This plan audits the other seven maps and answers, per map, whether the new
+    domains belong on them — with a <em>no</em> written down as firmly as a <em>yes</em>.
+  </p>
+  <p class="text-sm opacity-60">Audit of all 9 shipped maps · milestones MR1–MR3 · engine changes: none — every edit is a map <span class="rf-code">.txt</span> plus four new test lints</p>
+  <div class="alert alert-success text-sm max-w-3xl mx-auto">
+    <span><b>Shipped 2026-07-21.</b> All three retrofits are in, the whole suite green, and the build
+    improved on this draft in one way worth reading before the rest: Isthmus's beaches became
+    <em>road</em> conversions, not sea ones, which removed risk R3 outright. §9 records what shipped
+    and the AI-vs-AI measurements that decided Crossfire's provisional verdict.</span>
+  </div>
+</header>
+
+<!-- ============================= 1 · THE INVARIANT ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">1 · The invariant this plan revises — on purpose</h2>
+  <p class="max-w-3xl">
+    The naval/air plan (§ backwards compatibility) locked this while the domains were being built:
+  </p>
+  <blockquote class="border-l-4 border-warning pl-4 py-1 italic opacity-90 max-w-3xl">
+    "No existing map gains an airport or a port, so on every current map (and every current save)
+    nothing new can be built and nothing changes — the whole feature is opt-in per map.
+    The existing maps stay byte-identical."
+  </blockquote>
+  <p class="max-w-3xl">
+    That was a <strong>shipping constraint, not a design belief</strong>: while fuel, hulls and the
+    facility-aware AI were unproven, the old maps were the control group. All four N milestones are
+    merged, the air-war, naval-war and per-map soaks are green, and the control group has done its
+    job. Retrofitting is now exactly what "opt-in per map" was designed to allow — this plan is the
+    opt-in, exercised deliberately, one map at a time.
+  </p>
+  <div class="card bg-base-100 shadow-sm max-w-3xl">
+    <div class="card-body py-4">
+      <h3 class="font-bold text-sm uppercase tracking-wide opacity-60">The replacement rule — save-safe conversions only</h3>
+      <p class="text-sm">
+        Saves store the board by <span class="rf-code">map_path</span> and re-read the file on load —
+        <span class="rf-code">save_codec.gd</span> says it plainly: <em>"saves stay small and follow map
+        edits."</em> A retrofit therefore edits terrain <em>under</em> any mid-match save on that map.
+        The rule that keeps this safe: <strong>convert cells, never carve</strong>. Land&nbsp;→&nbsp;port/airport
+        keeps every land class passable at cost 1, so no saved unit is ever stranded. No cell becomes
+        sea; no land is removed; no coastline is redrawn.
+      </p>
+      <p class="text-sm mt-2">
+        <b>As built, every conversion is a strict superset.</b> Reading the terrain
+        <span class="rf-code">.tres</span> files settled it: <span class="rf-code">shoal</span> is
+        <span class="rf-code">road</span> plus lander access — the same cost 1 for foot, boot, tires
+        and treads, the same 0 defence stars — so a coastal road that becomes a beach changes
+        <em>nothing</em> for anything already standing on it. <span class="rf-code">port</span> is
+        likewise plains-or-better for every land class (it even lifts plains' cost-2 penalty on
+        tires) at 3 defence stars rather than 1. Not one cell on any of the three maps got worse for
+        any unit — which is why the sea&nbsp;→&nbsp;shoal exception this plan first drafted was
+        dropped rather than mitigated, taking risk R3 with it.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 2 · THE AUDIT ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">2 · The audit — nine maps, three verdicts</h2>
+  <p class="max-w-3xl">
+    A retrofit has to make a map <em>more itself</em>, not dilute it into every other map. Four of
+    the seven candidates are built on a premise the new domains would erase — for those the answer
+    is no, and the no is part of the plan.
+  </p>
+  <div class="overflow-x-auto">
+    <table class="table rf-verdict bg-base-100 shadow-sm">
+      <thead><tr><th>Map</th><th>Size</th><th>Water today</th><th>Verdict</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="font-bold">isthmus</td><td>20×12</td><td>Half the board, one connected body</td>
+            <td><span class="badge badge-success badge-sm">Retrofit — naval</span></td>
+            <td>Its own header says "sea is a hard wall in this game" — the one map whose premise the naval domain rewrote. The flagship.</td></tr>
+        <tr><td class="font-bold">ironworks</td><td>24×16</td><td>Frame only</td>
+            <td><span class="badge badge-success badge-sm">Retrofit — air</span></td>
+            <td>The economy board is the only one where 20–22k airframes are routinely affordable; air extends the late game the map exists for.</td></tr>
+        <tr><td class="font-bold">crossfire</td><td>20×15</td><td>Frame + a 4×3 landlocked lake</td>
+            <td><span class="badge badge-success badge-sm">Retrofit — air</span></td>
+            <td>"Rewards transports" is the map's thesis; a t-copter is the better transport, and wings over the lake open a third route. Weakest of the three claims — see R4.</td></tr>
+        <tr><td class="font-bold">first_steps</td><td>20×15</td><td>Frame only</td>
+            <td><span class="badge badge-warning badge-sm">Leave</span></td>
+            <td>The learning board. Two domains at once is exactly what a first match doesn't need; Jet Stream and The Straits are the teaching boards for wings and hulls.</td></tr>
+        <tr><td class="font-bold">scrimmage</td><td>12×9</td><td>None</td>
+            <td><span class="badge badge-warning badge-sm">Leave</span></td>
+            <td>"The starting army decides it before big builds land" — a 9k copter build is precisely the big build the map is designed to end before.</td></tr>
+        <tr><td class="font-bold">timberline</td><td>16×14</td><td>Frame only</td>
+            <td><span class="badge badge-warning badge-sm">Leave</span></td>
+            <td>Three lanes sorted by move class are the whole design. Wings ignore ridges; an airport here deletes the map's identity.</td></tr>
+        <tr><td class="font-bold">riverline</td><td>18×13</td><td>Frame + river</td>
+            <td><span class="badge badge-warning badge-sm">Leave</span></td>
+            <td>"The only way a tank reaches the far bank is one of the two crossings." Air voids the sentence; artillery-over-water is the map's trick, not helicopters.</td></tr>
+        <tr><td class="font-bold">jet_stream</td><td>20×14</td><td>Frame only</td>
+            <td><span class="badge badge-info badge-sm">Owns air</span></td>
+            <td>Built for the domain; four airfields already placed with fuel-range intent. No change.</td></tr>
+        <tr><td class="font-bold">the_straits</td><td>20×16</td><td>Corner-to-corner strait</td>
+            <td><span class="badge badge-info badge-sm">Owns naval</span></td>
+            <td>Ports, shoals, reefs, airports — the domain showcase. No change.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow-sm rf-left rf-stay">
+      <div class="card-body py-4">
+        <h3 class="font-bold">Why the four no's are load-bearing</h3>
+        <p class="text-sm">Timberline and Riverline are <em>wall maps</em> — their entire tension is
+        a barrier one move class respects and another doesn't. Air respects nothing, so on a wall map
+        it isn't a new option, it's a solvent. Scrimmage is a <em>clock map</em>; air arrives after
+        the clock. First Steps is a <em>vocabulary map</em>; it teaches nine words, not fourteen.
+        Retrofitting any of them is scope creep wearing a flight jacket.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm rf-left rf-go">
+      <div class="card-body py-4">
+        <h3 class="font-bold">Considered and rejected: a lake fleet on Crossfire</h3>
+        <p class="text-sm">The central lake is 12 tiles and landlocked. A port there would sell a
+        28k battleship a 2–6 gun arc over the whole midboard from a pond no sub flank can reach —
+        a gimmick, not a fight, and the lake shore cells are the passes the map is named for.
+        Crossfire's water stays scenery; its retrofit is wings only.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 3 · THE THREE RETROFITS ============================= -->
+<section class="space-y-8">
+  <h2 class="text-3xl font-bold">3 · The three retrofits — proposed cells, mirrored</h2>
+  <p class="max-w-3xl">
+    Every changed cell is shown below (<span class="rf-map new" style="letter-spacing:normal">green</span>
+    = new facility or shoal). All three maps are <span class="rf-code"># symmetric</span> and stay
+    that way: each edit is a mirrored pair under the map's own
+    <span class="rf-code">(w−1−x, h−1−y)</span> rotation, which
+    <span class="rf-code">test_maps.gd</span> re-asserts on every run. No new cell sits under a
+    starting unit, so the "no unit starts on a property" lint holds untouched.
+  </p>
+
+  <!-- ---- ISTHMUS ---- -->
+  <div class="card bg-base-100 shadow-md rf-left rf-go">
+    <div class="card-body space-y-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <h3 class="text-2xl font-bold">Isthmus — the naval flagship</h3>
+        <span class="badge badge-success">MR1</span>
+        <span class="badge badge-ghost">+2 ports · +2 beaches</span>
+      </div>
+      <p class="text-sm max-w-3xl">
+        Every drop of water on this board — the frame, both shelf seas, the diagonal — is already
+        <strong>one connected body</strong>, so no carving is needed and R1 is satisfied without
+        touching a coastline. But <em>connected</em> and <em>close</em> are different things, and the
+        interesting fact about Isthmus is the gap: each port opens onto its own pocket, the two
+        pockets are a ~30-tile sail apart around the frame, and they pass within
+        <strong>five tiles</strong> of each other beside the neck. Five is inside a battleship's 2–6
+        arc and outside every other hull's. So capital ships duel across the isthmus from day one
+        while cruisers and submarines rule only their own water — which is what the map's own
+        geography always wanted to say.
+      </p>
+      <pre class="rf-map bg-neutral text-neutral-content"><span class="sea">SSSSSSSSSSSSSSSSSSSS</span>
+<span class="sea">S</span>BQ========<span class="sea">SSSSSSSSS</span>
+<span class="sea">S</span>.....C..M=<span class="sea">SSSSSSSSS</span>
+<span class="sea">S</span>.C.F...C.<span class="new">_</span><span class="sea">SSSSSSSSS</span>
+<span class="sea">S</span>F...CMF..=<span class="sea">SSSSSSSSS</span>
+<span class="sea">S</span>.<span class="new">P</span>.<span class="sea">SSSS</span>.C=.<span class="sea">SSSSSSSS</span>
+<span class="sea">SSSSSSSS</span>.=C.<span class="sea">SSSS</span>.<span class="new">P</span>.<span class="sea">S</span>
+<span class="sea">SSSSSSSSS</span>=..FMC...F<span class="sea">S</span>
+<span class="sea">SSSSSSSSS</span><span class="new">_</span>.C...F.C.<span class="sea">S</span>
+<span class="sea">SSSSSSSSS</span>=M..C.....<span class="sea">S</span>
+<span class="sea">SSSSSSSSS</span>========QB<span class="sea">S</span>
+<span class="sea">SSSSSSSSSSSSSSSSSSSS</span></pre>
+      <ul class="text-sm space-y-1 list-disc pl-5 max-w-3xl">
+        <li><strong>Ports</strong> at <span class="rf-code">(2,5)</span> / mirror <span class="rf-code">(17,6)</span>,
+            one per shelf, plains&nbsp;→&nbsp;port, <strong>owned from day 1</strong> — the precedent
+            Jet Stream's home airfields and The Straits' ports set: the domain is live without an
+            infantry walk first.</li>
+        <li><strong>Beaches</strong> at <span class="rf-code">(10,3)</span> / mirror <span class="rf-code">(9,8)</span>.
+            These are the cells the draft got wrong and the build got right. Each is a <em>coastal
+            road</em> cell on the neck, converted to shoal — which costs every land class exactly
+            what road did, so the crossing is untouched — and each is a dead end for hulls, so the
+            two pockets stay two pockets. What they add is the landing: each beach sits on the water
+            the <em>enemy's</em> port opens onto, roughly nine tiles out, so a lander crosses in two
+            turns and puts armour ashore behind the far line. The AI never builds one (naval plan R1),
+            so this is a human-only flank — by design, not by omission.</li>
+        <li><strong>The header lied and was rewritten</strong> — "Sea is a hard wall in this game,
+            which makes coastline the strongest shaping tool there is" was true when written and is
+            the exact sentence the naval domain repealed. The new one (it is the menu tooltip) names
+            the five-tile firing lane and says why the beaches cannot become a canal.</li>
+        <li>Each side's day-1 income rises from 2 to 3 properties — mirrored, so no edge.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ---- IRONWORKS ---- -->
+  <div class="card bg-base-100 shadow-md rf-left rf-go">
+    <div class="card-body space-y-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <h3 class="text-2xl font-bold">Ironworks — air for the late game</h3>
+        <span class="badge badge-success">MR2</span>
+        <span class="badge badge-ghost">+2 airports</span>
+      </div>
+      <p class="text-sm max-w-3xl">
+        Twenty-two properties mean this is the one board where fighters (20k) and bombers (22k) are
+        a routine buy, not a gamble — the same reasoning that already gave Ironworks the md-tank and
+        rocket late game "they never reach elsewhere". An airfield in each industrial cluster gives
+        anti-air and missiles real work and the double front a third axis.
+      </p>
+      <pre class="rf-map bg-neutral text-neutral-content"><span class="sea">S</span>.Q=..C....C.....C...F.<span class="sea">S</span>
+<span class="sea">S</span>B.=================..F<span class="sea">S</span>
+<span class="sea">S</span>.<span class="new">A</span>.=....C....C....=...<span class="sea">S</span>
+<span class="sea">S</span>B..=.......F...MM.=C..<span class="sea">S</span>
+<span class="sea">⋮</span>
+<span class="sea">S</span>..C=.MM...F.......=..B<span class="sea">S</span>
+<span class="sea">S</span>...=....C....C....=.<span class="new">A</span>.<span class="sea">S</span>
+<span class="sea">S</span>F..=================.B<span class="sea">S</span>
+<span class="sea">S</span>.F...C.....C....C..=Q.<span class="sea">S</span></pre>
+      <ul class="text-sm space-y-1 list-disc pl-5 max-w-3xl">
+        <li><strong>Airports</strong> at <span class="rf-code">(2,3)</span> / mirror
+            <span class="rf-code">(21,12)</span> — inside each home cluster, between the two bases,
+            owned from day 1. Behind the front on purpose, same fuel logic Jet Stream wrote down:
+            a bomber that overstays dies of its own tank.</li>
+        <li>No port. The sea here is a frame, and giving it a coast means redrawing the map — that
+            is a new map, and new maps are future map work, out of scope for this plan.</li>
+        <li>Property count 22 → 24, mirrored. Header symbol legend gains <span class="rf-code">A</span>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ---- CROSSFIRE ---- -->
+  <div class="card bg-base-100 shadow-md rf-left rf-go">
+    <div class="card-body space-y-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <h3 class="text-2xl font-bold">Crossfire — wings over the lake</h3>
+        <span class="badge badge-success">MR2</span>
+        <span class="badge badge-ghost">+2 airports · provisional, see R4</span>
+      </div>
+      <p class="text-sm max-w-3xl">
+        The map's own header says it "rewards transports". The ring road made that mean APCs; a
+        t-copter carrying infantry straight over the lake to the mountain passes is the same thesis
+        with the new vocabulary — and a b-copter over the midboard finally gives the anti-air a
+        reason to hold the passes rather than trail the tanks.
+      </p>
+      <pre class="rf-map bg-neutral text-neutral-content"><span class="sea">SSSSSSSSSSSSSSSSSSSS</span>
+<span class="sea">S</span>.Q<span class="new">A</span>...C........F..<span class="sea">S</span>
+<span class="sea">S</span>.B===========.....<span class="sea">S</span>
+<span class="sea">⋮</span>
+<span class="sea">S</span>.....===========B.<span class="sea">S</span>
+<span class="sea">S</span>..F........C...<span class="new">A</span>Q.<span class="sea">S</span>
+<span class="sea">SSSSSSSSSSSSSSSSSSSS</span></pre>
+      <ul class="text-sm space-y-1 list-disc pl-5 max-w-3xl">
+        <li><strong>Airports</strong> at <span class="rf-code">(3,1)</span> / mirror
+            <span class="rf-code">(16,13)</span> — beside each HQ, deep behind the lines, owned from
+            day 1. The first copter reaches the front around day 3–4; an 8k anti-air from the base
+            is buildable before it arrives, so the answer exists before the question.</li>
+        <li>The lake stays portless (§2). Header legend gains <span class="rf-code">A</span>;
+            description keeps its transport sentence, now truer.</li>
+        <li><strong>Provisional</strong>: this is the retrofit that could dilute a map identity
+            rather than extend one. If MR2's playtest shows copters flattening the passes game,
+            Crossfire reverts and the plan ships two maps, not three (risk R4).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body py-4">
+      <h3 class="font-bold text-sm uppercase tracking-wide opacity-60">What no retrofit adds: starting units</h3>
+      <p class="text-sm max-w-3xl">
+        No map gains starting aircraft, hulls or landers. Facilities introduce the domain through
+        production — openings stay the openings players know, day-1 saves stay believable, and no
+        AI-owned lander sits idle at a dock it will never use (the AI cannot plan a ferry — naval
+        plan R1, still standing). The Straits keeps its starting cruiser/sub pair; it was designed
+        around them.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 4 · WHAT'S ALREADY BUILT ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl bold font-bold">4 · Why this costs almost nothing — the systems already exist</h2>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body py-4">
+        <h3 class="font-bold">Zero engine changes</h3>
+        <ul class="text-sm space-y-1 list-disc pl-5">
+          <li><span class="rf-code">TerrainType.builds / services</span> is data — a port on Isthmus
+              builds ships and repairs hulls the moment the symbol is in the file.</li>
+          <li>The AI's facility-aware production and fuel-retreat shipped with N-milestones; it
+              will buy from a retrofit airport with no new code, at every difficulty tier, and the
+              difficulty invariant (the AI never cheats) is untouched because nothing here is an
+              <span class="rf-code">AIProfile</span> weight.</li>
+          <li>Menu ordering is by board area (<span class="rf-code">MapCatalog.ordered</span>) —
+              property edits don't move any map in the list.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body py-4">
+        <h3 class="font-bold">Zero new validation infrastructure</h3>
+        <ul class="text-sm space-y-1 list-disc pl-5">
+          <li><span class="rf-code">test_maps.gd</span> re-lints every shipped map: symmetry, HQ
+              count, base per team, foot-reachable HQs, no unit on a property. All hold by
+              construction of the edits above.</li>
+          <li><span class="rf-code">test_map_soak.gd</span> plays AI-vs-AI on every map, fog
+              alternating — the retrofits are inside its net <em>the moment the file changes</em>,
+              no test edit required. This is the soak that has already caught what unit tests
+              missed.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="max-w-3xl text-sm opacity-80">
+    The genuinely new work is two small lints (§5), three map-file edits, three header rewrites, and
+    a documentation addendum. That's the whole bill.
+  </p>
+</section>
+
+<!-- ============================= 5 · NEW GUARDRAILS ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">5 · Two new lints, one targeted test</h2>
+  <div class="overflow-x-auto">
+    <table class="table rf-verdict bg-base-100 shadow-sm">
+      <thead><tr><th>Guardrail</th><th>Asserts</th><th>The failure it exists for</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="font-bold whitespace-nowrap">Port-touches-sea lint</td>
+          <td>Every <span class="rf-code">P</span> on every map neighbours ≥1 ship-passable cell.</td>
+          <td>A port that builds ships which can never leave the dock — well-formed, unplayable,
+              invisible to the parser.</td>
+        </tr>
+        <tr>
+          <td class="font-bold whitespace-nowrap">One-water lint</td>
+          <td>On any map where both teams own or can reach a port, the ship-reachable sea from each
+              side's ports is one intersecting body.</td>
+          <td>Naval plan R1 turned from prose into a test: two fleets that can never meet make an
+              AI that builds a navy which shells nothing.</td>
+        </tr>
+        <tr>
+          <td class="font-bold whitespace-nowrap">No-beach-is-a-bridge lint</td>
+          <td>Counting landmasses with shoals and again without them gives the same number, on every
+              map that has any.</td>
+          <td>Shoals cost 1 for <em>every land class</em>, so a careless one — or a chain of them,
+              which a per-cell check would wave through — is a tank ford that silently deletes
+              whatever the water was separating. Comparing the two counts catches chains.</td>
+        </tr>
+        <tr>
+          <td class="font-bold whitespace-nowrap">Beach-reachability lint</td>
+          <td>Every shoal is sailable to by a lander from some port on that map.</td>
+          <td>A beach no landing craft can reach is decoration wearing design's clothes — and it is
+              how an amphibious lane dies without anyone noticing.</td>
+        </tr>
+        <tr>
+          <td class="font-bold whitespace-nowrap">Three guard tests</td>
+          <td>The shared-water and no-bridge lints, run against synthetic boards built to break
+              them: two harbours split by dry land, two islands joined by one beach — plus the
+              false positive the other way, an offshore beach touching no land at all, which the
+              no-bridge lint must <em>not</em> read as a bridge.</td>
+          <td>All four lints above pass on all nine shipped maps, which is only reassuring if they
+              are capable of failing — and of not failing on a legal board. These prove the
+              mechanism, so "green" keeps meaning something after the tenth map lands.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="max-w-3xl text-sm opacity-80">
+    All of them live in <span class="rf-code">tests/unit/test_maps.gd</span> beside the map
+    invariants that file and <span class="rf-code">tests/unit/test_map_soak.gd</span> already
+    enforce — and all of them are written against
+    <span class="rf-code">MapCatalog</span> rather than a list of names, so the 10th map with a port
+    inherits them for free. The file went from 9 tests to 16, and the suite gained all seven.
+  </p>
+</section>
+
+<!-- ============================= 6 · MILESTONES ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">6 · Milestones — each ends playable</h2>
+  <div class="space-y-4">
+    <div class="card bg-base-100 shadow-sm rf-left rf-go">
+      <div class="card-body py-4">
+        <h3 class="font-bold text-lg">MR1 · Isthmus sails <span class="badge badge-ghost badge-sm ml-2">the naval retrofit</span></h3>
+        <p class="text-sm">Ports, shoals, header rewrite; port-touches-sea and one-water lints;
+        the treads-crossing test. <strong>Done means:</strong> suite green including the map soak;
+        a hotseat match where a lander ferries armour around the neck; a vs-AI match where the AI
+        builds hulls from its port unprompted and the fleets actually meet.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm rf-left rf-go">
+      <div class="card-body py-4">
+        <h3 class="font-bold text-lg">MR2 · Airfields inland <span class="badge badge-ghost badge-sm ml-2">ironworks + crossfire</span></h3>
+        <p class="text-sm">Both airport pairs, legends and descriptions updated. <strong>Done
+        means:</strong> suite green; on each board a vs-AI match in which the AI buys aircraft and
+        anti-air answers them; the Crossfire provisional verdict (keep or revert, R4) is made and
+        written down here.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm rf-left rf-go">
+      <div class="card-body py-4">
+        <h3 class="font-bold text-lg">MR3 · The record set straight <span class="badge badge-ghost badge-sm ml-2">docs &amp; verdict</span></h3>
+        <p class="text-sm">Addendum in the naval/air plan marking the byte-identical invariant
+        superseded (with a pointer here); README map paragraph and lint list refreshed; this plan's
+        §9 updated with what shipped and what the matches taught. <strong>Done means:</strong> no
+        document in the repo still claims the old maps are untouched.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 7 · RISKS ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">7 · Risks &amp; failure modes</h2>
+  <div class="overflow-x-auto">
+    <table class="table rf-verdict bg-base-100 shadow-sm">
+      <thead><tr><th>#</th><th>Risk</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td class="font-bold">R1</td>
+          <td>The battleship's 2–6 indirect arc dominates Isthmus: parked in open water it shells
+              the neck city and the crossing with nothing land-side able to answer.</td>
+          <td>Deliberate tension, bounded: the firing water is shared (subs and rival battleships
+              reach it), ports are the only hull repair and sit a long sail from the neck, and
+              rockets out-range it from the shelf. <span class="badge badge-success badge-sm">Holding</span>
+              Across three 40-day AI-vs-AI matches the sides build 10–13 hulls and sink 3–5 of them,
+              so the lane is contested rather than owned. Fallback if that changes: move the ports a
+              cell further from the neck — a two-character diff.</td></tr>
+        <tr><td class="font-bold">R2</td>
+          <td>Shoals are walkable by every land class — a shoal chain is an accidental bridge.</td>
+          <td><span class="badge badge-success badge-sm">Closed</span> Both beaches are dead ends for
+              hulls and neither joins two landmasses, pinned for every map present and future by the
+              no-beach-is-a-bridge lint and its guard test (§5).</td></tr>
+        <tr><td class="font-bold">R3</td>
+          <td>Saves follow map edits: a mid-match save on a retrofit map reloads onto the new
+              terrain, and a sea→shoal cell could strand a saved <em>ship</em> parked on it.</td>
+          <td><span class="badge badge-success badge-sm">Void</span> The risk existed only because
+              the draft carved sea. As built, no cell became sea and no cell became worse for any
+              unit: shoal is road plus lander access, port is plains-or-better (§1). There is nothing
+              left to strand.</td></tr>
+        <tr><td class="font-bold">R4</td>
+          <td>Crossfire's identity dilutes — copters flatten the passes-and-ring-road game instead
+              of extending it.</td>
+          <td><span class="badge badge-success badge-sm">Resolved — keep</span> Decided on measured
+              play, not taste: across three 40-day AI-vs-AI matches, aircraft are 5–9 of ~52 units
+              built and die at close to the rate they are produced (9 built / 9 lost, 7 / 6, 5 / 3).
+              Anti-air answers them rather than the reverse, so air is an accent on the passes game,
+              not a solvent. See §9.</td></tr>
+        <tr><td class="font-bold">R5</td>
+          <td>Scope creep — the project's standing top risk. Retrofitting invites redrawing:
+              a coast for Ironworks, a port lake for Crossfire, "just one more" for Riverline.</td>
+          <td>§8's out-of-scope list is the contract: conversions only, three maps only, the four
+              no's stay no. New coastlines and new boards are future map work, not this plan's.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================= 8 · DECISIONS + OUT OF SCOPE ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">8 · Decisions — proposed, for review</h2>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body py-4">
+        <h3 class="font-bold">D1 · Supersede "byte-identical"</h3>
+        <p class="text-sm">The naval plan's backwards-compatibility invariant is retired and
+        replaced by the conversion rule of §1: cells may change class, land stays land-passable,
+        sea is never carved, coastlines are never redrawn.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body py-4">
+        <h3 class="font-bold">D2 · The set is exactly three</h3>
+        <p class="text-sm">Isthmus (naval), Ironworks (air), Crossfire (air, provisional). First
+        Steps, Scrimmage, Timberline and Riverline stay untouched <em>as a decision</em>, not an
+        omission — each guards a premise the new domains would erase.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body py-4">
+        <h3 class="font-bold">D3 · Facilities only, owned from day 1</h3>
+        <p class="text-sm">No starting air or naval units on any retrofit map; home facilities start
+        owned, following Jet Stream's airfields and The Straits' ports. Production is how a domain
+        walks onto an old board.</p>
+      </div>
+    </div>
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body py-4">
+        <h3 class="font-bold">D4 · R1's posture is unchanged</h3>
+        <p class="text-sm">The AI still never builds transports. Isthmus's ferry flank is a
+        human-only line, and its ports pass the one-water lint — which guarantees exactly one
+        thing: every port on a map opens onto the <em>same</em> body of water, so no fleet is
+        sealed into a sea the other side's hulls could never enter. It says nothing about
+        <em>distance</em>. On Isthmus the two pockets join only the long way round, via the sea
+        border ring, so a cruiser or sub stays in its own pocket short of a multi-turn sail; the
+        battleship's 2–6 arc spanning the five-tile lane beside the neck is the intended direct
+        engagement, and the map header says so. Ferry AI remains the named stretch goal it already
+        was.</p>
+      </div>
+    </div>
+  </div>
+  <div class="card bg-base-100 shadow-sm rf-left rf-stay">
+    <div class="card-body py-4">
+      <h3 class="font-bold">Out of scope — named so it stays out</h3>
+      <ul class="text-sm space-y-1 list-disc pl-5">
+        <li>New maps, new coastlines, or any edit that adds/removes sea — that is future map work,
+            and none of it may ride in on a retrofit.</li>
+        <li>Retrofits for First Steps, Scrimmage, Timberline, Riverline — the four no's.</li>
+        <li>Ports on lakes; reefs on retrofit maps (concealment stays a Straits signature for now).</li>
+        <li>Starting air/naval units, AI ferry planning, balance-number changes in <span class="rf-code">data/</span> —
+            if a retrofit only works after a stat change, the retrofit is wrong, not the stat.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 9 · WHAT SHIPPED ============================= -->
+<section class="space-y-6">
+  <h2 class="text-3xl font-bold">9 · What shipped, and what the measurements said</h2>
+  <p class="max-w-3xl">
+    All three retrofits are in and the suite is green. MR1–MR3 landed together because
+    the work turned out to be smaller than drafted: no engine change, no data change, eight edited
+    cells across three <span class="rf-code">.txt</span> files, and seven new tests.
+  </p>
+
+  <div class="card bg-base-100 shadow-sm rf-left rf-go">
+    <div class="card-body py-4 space-y-2">
+      <h3 class="font-bold">The one place the build beat the plan</h3>
+      <p class="text-sm max-w-3xl">
+        The draft put Isthmus's beaches at <span class="rf-code">(4,5)</span> /
+        <span class="rf-code">(15,6)</span>, carved out of sea, and accepted a stranding risk (R3) and
+        a ~30-tile ferry for it. Reading <span class="rf-code">data/terrain/*.tres</span> before
+        editing changed the answer twice over. First, <span class="rf-code">shoal</span> turned out to
+        be <span class="rf-code">road</span> plus lander access — identical costs, identical defence —
+        so beaches could be made from <em>coastal road</em> and cost nothing. Second, and more
+        useful: <span class="rf-code">DropCommand</span> only unloads from a shoal or a port, so the
+        port is already the loading dock and a beach is only ever needed as the <em>landing</em>
+        point. That flipped the placement onto the neck's two coasts, where each beach sits on the
+        water the enemy's port opens onto — turning a five-turn circumnavigation into a two-turn
+        assault, and deleting R3 rather than mitigating it.
+      </p>
+    </div>
+  </div>
+
+  <h3 class="text-xl font-bold pt-2">Did the AI actually use any of it?</h3>
+  <p class="max-w-3xl text-sm">
+    The lints prove a board is well-formed; they say nothing about whether the new facilities get
+    used. Three 40-day AI-vs-AI matches per map, before and after, with builds and losses counted by
+    domain — the "before" column is the same map at <span class="rf-code">HEAD</span>:
+  </p>
+  <div class="overflow-x-auto">
+    <table class="table rf-verdict bg-base-100 shadow-sm">
+      <thead><tr><th>Map</th><th>Before</th><th>After</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="font-bold">isthmus</td>
+          <td>3 of 3 unresolved at day 40; ~51 land units built, all land.</td>
+          <td>Still 3 of 3 unresolved; <strong>10–13 hulls built, 3–5 sunk</strong> per match —
+              battleships, cruisers and submarines.</td>
+          <td>The fleets are real and they fight, which is the five-tile lane working. The stalemate
+              is <em>pre-existing</em>, not caused by the retrofit — worth its own look someday, out
+              of scope here.</td>
+        </tr>
+        <tr>
+          <td class="font-bold">ironworks</td>
+          <td>3 of 3 unresolved at day 40.</td>
+          <td><strong>2 of 3 now resolve</strong> (days 38 and 39); 13–16 aircraft built, 9–13 shot
+              down; anti-air production jumps to 17–24.</td>
+          <td>The best result of the three. Air is breaking the economy map's late-game deadlock,
+              which is exactly the map's stated purpose extended rather than replaced.</td>
+        </tr>
+        <tr>
+          <td class="font-bold">crossfire</td>
+          <td>1 of 3 resolved (day 33).</td>
+          <td>1 of 3 resolved, sooner (day 24); 5–9 aircraft built, 3–9 shot down.</td>
+          <td>Air is a minority of production and dies about as fast as it arrives. The passes game
+              is intact — R4 resolves to <strong>keep</strong>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="max-w-3xl text-sm opacity-80">
+    No side built a lander in any run, on any map. That is the expected and correct outcome of naval
+    plan R1 — the AI cannot plan a ferry, so it does not buy one — and it is why Isthmus's beaches
+    are documented as a human line rather than counted as an AI capability.
+  </p>
+
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body py-4">
+      <h3 class="font-bold text-sm uppercase tracking-wide opacity-60">Left undone, deliberately</h3>
+      <ul class="text-sm space-y-1 list-disc pl-5">
+        <li>Isthmus is a 40-day AI-vs-AI stalemate and was one before this work. Fixing that is a
+            balance question about the map's economy, not about ports.</li>
+        <li>Short-ranged hulls on Isthmus can only fight within their own pocket without a long sail.
+            Named here rather than smoothed away: it is what the geography says, and battleships are
+            the answer to it.</li>
+        <li>The four no's stayed no. First Steps, Scrimmage, Timberline and Riverline are untouched.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="text-center text-sm opacity-60 pb-6">
+  Grid Commander · Map retrofit proposal · audits maps against the naval/air domains shipped in N1–N4 ·
+  companion: <span class="rf-code">naval-air-units-plan.html</span>
+</footer>
+
+</main>
+</body>
+</html>

@@ -2,12 +2,15 @@
 # symmetric
 # Mirrored: every cell maps to (19 - x, 14 - y), so neither side gets a terrain
 # or income edge — asserted by tests/unit/test_maps.gd. The mountains beside
-# the lake are the passes that reward infantry.
+# the lake are the passes that reward infantry — and the airfield beside each HQ
+# is the other way to reach them, since a t-copter carries a rifle over the lake
+# the ring road has to drive around. The lake takes no port: it is landlocked, and
+# a fleet that cannot be flanked is not a fight.
 # Symbols: . plains  F woods  M mountain  = road  ~ river
-#          C city  B base  Q HQ  S sea
+#          C city  B base  Q HQ  A airport  S sea
 [terrain]
 SSSSSSSSSSSSSSSSSSSS
-S.Q....C........F..S
+S.QA...C........F..S
 S.B===========.....S
 S.....=..FF..=.MM..S
 S..CF.=...C..=.M.C.S
@@ -19,15 +22,17 @@ S.....=....F.=MM...S
 S.C.M.=..C...=.FC..S
 S..MM.=..FF..=.....S
 S.....===========B.S
-S..F........C....Q.S
+S..F........C...AQ.S
 SSSSSSSSSSSSSSSSSSSS
 [owners]
-# team x y — only HQ + base start owned; every city is contested.
+# team x y — HQ, base and airfield start owned; every city is contested.
 # Four cities sit closer to each base (foot distances 3/6/8/10 per side).
 1 2 1
 1 2 2
+1 3 1
 2 17 12
 2 17 13
+2 16 13
 [units]
 # team symbol x y — i infantry, m mech, r recon, t tank, T md tank,
 #                   a anti-air, g artillery, R rockets, p apc
