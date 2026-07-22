@@ -64,6 +64,13 @@ three movement domains (land, air, sea), property capture and income, and a comp
   is the standing boundary: **"Red"/"Blue" survive only as developer slot vocabulary** — the Balance
   Lab's `--red`/`--blue` grammar and its byte-stable reports, code identifiers, comments — never on a
   screen a player sees; if a player can see it, it speaks faction.
+  `.lavish/battle-animations-plan.html` owns the combat cut-in — milestones BA1–BA4, all shipped —
+  and its D1: **the cut-in replays a snapshot, it computes nothing.** The only thing `core/` gained
+  for it is `CombatResult.attacker_hp_before` / `defender_hp_before`, because the animation runs
+  *after* the command applied and both units already hold post-combat HP. Its D5 is the standing
+  rule on the other side of the line: how a weapon looks is a `BattleStyle` under
+  `data/battle_anim/`, `UnitType.battle_style` is a presentation key exactly like `atlas_col`, and
+  no gameplay number may ever appear in a style.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
@@ -99,9 +106,11 @@ The AI plugs in at the exact same point as player input.
 ```
 res://
 ├─ core/        # sim: game_state.gd, commands/, rules/, commanders/  (NO Node references)
-├─ data/        # .tres resources: units/, terrain/, commanders/, ai/, difficulty/, damage_chart
+├─ data/        # .tres resources: units/, terrain/, commanders/, ai/, difficulty/,
+│              # battle_anim/ (weapon signatures), damage_chart
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
+│  │  └─ cutscene/  # the combat cut-in and the BattleStyle class it reads
 │  ├─ menu/     # main_menu.tscn — map and commander select, match options
 │  ├─ common/   # helpers shared by both scenes
 │  └─ ui/       # menus, panels, damage preview
@@ -196,6 +205,18 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
   exception without a matching decision in the plan. A submerged submarine is hidden through the
   same hook and is the one rule there that holds **with fog off** — being under the water is not a
   question of how far anyone can see.
+- **The battle cut-in replays; it never decides.** `BattleAnimator.animate_combat` is the one seam —
+  both call sites `await` it, and it either plays the full-screen cut-in or falls through to the
+  on-map hit, returning exactly once either way. Inside `scenes/battle/cutscene/`, everything is a
+  pure function of one clock: skipping sets that clock to the end rather than cancelling tweens,
+  which is what makes "any press, at any beat, lands on the right board" true by construction
+  instead of by testing. Every number the cut-in shows was handed to it — the result's two HP
+  snapshots and the units themselves — and none is recomputed from the damage chart or the RNG.
+  Keep it that way: a second opinion on combat is the movement bug this repo already paid for once.
+  Two consequences worth knowing before touching it. It is suppressed while `capturing`, like the
+  shake and the pulse, so `make screenshot` stays byte-stable and a posed cut-in goes through
+  `pose_at` instead; and it only plays when the *viewer* can see both combatants, which is asked of
+  the view (and so of `Vision`), never re-derived.
 
 ## Commits
 

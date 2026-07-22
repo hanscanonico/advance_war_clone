@@ -37,6 +37,10 @@ const IMPACT := 0.40
 const DEATH := 0.35
 const HOLD := 0.25
 const WIPE_OUT := 0.20
+## The hold can be trimmed away entirely when the pacing asks for it, but the
+## wipe cannot: a cut-in that vanishes on one frame reads as a glitch rather than
+## as a fast exit.
+const MIN_WIPE_SCALE := 0.4
 
 ## Letterbox bar height, as a share of the viewport.
 const BAR_RATIO := 0.13
@@ -46,6 +50,8 @@ const SLIDE_PX := 60.0
 ## Push-in over the exchange, and the shake an impact adds.
 const PUSH_SCALE := 0.03
 const SHAKE_PX := 5.0
+## Thickness of the faction line the wipe carries along the letterbox edges.
+const ACCENT_PX := 2.0
 ## How much higher an indirect weapon lobs its round than the same style fired
 ## flat. Artillery, Rockets and Missiles all share a style with something that
 ## shoots straight, and the arc is what tells them apart at a glance — so it is
@@ -76,15 +82,22 @@ class Beats:
 ## cut-in reads exactly two things off it — the terrain each side stands on and
 ## who owns that cell — which is what dresses each half's ground strip.
 var view: BattleView
-## Playback rate. BA4's AI pacing nudges this above 1.0 for a side that is
-## attacking repeatedly; a player's own attacks always run at 1.0.
+## Playback rate, and how much of the closing hold and wipe is kept. Both are
+## the AI-pacing levers (BA4): a side attacking over and over gets a faster
+## cut-in with most of its ceremony cut away, while the beats that carry the
+## information — the volley, the impact, the tick — keep their full length at
+## every setting, because those are what the animation is *for*. The animator
+## sets them; see BattleAnimator.animate_combat.
 var speed := 1.0
+var tail_scale := 1.0
 
 var _root: Control
 var _dim: ColorRect
 var _band: Control
 var _top_bar: ColorRect
 var _bottom_bar: ColorRect
+var _top_edge: ColorRect
+var _bottom_edge: ColorRect
 var _atk: CutsceneSide
 var _def: CutsceneSide
 var _fx: CutsceneFx
@@ -105,6 +118,8 @@ var _def_hp_after := 0
 var _styles := BattleStyleDB.new()
 var _atk_style: BattleStyle
 var _def_style: BattleStyle
+## The attacking side's faction colour, which the wipe carries in.
+var _accent := Color.WHITE
 ## Cue name -> true once its sound has played, so a beat crossed twice by a
 ## frame boundary is still heard once and a skip is silent rather than a pile-up.
 var _cues: Dictionary = {}
@@ -205,13 +220,19 @@ func _pose(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) 
 	_def_hp_after = defender.displayed_hp()
 	_atk_style = _styles.for_unit(attacker.type)
 	_def_style = _styles.for_unit(defender.type)
+	_accent = _accent_of(attacker.team)
 	_atk.bind(attacker, _terrain_at(attacker.cell), view.game.owner_at(attacker.cell), false)
 	_def.bind(defender, _terrain_at(defender.cell), view.game.owner_at(defender.cell), true)
 	_atk.hp_shown = result.attacker_hp_before
 	_def.hp_shown = result.defender_hp_before
 	_squads(_atk, result.attacker_hp_before, _atk_hp_after, result.attacker_died)
 	_squads(_def, result.defender_hp_before, _def_hp_after, result.defender_died)
-	_beats = _plan(result, TRAVEL * _atk_style.travel_scale, TRAVEL * _def_style.travel_scale)
+	_beats = _plan(
+		result,
+		TRAVEL * _atk_style.travel_scale,
+		TRAVEL * _def_style.travel_scale,
+		clampf(tail_scale, 0.0, 1.0)
+	)
 
 
 ## How many figures a side posts and how many it keeps. A side that dies keeps
@@ -220,6 +241,17 @@ func _pose(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) 
 static func _squads(side: CutsceneSide, before: int, after: int, died: bool) -> void:
 	side.squad_was = CutsceneSide.figures_for(before)
 	side.squad_now = side.squad_was if died else CutsceneSide.figures_for(after)
+
+
+## The colour the wipe carries: the attacking commander's faction, or that
+## side's plain team colour when it is fighting without one. CommanderVisuals is
+## the single authority on what a faction looks like — the card, the HUD chip and
+## the power banner all ask it, and so does this.
+func _accent_of(team: int) -> Color:
+	var commander := view.game.commander_of(team)
+	if commander != null and commander.id != CommanderType.NEUTRAL_ID:
+		return CommanderVisuals.theme_for(commander).color_light
+	return TerrainPanel.TEAM_COLORS.get(team, Color.WHITE)
 
 
 ## The cell's terrain. An attacker fires from the cell it has already been moved
@@ -232,9 +264,10 @@ func _terrain_at(cell: Vector2i) -> TerrainType:
 ## The beat sheet, laid out on the clock. Reads only the result's flags, so an
 ## exchange with no counter is genuinely shorter rather than padded with a pause.
 ## The two travel budgets come from the firing styles — an arcing shell is given
-## longer to get there than a burst of tracer.
+## longer to get there than a burst of tracer — and `tail` trims the closing hold
+## and wipe, which is the only part the pacing is allowed to take.
 static func _plan(
-	result: CombatResolver.CombatResult, atk_travel: float, def_travel: float
+	result: CombatResolver.CombatResult, atk_travel: float, def_travel: float, tail: float
 ) -> Beats:
 	var beats := Beats.new()
 	beats.atk_ready = Vector2(WIPE_IN, WIPE_IN + ANTICIPATION)
@@ -254,7 +287,8 @@ static func _plan(
 		if result.attacker_died:
 			beats.atk_death = Vector2(settled - 0.05, settled - 0.05 + DEATH)
 			settled = beats.atk_death.y
-	beats.wipe_out = Vector2(settled + HOLD, settled + HOLD + WIPE_OUT)
+	var hold := settled + HOLD * tail
+	beats.wipe_out = Vector2(hold, hold + WIPE_OUT * maxf(tail, MIN_WIPE_SCALE))
 	beats.total = beats.wipe_out.y
 	return beats
 
@@ -301,11 +335,22 @@ func _apply() -> void:
 	_sound()
 
 
+## The letterbox, and the faction line on its inner edge. The accent is brightest
+## while the halves are still sliding and settles to a quiet rule once they are
+## home — the wipe is the attacking side arriving, so it arrives in their colour.
 func _frame_bars(present: float) -> void:
 	var bar := _bar_h * present
 	_top_bar.size = Vector2(_view.x, bar)
 	_bottom_bar.position = Vector2(0.0, _view.y - bar)
 	_bottom_bar.size = Vector2(_view.x, bar)
+	var glow := lerpf(1.0, 0.55, present)
+	var edge := Color(_accent, present * glow)
+	_top_edge.color = edge
+	_top_edge.position = Vector2(0.0, bar)
+	_top_edge.size = Vector2(_view.x, ACCENT_PX)
+	_bottom_edge.color = edge
+	_bottom_edge.position = Vector2(0.0, _view.y - bar - ACCENT_PX)
+	_bottom_edge.size = Vector2(_view.x, ACCENT_PX)
 
 
 ## The two halves slide in from their own edges, and the whole band pushes in
@@ -503,6 +548,8 @@ func _build() -> void:
 	_band.add_child(_fx)
 	_top_bar = _new_bar()
 	_bottom_bar = _new_bar()
+	_top_edge = _new_bar()
+	_bottom_edge = _new_bar()
 	_root.resized.connect(_layout)
 
 

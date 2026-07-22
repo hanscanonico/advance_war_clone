@@ -4,6 +4,11 @@ extends Node
 ## runs and fresh checkouts (before `make sfx`) never break.
 
 const SFX_DIR := "res://assets/sfx"
+## The last three belong to the battle cut-in's weapon styles — a BattleStyle
+## names the sound its volley makes, and these are the ones that wanted a voice
+## of their own rather than the generic `shot`. A style may name a sound that has
+## not been generated yet: `play` skips a missing stream in silence, which is
+## what lets a new style ship before its wav does.
 const NAMES: Array[StringName] = [
 	&"select",
 	&"move",
@@ -11,6 +16,9 @@ const NAMES: Array[StringName] = [
 	&"explosion",
 	&"capture",
 	&"fanfare",
+	&"flak",
+	&"rocket",
+	&"torpedo",
 ]
 const POOL_SIZE := 6
 

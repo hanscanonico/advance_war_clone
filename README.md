@@ -66,6 +66,26 @@ A mode may carry a `+fog` suffix (`make smoke MODES="victory+fog"`) to rerun tha
 of war on. Fog is the only setting under which the scene hides units rather than just drawing them,
 so two scenarios run both ways by default.
 
+The battle cut-in has its own family of modes, because it is deliberately suppressed while
+capturing — a mid-animation frame is what would make two identical captures differ. They pose the
+overlay at a fixed moment of its own clock instead, and the matchup is part of the mode name:
+
+```sh
+make smoke MODES="cutin"                      # the frontline tanks, defender survives
+make smoke MODES="cutin_ko"                   # the same pair, defender routed
+make smoke MODES="cutin:bomber:tank"          # any matchup, staged wherever it fits the board
+make smoke MODES="cutin_skip"                 # walks a skip across every beat; must never hang
+```
+
+`cutin_skip` is the one that is a test rather than a picture: it plays the same exchange ten times,
+skipping one frame later each time, and fails unless every run finishes exactly once. Both call
+sites hold the whole interaction flow on that, so a cut-in that ever failed to finish would freeze
+input for the rest of the session.
+
+`--no-battle-anim` forces the cut-in off for one run without touching the saved preference, which
+is how "with the animation off, the match plays out identically" is checked against the offline
+harness.
+
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
 Twelve maps ship. The main menu lists them smallest board first — `scrimmage`, `forge`,

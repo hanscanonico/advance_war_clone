@@ -73,16 +73,18 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 #
 # `cutin[_ko][:<attacker>:<defender>]` stages any matchup on whatever board the
 # run was launched with, which is what makes "all eighteen units stage
-# correctly" checkable. The five below are one per branch that has its own code:
-# survival and the kill, then the three domains — a bombing run from the air, a
-# torpedo across the water, and an indirect shot, which is the only one that
-# frames a volley with no counter coming back.
+# correctly" checkable. The ones below are one per branch with its own code:
+# survival and the kill, a bombing run from the air, a torpedo across the water,
+# a shot at a submarine — the one target the roster hides — and an indirect
+# attack, which is the only case that frames a volley with no counter coming
+# back. cutin_skip is a test rather than a picture; see _spam_skip.
 DEFAULT_MODES=(
 	attack resolve capture build buildmenu endturn
 	load cargo drop transport supply divemenu dive mapmenu powermenu victory aiturn
 	powermenu+fog victory+fog ambush vanish
 	power_ready power_active power_banner commander_info commander_victory
-	cutin cutin_ko cutin:bomber:tank cutin:sub:cruiser cutin:artillery:mech
+	cutin cutin_ko cutin_skip
+	cutin:bomber:tank cutin:sub:cruiser cutin:cruiser:sub cutin:artillery:mech
 )
 
 if [[ ! -x "$GODOT" ]]; then
@@ -142,7 +144,7 @@ for mode in "${modes[@]}"; do
 	fi
 	# The naval scenarios need a board with water on it; the default has none.
 	case "$demo" in
-		divemenu | dive | *:sub:* | *:cruiser | *:battleship | *:lander)
+		divemenu | dive | *:sub | *:sub:* | *:cruiser | *:battleship | *:lander)
 			godot_args+=(--map=the_straits)
 			;;
 	esac

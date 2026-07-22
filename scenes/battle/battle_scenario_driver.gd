@@ -34,6 +34,11 @@ const KO_POSE := 1.15
 ## by prefix and parsed rather than matched name-for-name.
 const CUT_IN_MODE := "cutin"
 const KO_SUFFIX := "_ko"
+## `cutin_skip` walks a skip across the whole cut-in — see _spam_skip. One entry
+## per beat boundary and a couple past the end, which is where a double-finish
+## would show up.
+const SKIP_SUFFIX := "_skip"
+const SKIP_FRAMES: Array[int] = [0, 1, 2, 4, 8, 16, 32, 64, 128, 240]
 
 var _battle: Battle
 var _shot_path := ""
@@ -126,7 +131,7 @@ func _run_demo(mode: String) -> void:
 	# The cut-in modes carry a matchup in the name, so they are parsed rather
 	# than matched — see _stage_cut_in.
 	if mode.begins_with(CUT_IN_MODE):
-		_stage_cut_in(mode)
+		await _stage_cut_in(mode)
 		return
 	match mode:
 		"attack", "resolve":
@@ -338,9 +343,47 @@ func _stage_cut_in(spec: String) -> void:
 	defender.hp = 10 if lethal else 74
 	var result := CombatResolver.resolve(game, attacker, defender)
 	_battle.view.sync_sprites()
+	if parts[0].ends_with(SKIP_SUFFIX):
+		await _spam_skip(result, attacker, defender)
 	_battle.animator.cutscene.pose_at(
 		result, attacker, defender, KO_POSE if lethal else CUT_IN_POSE
 	)
+
+
+## Risk R2, made checkable: both call sites hold the whole interaction flow on
+## `animate_combat`, so a cut-in that ever fails to finish freezes input for the
+## rest of the session. Here the same exchange is played and skipped again and
+## again, one frame later each time, which walks the skip across every beat the
+## cut-in has — the wipe, the volley, the impact, the counter, the death and the
+## hold. Each run has to emit `finished` exactly once.
+##
+## A run that never finishes hangs the scenario and the smoke sweep reports the
+## timeout; one that finishes twice, or not at all, quits non-zero here.
+func _spam_skip(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
+	var cutscene := _battle.animator.cutscene
+	var tree := _battle.get_tree()
+	for delay in SKIP_FRAMES:
+		var finishes := [0]
+		# Deliberately not CONNECT_ONE_SHOT: a one-shot connection drops itself
+		# after the first emission, so the very failure this is looking for — an
+		# exit that fires twice — would be the one it could not see.
+		var tally := func() -> void: finishes[0] += 1
+		cutscene.finished.connect(tally)
+		cutscene.play(result, attacker, defender)  # deliberately not awaited
+		for frame in delay:
+			await tree.process_frame
+		# Spammed, not pressed once: a second skip after the exit has run must be
+		# a no-op rather than a second `finished`.
+		for spam in 3:
+			cutscene.skip()
+			await tree.process_frame
+		await tree.process_frame  # the exit lands on the frame after the skip
+		cutscene.finished.disconnect(tally)
+		if finishes[0] != 1:
+			push_error("cut-in skipped after %d frame(s) finished %d times" % [delay, finishes[0]])
+			tree.quit(1)
+			return
+	print("cutin_skip: %d skips, each resolved exactly once" % SKIP_FRAMES.size())
 
 
 ## Puts one unit of each named type onto the first pair of cells the board has
