@@ -1,24 +1,32 @@
 extends SceneTree
-## Paints placeholder art for every unit the CC0 PixVoxel pack has no sprite for
-## — the aircraft and the fleet — into the columns of assets/tiles/units_atlas.png
-## past the ones tools/build_pixvoxel_atlases.sh owns.
+## Paints placeholder art into the columns of assets/tiles/units_atlas.png that
+## still have none — the units the CC0 PixVoxel pack does not cover and no hand
+## authored sprite has replaced yet.
 ##
-## Run it after that script (see the `tiles` target in the Makefile): it reads the
-## atlas that step wrote, widens the canvas to whatever data/units/*.tres now asks
-## for, and leaves the PixVoxel columns byte-identical. Idempotent — every column
-## from PIXVOXEL_COLS up is repainted from scratch, so running it twice is the
-## same as running it once.
+## Run it after tools/build_pixvoxel_atlases.sh (see the `tiles` target in the
+## Makefile): it reads the atlas that step wrote, widens the canvas to whatever
+## data/units/*.tres now asks for, and repaints only the columns PLACEHOLDER_IDS
+## names. Every other column is copied across byte-identical. Idempotent — those
+## columns are repainted from scratch, so running it twice is the same as once.
 ##
 ## The art is deliberately placeholder: flat 16px silhouettes in the team colour,
 ## drawn from the ASCII grids below so a shape can be read and edited in the
-## source. They are here so a milestone is never blocked on art; swapping in real
-## sprites means extending the PixVoxel roster and shrinking PIXVOXEL_COLS' reach,
-## not touching any rule.
+## source. They are here so a milestone is never blocked on art.
+##
+## Retiring a placeholder is one edit: drop the unit's id from PLACEHOLDER_IDS
+## (and its grid from SPRITES) once real art occupies its column, and this script
+## will preserve that column instead of overwriting it. Ownership is an explicit
+## list rather than a "column N and up" watermark because the real air and naval
+## art landed on columns 9-12 and 14-17, leaving missiles at 13 still a
+## placeholder — a watermark cannot describe a hole.
 
 const ATLAS_PATH := "res://assets/tiles/units_atlas.png"
 ## Columns tools/build_pixvoxel_atlases.sh writes: the length of its UNITS array.
-## Everything at or past this column is ours.
+## Only used to sanity-check the atlas we were handed is at least that wide.
 const PIXVOXEL_COLS := 9
+## The unit ids this script still draws. Everything else in the atlas is real art
+## and is passed through untouched.
+const PLACEHOLDER_IDS: Array[StringName] = [&"missiles"]
 const TILE := 16
 ## Atlas cells are 4x the world grid, matching the PixVoxel columns beside them.
 const SCALE := 4
@@ -31,82 +39,6 @@ const WAKE := Color("9fd0f2")
 ## '#' body (team colour) · '-' its shaded half · '+' glass/warhead · 'o' outline
 ## '~' wake · '.' transparent. One 16x16 grid per unit id.
 const SPRITES := {
-	&"fighter":
-	[
-		"................",
-		".......##.......",
-		"......o##o......",
-		"......####......",
-		"......#++#......",
-		"......####......",
-		".##############.",
-		".##############.",
-		"..o##########o..",
-		"......####......",
-		"......####......",
-		"....########....",
-		"....########....",
-		"....o##..##o....",
-		"................",
-		"................",
-	],
-	&"bomber":
-	[
-		"................",
-		"......o##o......",
-		"......####......",
-		"......#++#......",
-		"......####......",
-		"......####......",
-		"################",
-		"################",
-		"..--..----..--..",
-		"......####......",
-		"......####......",
-		"......####......",
-		"...##########...",
-		"...##########...",
-		"...o##....##o...",
-		"................",
-	],
-	&"b_copter":
-	[
-		"................",
-		"oooooooooooooooo",
-		".......##.......",
-		"......o##o......",
-		"...##########...",
-		"..############..",
-		".##++##########o",
-		".##++###########",
-		".##############o",
-		"..############..",
-		"...##########...",
-		"....o.....o.....",
-		"..oooooooooooo..",
-		"................",
-		"................",
-		"................",
-	],
-	&"t_copter":
-	[
-		"................",
-		"oooooooooooooooo",
-		".......##.......",
-		"......o##o......",
-		"..############..",
-		".##############.",
-		".##++######++##o",
-		".##++######++###",
-		".##############o",
-		".##############.",
-		"..############..",
-		"....o.....o.....",
-		"..oooooooooooo..",
-		"................",
-		"................",
-		"................",
-	],
 	&"missiles":
 	[
 		"................",
@@ -126,82 +58,6 @@ const SPRITES := {
 		"................",
 		"................",
 	],
-	&"battleship":
-	[
-		"................",
-		"................",
-		"...++......++...",
-		"..o##o.++.o##o..",
-		"..o##o.##.o##o..",
-		".oo##ooo#ooo##o.",
-		"o##############o",
-		"o##############o",
-		"o#------------#o",
-		"o##############o",
-		".oo##########oo.",
-		"..oooooooooooo..",
-		"..~~~~~~~~~~~~..",
-		"................",
-		"................",
-		"................",
-	],
-	&"cruiser":
-	[
-		"................",
-		"................",
-		".........+......",
-		"........o#o.....",
-		"........o#o.....",
-		"......oo###oo...",
-		"....oo#######o..",
-		"..oo##########o.",
-		"o##############o",
-		"o#------------#o",
-		"o##############o",
-		".oo##########oo.",
-		"..oooooooooooo..",
-		"..~~~~~~~~~~~~..",
-		"................",
-		"................",
-	],
-	&"sub":
-	[
-		"................",
-		"................",
-		"................",
-		"................",
-		".......++.......",
-		"......o##o......",
-		"......o##o......",
-		"..oooo####oooo..",
-		".o############o.",
-		"o##############o",
-		"o#------------#o",
-		".oo##########oo.",
-		"..oooooooooooo..",
-		"..~~~~~~~~~~~~..",
-		"................",
-		"................",
-	],
-	&"lander":
-	[
-		"................",
-		"................",
-		"................",
-		"....oooooooo....",
-		"...o++++++++o...",
-		"...o+------+o...",
-		"..o##########o..",
-		".o############o.",
-		"o##############o",
-		"o#------------#o",
-		"o##############o",
-		".oo##########oo.",
-		"..oooooooooooo..",
-		"..~~~~~~~~~~~~..",
-		"................",
-		"................",
-	],
 }
 
 
@@ -213,15 +69,23 @@ func _init() -> void:
 		return
 	var types := _placeholder_types()
 	if types.is_empty():
-		print("generate_unit_placeholders: nothing past column %d to draw" % PIXVOXEL_COLS)
+		_warn_missing_art(atlas)
+		print("generate_unit_placeholders: every column has real art, nothing to draw")
 		quit()
 		return
-	var columns := _atlas_columns(types)
+	var columns := _atlas_columns()
 	var painted := _paint(atlas, types, columns)
 	if painted == null:
 		quit(1)
 		return
-	painted.save_png(ATLAS_PATH)
+	var err := painted.save_png(ATLAS_PATH)
+	if err != OK:
+		push_error(
+			"generate_unit_placeholders: cannot write %s: %s" % [ATLAS_PATH, error_string(err)]
+		)
+		quit(1)
+		return
+	_warn_missing_art(painted)
 	print(
 		(
 			"generate_unit_placeholders: wrote %d placeholder column(s), atlas now %dx%d"
@@ -231,28 +95,55 @@ func _init() -> void:
 	quit()
 
 
-## Units whose atlas column this script owns, in column order. Read from the unit
-## database rather than listed here, so adding a `.tres` is the only step.
+## Units whose atlas column this script owns, in column order — the roster entries
+## named by PLACEHOLDER_IDS. An id with no matching `.tres` is reported rather
+## than skipped silently, since it means a unit was renamed out from under us.
 func _placeholder_types() -> Array[UnitType]:
-	var types: Array[UnitType] = []
+	var by_id := {}
 	for unit_type in UnitDB.load_default().all():
-		if unit_type.atlas_col >= PIXVOXEL_COLS:
-			types.append(unit_type)
+		by_id[unit_type.id] = unit_type
+	var types: Array[UnitType] = []
+	for id in PLACEHOLDER_IDS:
+		if not by_id.has(id):
+			push_warning("generate_unit_placeholders: no unit '%s' in the roster" % id)
+			continue
+		types.append(by_id[id])
 	types.sort_custom(func(a: UnitType, b: UnitType) -> bool: return a.atlas_col < b.atlas_col)
 	return types
 
 
 ## How wide the finished atlas has to be, in cells: past the last column any unit
-## actually asks for, a sprite would sample transparent pixels and vanish.
-func _atlas_columns(types: Array[UnitType]) -> int:
+## actually asks for, a sprite would sample transparent pixels and vanish. Measured
+## over the whole roster, not just our placeholders — sizing to the placeholders
+## alone would crop away every real-art column beyond the last one we draw.
+func _atlas_columns() -> int:
 	var last := PIXVOXEL_COLS - 1
-	for unit_type in types:
+	for unit_type in UnitDB.load_default().all():
 		last = maxi(last, unit_type.atlas_col)
 	return last + 1
 
 
-## Copies the PixVoxel columns across unchanged and draws ours beside them.
-## Returns null (having reported why) if the source atlas is not the size the
+## The last set of eyes on the finished atlas: warns about any roster column past
+## the PixVoxel nine that ended up fully transparent — a unit neither the paste
+## step nor PLACEHOLDER_IDS supplies art for, which would otherwise ship as an
+## invisible unit and only be noticed at run time.
+func _warn_missing_art(painted: Image) -> void:
+	var cell := TILE * SCALE
+	for unit_type in UnitDB.load_default().all():
+		if unit_type.atlas_col < PIXVOXEL_COLS:
+			continue
+		var column := painted.get_region(Rect2i(unit_type.atlas_col * cell, 0, cell, ROWS * cell))
+		if column.is_invisible():
+			push_warning(
+				(
+					"generate_unit_placeholders: column %d ('%s') has no art — the unit is invisible"
+					% [unit_type.atlas_col, unit_type.id]
+				)
+			)
+
+
+## Copies the existing atlas across unchanged and redraws only our columns over
+## it. Returns null (having reported why) if the source atlas is not the size the
 ## PixVoxel step is documented to write.
 func _paint(atlas: Image, types: Array[UnitType], columns: int) -> Image:
 	var cell := TILE * SCALE
@@ -271,7 +162,9 @@ func _paint(atlas: Image, types: Array[UnitType], columns: int) -> Image:
 		)
 		return null
 	var painted := Image.create_empty(columns * cell, ROWS * cell, false, Image.FORMAT_RGBA8)
-	var kept := Rect2i(0, 0, PIXVOXEL_COLS * cell, ROWS * cell)
+	# Everything the source atlas already holds, including real art in columns we
+	# do not own. Clamped in case the atlas is wider than the roster now needs.
+	var kept := Rect2i(0, 0, mini(atlas.get_width(), columns * cell), ROWS * cell)
 	painted.blit_rect(atlas, kept, Vector2i.ZERO)
 	for row in ROWS:
 		for unit_type in types:
