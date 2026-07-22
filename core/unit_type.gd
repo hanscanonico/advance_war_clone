@@ -59,6 +59,16 @@ const SEA := &"sea"
 @export var can_resupply: bool = false
 ## Column of this unit in the generated units atlas texture.
 @export var atlas_col: int = 0
+## Which weapon signature the battle cut-in fires this unit with — a key into
+## data/battle_anim/, resolved by BattleStyleDB in the presentation layer.
+##
+## A presentation key on a data resource, exactly like `atlas_col` above, and for
+## the same reason: the roster is the one place that knows a Rocket is a Rocket,
+## and neither a column number nor a puff of smoke is a rule. Nothing in core/ or
+## ai/ reads this, and the style it names carries no gameplay number to read.
+## Defaults to unarmed, so a unit that forgets to declare one stages quietly
+## rather than firing something it does not own.
+@export var battle_style: StringName = &"unarmed"
 
 
 ## True when running dry destroys this unit rather than merely stranding it.

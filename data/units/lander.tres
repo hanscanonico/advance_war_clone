@@ -23,3 +23,4 @@ cargo_classes = Array[StringName]([&"foot", &"boot", &"tires", &"treads"])
 unload_terrain = Array[StringName]([&"shoal", &"port"])
 can_resupply = false
 atlas_col = 17
+battle_style = &"unarmed"

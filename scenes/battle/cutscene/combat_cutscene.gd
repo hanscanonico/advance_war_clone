@@ -94,6 +94,11 @@ var _beats := Beats.new()
 var _result: CombatResolver.CombatResult
 var _atk_hp_after := 0
 var _def_hp_after := 0
+## The two weapon signatures this exchange fires with. Read from data, never
+## decided here — see BattleStyle.
+var _styles := BattleStyleDB.new()
+var _atk_style: BattleStyle
+var _def_style: BattleStyle
 ## Cue name -> true once its sound has played, so a beat crossed twice by a
 ## frame boundary is still heard once and a skip is silent rather than a pile-up.
 var _cues: Dictionary = {}
@@ -101,6 +106,7 @@ var _cues: Dictionary = {}
 
 func _ready() -> void:
 	_build()
+	_styles = BattleStyleDB.load_default()
 	_root.hide()
 	set_process(false)
 
@@ -191,11 +197,23 @@ func _pose(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) 
 	_result = result
 	_atk_hp_after = attacker.displayed_hp()
 	_def_hp_after = defender.displayed_hp()
+	_atk_style = _styles.for_unit(attacker.type)
+	_def_style = _styles.for_unit(defender.type)
 	_atk.bind(attacker, _terrain_at(attacker.cell), view.game.owner_at(attacker.cell), false)
 	_def.bind(defender, _terrain_at(defender.cell), view.game.owner_at(defender.cell), true)
 	_atk.hp_shown = result.attacker_hp_before
 	_def.hp_shown = result.defender_hp_before
-	_beats = _plan(result)
+	_squads(_atk, result.attacker_hp_before, _atk_hp_after, result.attacker_died)
+	_squads(_def, result.defender_hp_before, _def_hp_after, result.defender_died)
+	_beats = _plan(result, TRAVEL * _atk_style.travel_scale, TRAVEL * _def_style.travel_scale)
+
+
+## How many figures a side posts and how many it keeps. A side that dies keeps
+## all of them: the blast is what takes it, and toppling them first would leave
+## the explosion going off over an empty patch of ground.
+static func _squads(side: CutsceneSide, before: int, after: int, died: bool) -> void:
+	side.squad_was = CutsceneSide.figures_for(before)
+	side.squad_now = side.squad_was if died else CutsceneSide.figures_for(after)
 
 
 ## The cell's terrain. An attacker fires from the cell it has already been moved
@@ -207,11 +225,15 @@ func _terrain_at(cell: Vector2i) -> TerrainType:
 
 ## The beat sheet, laid out on the clock. Reads only the result's flags, so an
 ## exchange with no counter is genuinely shorter rather than padded with a pause.
-static func _plan(result: CombatResolver.CombatResult) -> Beats:
+## The two travel budgets come from the firing styles — an arcing shell is given
+## longer to get there than a burst of tracer.
+static func _plan(
+	result: CombatResolver.CombatResult, atk_travel: float, def_travel: float
+) -> Beats:
 	var beats := Beats.new()
 	beats.atk_ready = Vector2(WIPE_IN, WIPE_IN + ANTICIPATION)
 	beats.atk_fire = beats.atk_ready.y
-	beats.atk_travel = Vector2(beats.atk_fire, beats.atk_fire + TRAVEL)
+	beats.atk_travel = Vector2(beats.atk_fire, beats.atk_fire + atk_travel)
 	beats.def_impact = Vector2(beats.atk_travel.y - 0.02, beats.atk_travel.y - 0.02 + IMPACT)
 	var settled := beats.def_impact.y
 	if result.defender_died:
@@ -220,7 +242,7 @@ static func _plan(result: CombatResolver.CombatResult) -> Beats:
 	elif result.countered:
 		beats.ctr_ready = Vector2(settled, settled + ANTICIPATION)
 		beats.def_fire = beats.ctr_ready.y
-		beats.def_travel = Vector2(beats.def_fire, beats.def_fire + TRAVEL)
+		beats.def_travel = Vector2(beats.def_fire, beats.def_fire + def_travel)
 		beats.atk_impact = Vector2(beats.def_travel.y - 0.02, beats.def_travel.y - 0.02 + IMPACT)
 		settled = beats.atk_impact.y
 		if result.attacker_died:
@@ -255,6 +277,7 @@ func _apply() -> void:
 	_atk.lunge = _lunge(atk_ready)
 	_atk.flash = maxf(0.0, 1.0 - atk_hit / 0.3) if atk_hit > 0.0 else 0.0
 	_atk.hp_shown = _tick(_result.attacker_hp_before, _atk_hp_after, atk_hit)
+	_atk.fall_p = _window(_topple(_beats.atk_impact))
 	_atk.squad_alpha = 1.0 - atk_gone
 	_atk.queue_redraw()
 
@@ -262,6 +285,7 @@ func _apply() -> void:
 	_def.lunge = _lunge(ctr_ready)
 	_def.flash = maxf(0.0, 1.0 - def_hit / 0.3) if def_hit > 0.0 else 0.0
 	_def.hp_shown = _tick(_result.defender_hp_before, _def_hp_after, def_hit)
+	_def.fall_p = _window(_topple(_beats.def_impact))
 	_def.squad_alpha = 1.0 - def_gone
 	_def.queue_redraw()
 
@@ -297,24 +321,31 @@ func _frame_band(present: float) -> void:
 	)
 
 
+## Which side is firing, what it is firing, and where the blast goes off. Only
+## one volley is ever in the air: the counter cannot start until the first has
+## landed, which is the beat sheet's shape, not a rule enforced here.
 func _frame_fx(present: float) -> void:
-	var from_atk := _atk.position + _atk.barrel_point()
-	var from_def := _def.position + _def.barrel_point()
 	var outgoing := _window(_beats.atk_travel)
 	var returning := _window(_beats.def_travel)
-	_fx.tracer_p = 0.0
+	_fx.volley_p = 0.0
+	_fx.volley_style = null
 	if outgoing > 0.0 and outgoing < 1.0:
-		_fx.tracer_p = outgoing
-		_fx.tracer_from = from_atk
-		_fx.tracer_to = from_def
-		_fx.tracer_tint = CutsceneFx.TRACER_ATK
+		_aim(_atk, _def, outgoing, _atk_style)
 	elif returning > 0.0 and returning < 1.0:
-		_fx.tracer_p = returning
-		_fx.tracer_from = from_def
-		_fx.tracer_to = from_atk
-		_fx.tracer_tint = CutsceneFx.TRACER_DEF
-	_fx.muzzle_on = _flashing(_beats.atk_fire) or _flashing(_beats.def_fire)
-	_fx.muzzle_at = from_atk if _flashing(_beats.atk_fire) else from_def
+		_aim(_def, _atk, returning, _def_style)
+	_fx.muzzles = PackedVector2Array()
+	_fx.muzzle_radius = 0.0
+	if _flashing(_beats.atk_fire) and _atk_style.fires():
+		_flash_barrels(_atk, _atk_style)
+	elif _flashing(_beats.def_fire) and _def_style.fires():
+		_flash_barrels(_def, _def_style)
+	var def_gone := _window(_beats.def_death)
+	_fx.blast_p = def_gone if def_gone > 0.0 else _window(_beats.atk_death)
+	_fx.blast_at = (
+		_def.position + _def.center_point()
+		if def_gone > 0.0
+		else (_atk.position + _atk.center_point())
+	)
 	_fx.vs_alpha = present * (1.0 - clampf(_t / maxf(_beats.atk_fire, 0.01), 0.0, 1.0))
 	_fx.def_amount = _result.defender_hp_before - _def_hp_after
 	_fx.def_tag = CutsceneFx.KO_TAG if _result.defender_died else ""
@@ -328,14 +359,42 @@ func _frame_fx(present: float) -> void:
 	_fx.queue_redraw()
 
 
+## Points the volley from the front rank of one squad at the middle of the
+## other's, so a burst converges on what it is shooting at rather than at one
+## figure of it.
+func _aim(from: CutsceneSide, at: CutsceneSide, progress: float, style: BattleStyle) -> void:
+	var barrels := from.muzzle_points()
+	var origin := (
+		from.position + barrels[barrels.size() - 1]
+		if not barrels.is_empty()
+		else from.position + from.center_point()
+	)
+	_fx.volley_p = progress
+	_fx.volley_style = style
+	_fx.volley_figures = maxi(barrels.size(), 1)
+	_fx.volley_from = origin
+	_fx.volley_to = at.position + at.center_point()
+
+
+## Lights every standing figure's barrel on the firing side.
+func _flash_barrels(side: CutsceneSide, style: BattleStyle) -> void:
+	var points := PackedVector2Array()
+	for at in side.muzzle_points():
+		points.append(side.position + at)
+	_fx.muzzles = points
+	_fx.muzzle_radius = style.muzzle
+
+
 ## Fires the shot and explosion sounds as their beats come up. Silent during a
 ## fast-forward — skipping past four beats should not play four sounds at once —
 ## and silent for a posed still, which has no beats to cross.
 func _sound() -> void:
 	if not _playing:
 		return
-	_cue(&"atk_fire", _beats.atk_fire, &"shot")
-	_cue(&"def_fire", _beats.def_fire, &"shot")
+	if _atk_style.fires():
+		_cue(&"atk_fire", _beats.atk_fire, _atk_style.sfx)
+	if _def_style.fires():
+		_cue(&"def_fire", _beats.def_fire, _def_style.sfx)
 	_cue(&"def_death", _beats.def_death.x, &"explosion")
 	_cue(&"atk_death", _beats.atk_death.x, &"explosion")
 
@@ -358,6 +417,14 @@ func _window(span: Vector2) -> float:
 	if span.y <= span.x:
 		return 0.0
 	return clampf((_t - span.x) / (span.y - span.x), 0.0, 1.0)
+
+
+## The window surplus figures topple over: it opens just after the round lands
+## and closes with the impact, leaving room for the per-figure stagger.
+static func _topple(impact: Vector2) -> Vector2:
+	if impact.y <= impact.x:
+		return Vector2.ZERO
+	return Vector2(impact.x + 0.06, impact.y + 0.1)
 
 
 ## The window a damage callout is shown over: it outlives the impact, and a
@@ -397,10 +464,11 @@ func _flashing(at: float) -> bool:
 	return at > 0.0 and _t >= at and _t < at + 0.09
 
 
-## Just above a side's figure, in the overlay's coordinates — where that side's
-## damage callout is anchored.
+## Just above a side's squad, in the overlay's coordinates — where that side's
+## damage callout is anchored. Taken from the middle of a *full* squad, so the
+## number does not drift sideways as figures fall out from under it.
 static func _head_of(side: CutsceneSide) -> Vector2:
-	return side.position + side.barrel_point() + Vector2(0.0, -46.0)
+	return side.position + side.center_point() + Vector2(0.0, -56.0)
 
 
 # --- nodes -------------------------------------------------------------------

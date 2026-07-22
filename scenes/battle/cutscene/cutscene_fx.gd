@@ -15,20 +15,34 @@ const KO_TAG := "K.O."
 
 const INK := Color(0.078, 0.090, 0.102)
 const FLASH_GOLD := Color(0.988, 0.847, 0.353)
-const TRACER_ATK := Color(1.0, 0.949, 0.659)
-const TRACER_DEF := Color(0.812, 0.878, 1.0)
 const KO_RED := Color(0.902, 0.302, 0.243)
+
+## Ceiling on rounds drawn per volley. Five figures firing three apiece is
+## fifteen dashes on a 640 px stage, which reads as a smear rather than a burst.
+const MAX_ROUNDS := 8
+## How far apart, in travel progress, consecutive rounds leave the barrel.
+const ROUND_STAGGER := 0.085
 
 # --- pose, written every frame by CombatCutscene ------------------------------
 
 ## 0 while nothing is in flight; otherwise the volley's travel, 0 -> 1.
-var tracer_p := 0.0
-var tracer_from := Vector2.ZERO
-var tracer_to := Vector2.ZERO
-var tracer_tint := TRACER_ATK
-## Set for the handful of frames a barrel is alight.
-var muzzle_at := Vector2.ZERO
-var muzzle_on := false
+var volley_p := 0.0
+var volley_from := Vector2.ZERO
+var volley_to := Vector2.ZERO
+## The firing side's BattleStyle: what the rounds look like, how many there are,
+## and how high they arc. Never null while a volley is up.
+var volley_style: BattleStyle
+## How many figures are firing it. Held separately from `muzzles`, which is only
+## populated for the few frames the barrels are alight — the volley outlives the
+## flash, and a squad that has already stopped flashing is still five men firing.
+var volley_figures := 1
+## Every barrel alight this frame — one per standing figure. Empty for all but
+## the handful of frames after a volley leaves.
+var muzzles := PackedVector2Array()
+var muzzle_radius := 0.0
+## The kill blast, 0 -> 1, and where it goes off.
+var blast_p := 0.0
+var blast_at := Vector2.ZERO
 ## Fades out as the first volley leaves — the badge belongs to the stare-down.
 var vs_alpha := 0.0
 ## Damage callouts, keyed left (attacker) and right (defender). `amount` is the
@@ -53,37 +67,131 @@ func _ready() -> void:
 func _draw() -> void:
 	if vs_alpha > 0.0:
 		_draw_vs()
-	if muzzle_on:
-		_draw_muzzle(muzzle_at)
-	if tracer_p > 0.0 and tracer_p < 1.0:
-		_draw_tracer()
+	for at in muzzles:
+		_draw_muzzle(at)
+	if volley_p > 0.0 and volley_p < 1.0 and volley_style != null:
+		_draw_volley()
+	if blast_p > 0.0 and blast_p < 1.0:
+		_draw_blast()
 	_draw_callout(atk_at, atk_amount, atk_tag, atk_p)
 	_draw_callout(def_at, def_amount, def_tag, def_p)
 
 
-## Three dashes chasing each other along the firing line: the leading one at the
-## volley's position, the rest trailing and dimming.
-func _draw_tracer() -> void:
-	for i in 3:
-		var lag := clampf(tracer_p - i * 0.09, 0.0, 1.0)
-		if lag <= 0.0:
+## The volley in flight, drawn the way its style says. Rounds are staggered along
+## the firing line so a squad's burst reads as several shots rather than one
+## thick dash, and the whole thing is a function of `volley_p` like everything
+## else here.
+func _draw_volley() -> void:
+	if not volley_style.fires():
+		return
+	var rounds := mini(volley_style.shots_per_figure * maxi(volley_figures, 1), MAX_ROUNDS)
+	for i in rounds:
+		var lag := clampf(volley_p - i * ROUND_STAGGER, 0.0, 1.0)
+		if lag <= 0.0 or lag >= 1.0:
 			continue
-		var at := tracer_from.lerp(tracer_to, lag)
-		var length := 12.0 - i * 3.0
-		var toward := signf(tracer_to.x - tracer_from.x)
-		var tint := Color(tracer_tint, 1.0 - i * 0.28)
-		draw_rect(Rect2(at.x - (length if toward < 0.0 else 0.0), at.y - 1.5, length, 3.0), tint)
+		_draw_round(lag, i)
 
 
-## A four-pointed star at the barrel, drawn once per volley for a few frames.
+## One round, at `lag` along its travel. A flat style draws a bright dash on the
+## firing line; an arcing one lifts off it by `arc` and carries a fatter head, so
+## a shell is legible as a shell without a second sprite.
+func _draw_round(lag: float, index: int) -> void:
+	var at := volley_from.lerp(volley_to, lag)
+	at.y -= sin(lag * PI) * volley_style.arc
+	# Rounds after the first are nudged off the line so they do not stack.
+	at.y += (index % 3 - 1) * 3.0
+	var toward := signf(volley_to.x - volley_from.x)
+	var tint := Color(volley_style.tint, 1.0 - index * 0.09)
+	if volley_style.projectile == BattleStyle.SHELL:
+		# A heavy round: a hot head with a short streak of its own smoke behind
+		# it, so a single shell is as legible as a wall of tracer.
+		for trail in 3:
+			var back := at - Vector2(toward * (7.0 + trail * 6.0), -trail * 1.5)
+			draw_circle(back, 4.0 - trail, Color(tint, tint.a * (0.4 - trail * 0.1)))
+		draw_circle(at, 6.0, Color(INK, tint.a * 0.9))
+		draw_circle(at, 4.5, tint)
+		draw_circle(at, 2.0, Color(1.0, 1.0, 1.0, tint.a))
+		return
+	var length := 14.0
+	var body := Rect2(at.x - (length if toward < 0.0 else 0.0), at.y - 2.0, length, 4.0)
+	draw_rect(body.grow(1.0), Color(INK, tint.a * 0.8))
+	draw_rect(body, tint)
+
+
+## A four-pointed star at the barrel, drawn for the few frames after a volley
+## leaves. One per standing figure, so a full squad lights up along its whole
+## front and a lone survivor gives off a single flash.
 func _draw_muzzle(at: Vector2) -> void:
+	if muzzle_radius <= 0.0:
+		return
 	var points := PackedVector2Array()
 	for i in 8:
-		var reach := 14.0 if i % 2 == 0 else 4.5
+		var reach := muzzle_radius if i % 2 == 0 else muzzle_radius * 0.32
 		var angle := float(i) * PI / 4.0
 		points.append(at + Vector2(cos(angle), sin(angle)) * reach)
 	draw_colored_polygon(points, FLASH_GOLD)
-	draw_circle(at, 5.0, Color(1.0, 1.0, 1.0, 0.95))
+	draw_circle(at, muzzle_radius * 0.35, Color(1.0, 1.0, 1.0, 0.95))
+
+
+## The kill blast: a shock ring running out ahead of a ragged fireball, debris
+## thrown clear on a ballistic arc, and smoke left rising behind it. Original and
+## procedural — no explosion sheet, which is the fence D2 puts around this whole
+## feature.
+##
+## The fireball is a jagged star rather than a disc on purpose: nested circles
+## read as a bullseye at this size, and a torn silhouette reads as a blast.
+func _draw_blast() -> void:
+	var ring := ramp(blast_p, [0.0, 1.0], [14.0, 104.0])
+	var ring_alpha := ramp(blast_p, [0.0, 0.3, 1.0], [0.9, 0.28, 0.0])
+	draw_arc(blast_at, ring, 0.0, TAU, 28, Color(1.0, 1.0, 1.0, ring_alpha), 2.0)
+	_draw_debris()
+	_draw_smoke()
+	var core := ramp(blast_p, [0.0, 0.22, 1.0], [4.0, 54.0, 18.0])
+	var core_alpha := ramp(blast_p, [0.0, 0.15, 0.7, 1.0], [0.0, 1.0, 0.6, 0.0])
+	_draw_flare(core, Color(KO_RED, core_alpha * 0.9), 0.0)
+	_draw_flare(core * 0.68, Color(FLASH_GOLD, core_alpha), 0.42)
+	_draw_flare(core * 0.34, Color(1.0, 1.0, 1.0, core_alpha), 0.84)
+
+
+## One ragged ring of the fireball: alternating long and short spokes, rotated so
+## the three layers do not line their teeth up.
+func _draw_flare(reach: float, tint: Color, turn: float) -> void:
+	if reach <= 0.0 or tint.a <= 0.0:
+		return
+	var points := PackedVector2Array()
+	var spokes := 18
+	for i in spokes:
+		var angle := turn + float(i) * TAU / spokes
+		var length := reach if i % 2 == 0 else reach * 0.66
+		points.append(blast_at + Vector2(cos(angle), sin(angle) * 0.86) * length)
+	draw_colored_polygon(points, tint)
+
+
+## Wreckage thrown clear: out fast, then dragged down, so it arcs instead of
+## sliding along a straight line out of the fireball.
+func _draw_debris() -> void:
+	var alpha := ramp(blast_p, [0.0, 0.1, 0.75, 1.0], [0.0, 1.0, 0.9, 0.0])
+	for i in 12:
+		var angle := float(i) * TAU / 12.0 + (i % 3) * 0.17
+		var reach := ramp(blast_p, [0.0, 0.6, 1.0], [4.0, 58.0 + (i % 4) * 16.0, 96.0])
+		var drop := blast_p * blast_p * 54.0
+		var at := blast_at + Vector2(cos(angle), sin(angle) * 0.7) * reach + Vector2(0.0, drop)
+		var chip := 7.0 - (i % 3) * 1.5
+		draw_rect(
+			Rect2(at - Vector2(chip, chip) * 0.5, Vector2(chip, chip)),
+			Color(FLASH_GOLD if i % 2 == 0 else KO_RED, alpha)
+		)
+
+
+## What is left over the wreck once the fire is out.
+func _draw_smoke() -> void:
+	var alpha := ramp(blast_p, [0.0, 0.35, 0.7, 1.0], [0.0, 0.0, 0.45, 0.0])
+	if alpha <= 0.0:
+		return
+	for i in 4:
+		var lift := ramp(blast_p, [0.35, 1.0], [0.0, 34.0 + i * 9.0])
+		var at := blast_at + Vector2((i - 1.5) * 15.0, -lift)
+		draw_circle(at, 13.0 + i * 2.5, Color(0.35, 0.34, 0.36, alpha))
 
 
 ## The damage that landed, rising and fading over the side it landed on. Scaled

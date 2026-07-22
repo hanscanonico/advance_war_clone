@@ -27,6 +27,9 @@ const DEMO_SEED := 2026
 ## callout is at full. Any moment would be byte-stable — the cut-in is a pure
 ## function of its clock — but this is the one that shows the most.
 const CUT_IN_POSE := 0.95
+## And where `cutin_ko` is posed: the blast at its brightest, a third of the way
+## into the death beat, with the K.O. tag already up.
+const KO_POSE := 1.15
 
 var _battle: Battle
 var _shot_path := ""
@@ -160,8 +163,8 @@ func _run_demo(mode: String) -> void:
 			await _until_state(Battle.State.MENU)
 		"powermenu":
 			await _run_power_menu_demo()
-		"cutin":
-			_stage_cut_in()
+		"cutin", "cutin_ko":
+			_stage_cut_in(mode == "cutin_ko")
 		"ambush", "vanish":
 			_run_vanish_demo(mode)
 		"power_ready":
@@ -302,18 +305,22 @@ func _run_vanish_demo(mode: String) -> void:
 ## real resolver, frozen at one moment of the cut-in's own clock.
 ##
 ## The defender is softened first so the frame shows a mid-fight exchange with
-## both sides marked, rather than two units at full health.
-func _stage_cut_in() -> void:
+## both sides marked, rather than two units at full health. `lethal` softens it
+## all the way instead, which is the other half of the check: the kill branch
+## takes the explosion, and nothing about it is shared with the survival branch.
+func _stage_cut_in(lethal: bool) -> void:
 	var game := _battle.game
 	var attacker := game.unit_at(Vector2i(8, 8))  # red tank
 	var defender := game.unit_at(Vector2i(9, 8))  # blue tank
 	if attacker == null or defender == null:
 		push_error("cutin demo: the two frontline tanks are not where it expects them")
 		return
-	defender.hp = 74
+	defender.hp = 10 if lethal else 74
 	var result := CombatResolver.resolve(game, attacker, defender)
 	_battle.view.sync_sprites()
-	_battle.animator.cutscene.pose_at(result, attacker, defender, CUT_IN_POSE)
+	_battle.animator.cutscene.pose_at(
+		result, attacker, defender, KO_POSE if lethal else CUT_IN_POSE
+	)
 
 
 ## Sets Red's commander and, optionally, fills its meter, then refreshes the HUD

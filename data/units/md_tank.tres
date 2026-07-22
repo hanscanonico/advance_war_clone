@@ -21,3 +21,4 @@ max_ammo = 8
 transport_capacity = 0
 cargo_classes = Array[StringName]([])
 atlas_col = 4
+battle_style = &"cannon"

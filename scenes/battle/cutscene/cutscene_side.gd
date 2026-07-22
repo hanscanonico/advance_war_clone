@@ -20,10 +20,29 @@ const GROUND_RATIO := 0.45
 ## Figures are the 64 px atlas art at its own resolution — nearest-neighbour
 ## scaling of pixel art to a fractional size drops rows unevenly, so it isn't.
 const FIGURE_PX := 64
-## How far in from the outer edge the squad stands.
-const SQUAD_INSET := 96.0
+## How far in from the outer edge the squad's *middle* sits. Squads are centred
+## on this whatever their size, so a lone 1 HP straggler holds the same ground a
+## full five did rather than standing off at the edge of the frame where the
+## outermost of five would have been.
+const SQUAD_CENTER := 132.0
 ## Where the figures' feet sit, as a share of the arena height.
 const FEET_RATIO := 0.86
+## Advance Wars' rule: one figure per two displayed HP, so a full squad is five
+## and a battered 1 HP straggler fights alone (plan D3). Figures carry the feel;
+## the pip bar above them carries the exact number.
+const MAX_FIGURES := 5
+## Where each figure stands, offset from the outermost one. Staggered rather than
+## in a line so five 64 px sprites read as a cluster instead of a row, and drawn
+## back to front so the outermost is the one in front.
+const SLOTS: Array[Vector2] = [
+	Vector2(0.0, 6.0),
+	Vector2(44.0, -12.0),
+	Vector2(86.0, 9.0),
+	Vector2(128.0, -8.0),
+	Vector2(168.0, 13.0),
+]
+## How far apart, in fall progress, consecutive figures start toppling.
+const TOPPLE_STAGGER := 0.13
 
 const INK := Color(0.078, 0.090, 0.102)
 const SLATE_800 := Color(0.161, 0.184, 0.212)
@@ -36,6 +55,8 @@ const HP_MID := Color(0.910, 0.722, 0.227)
 const HP_LOW := Color(0.863, 0.282, 0.235)
 const HP_EMPTY := Color(1.0, 1.0, 1.0, 0.12)
 const PLATE_TEXT := Color(1.0, 1.0, 1.0, 0.88)
+## What a knocked-out figure burns down to on its way off the field.
+const WRECK_TINT := Color(0.22, 0.20, 0.21)
 
 const PIP_COUNT := 10
 const PIP_SIZE := Vector2(6, 8)
@@ -66,11 +87,20 @@ var mirror := false
 ## Displayed HP the pips currently show. Ticks from the result's snapshot to the
 ## unit's real HP across the impact beat.
 var hp_shown := 10
+## How many figures this side ends the exchange with, and how many it started
+## with. Both are whole counts written by the director rather than derived from
+## the ticking `hp_shown`, so surplus figures topple once, together, from the
+## start of their fall — deriving them mid-tick pops a figure into a topple that
+## is already half over.
+var squad_now := MAX_FIGURES
+var squad_was := MAX_FIGURES
+## 0 -> 1 as the surplus figures rise, spin and fall away.
+var fall_p := 0.0
 ## Recoil offset along the firing axis: negative pulls back, positive thrusts.
 var lunge := 0.0
 ## 0 -> 1 white over-brighten on taking a hit.
 var flash := 0.0
-## Fades the whole squad out — the shell's stand-in for the death explosion.
+## Fades whatever is left standing — what the death explosion takes with it.
 var squad_alpha := 1.0
 ## 0 -> 1 as the plates slide in and their text appears.
 var plate_p := 0.0
@@ -95,19 +125,45 @@ func bind(p_unit: Unit, p_terrain: TerrainType, p_owner_team: int, p_mirror: boo
 	_ridge_tint = _ground_tint(p_terrain.atlas_col, _atlas_row())
 
 
-## Where this side's volley leaves from and where the other side's lands, in
-## this control's own coordinates. Asked by CombatCutscene so the firing line is
-## derived from the same layout numbers the figures are drawn with, rather than
-## hand-tuned twice.
-func barrel_point() -> Vector2:
-	return figure_point(_arena()) + Vector2(_inward(24.0), -34.0)
+## Advance Wars' squad rule: one figure per two displayed HP, capped at five.
+## Zero only ever means dead.
+static func figures_for(displayed_hp: int) -> int:
+	return clampi(ceili(displayed_hp / 2.0), 0, MAX_FIGURES)
 
 
-## Where this side's figure stands, in this control's coordinates. The damage
-## callout is anchored to it too, so what a hit costs is printed over the thing
-## that took it rather than at a fixed share of the frame.
-func figure_point(arena: Rect2) -> Vector2:
-	return Vector2(_outward_px(SQUAD_INSET), arena.position.y + arena.size.y * FEET_RATIO)
+## Every standing figure's barrel, in this control's coordinates, innermost last
+## — the muzzle flashes go on all of them and the volley leaves from the last,
+## which is the figure nearest the enemy. Derived from the same layout numbers
+## the squad is drawn with rather than hand-tuned twice.
+func muzzle_points() -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var arena := _arena()
+	for slot in squad_now:
+		points.append(figure_point(arena, slot) + Vector2(_inward(22.0), -34.0))
+	return points
+
+
+## Where one figure of the squad stands, in this control's coordinates.
+##
+## The formation is laid out from its own middle rather than from its outermost
+## figure: the posted squad's span is measured off `squad_was` and halved, so
+## every size stays centred on SQUAD_CENTER.
+func figure_point(arena: Rect2, slot: int) -> Vector2:
+	var offset: Vector2 = SLOTS[clampi(slot, 0, SLOTS.size() - 1)]
+	var span: float = SLOTS[clampi(squad_was - 1, 0, SLOTS.size() - 1)].x
+	return Vector2(
+		_outward_px(SQUAD_CENTER - span * 0.5 + offset.x),
+		arena.position.y + arena.size.y * FEET_RATIO + offset.y
+	)
+
+
+## Where this side's callout sits, where an incoming round is aimed, and where
+## the kill blast goes off: the middle of the squad, at body height rather than
+## down at its feet. Fixed for the whole cut-in, so nothing anchored here drifts
+## sideways as figures fall out from under it.
+func center_point() -> Vector2:
+	var arena := _arena()
+	return Vector2(_outward_px(SQUAD_CENTER), arena.position.y + arena.size.y * FEET_RATIO - 28.0)
 
 
 func _arena() -> Rect2:
@@ -240,31 +296,67 @@ func _draw_vignette(arena: Rect2) -> void:
 # --- the squad ---------------------------------------------------------------
 
 
-## The one figure BA1 poses. Its feet sit on the ground line, it faces the seam,
-## and it carries the whole of the exchange the plates are describing.
+## The squad: one figure per two HP the side went in with, the surplus toppling
+## away as the volley lands. Drawn back to front so the outermost figure — the
+## one nearest the camera's edge of the frame — is the one in front.
 func _draw_squad(arena: Rect2) -> void:
 	if squad_alpha <= 0.0:
 		return
-	var feet := figure_point(arena)
-	# A flattened disc, not a circle: the light is high and the ground is a
-	# plane, so the contact shadow has to lie down on it.
+	var posted := maxi(squad_now, squad_was)
+	# Each falls a beat after the one before it, so a squad losing three figures
+	# reads as three going down rather than a row vanishing. `reach` is what pays
+	# for that: the last one to start still has a full fall left when the window
+	# closes, so the run has to be long enough for all of them to finish it.
+	var reach := 1.0 + TOPPLE_STAGGER * maxf(posted - squad_now - 1, 0.0)
+	for slot in range(posted - 1, -1, -1):
+		var feet := figure_point(arena, slot)
+		var toppling := slot >= squad_now
+		var fall := 0.0
+		if toppling:
+			fall = clampf(fall_p * reach - (slot - squad_now) * TOPPLE_STAGGER, 0.0, 1.0)
+		if fall >= 1.0:
+			continue
+		_draw_shadow(feet, 1.0 - fall)
+		_draw_figure(feet + Vector2(_inward(lunge), 0.0), fall, not toppling)
+
+
+## A flattened disc, not a circle: the light is high and the ground is a plane,
+## so the contact shadow has to lie down on it.
+func _draw_shadow(feet: Vector2, strength: float) -> void:
 	draw_set_transform(feet + Vector2(0.0, -2.0), 0.0, Vector2(1.0, 0.3))
-	draw_circle(Vector2.ZERO, 24.0, Color(0.078, 0.102, 0.133, 0.3 * squad_alpha))
+	draw_circle(Vector2.ZERO, 22.0, Color(0.078, 0.102, 0.133, 0.3 * strength * squad_alpha))
 	draw_set_transform(Vector2.ZERO)
-	_draw_figure(feet + Vector2(_inward(lunge), 0.0))
 
 
 ## One figure, standing on `feet` and facing the seam. Drawn twice: a hard offset
 ## shadow first, then the art, over-brightened while flashing — the same
 ## white-hit language UnitSprite already uses on the board.
-func _draw_figure(feet: Vector2) -> void:
+##
+## `fall` above zero knocks it out: kicked up and back, tipping over, burning
+## down to a dark silhouette as it goes. The tip is deliberately shallow — these
+## are the board's own three-quarter-view sprites, and spinning one right over
+## reads as a rendering glitch rather than a casualty (plan R3).
+##
+## A figure already on its way down does not flash: it has taken its hit.
+func _draw_figure(feet: Vector2, fall: float, hittable: bool) -> void:
 	var flip := Vector2(-1.0 if mirror else 1.0, 1.0)
 	var box := Rect2(-FIGURE_PX * 0.5, -FIGURE_PX, FIGURE_PX, FIGURE_PX)
-	draw_set_transform_matrix(Transform2D(0.0, flip, 0.0, feet))
-	var shadow := Color(0.137, 0.153, 0.169, 0.4 * squad_alpha)
+	var lift := 0.0
+	var spin := 0.0
+	var alpha := squad_alpha
+	var tint := Color(1.0, 1.0, 1.0)
+	if fall > 0.0:
+		lift = CutsceneFx.ramp(fall, [0.0, 0.3, 1.0], [0.0, -13.0, 46.0])
+		spin = CutsceneFx.ramp(fall, [0.0, 1.0], [0.0, _inward(-0.55)])
+		alpha *= CutsceneFx.ramp(fall, [0.0, 0.55, 1.0], [1.0, 1.0, 0.0])
+		tint = tint.lerp(WRECK_TINT, CutsceneFx.ramp(fall, [0.0, 0.35, 1.0], [0.0, 0.85, 1.0]))
+	elif hittable:
+		tint = tint.lerp(Color(3.4, 3.4, 3.4), flash)
+	var at := feet + Vector2(_inward(-fall * 10.0), lift)
+	draw_set_transform_matrix(Transform2D(spin, flip, 0.0, at))
+	var shadow := Color(0.137, 0.153, 0.169, 0.4 * alpha)
 	draw_texture_rect(_art, Rect2(box.position + Vector2(2.0, 3.0), box.size), false, shadow)
-	var tint := Color(1.0, 1.0, 1.0).lerp(Color(3.4, 3.4, 3.4), flash)
-	tint.a = squad_alpha
+	tint.a = alpha
 	draw_texture_rect(_art, box, false, tint)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 

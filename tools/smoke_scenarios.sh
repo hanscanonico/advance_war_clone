@@ -71,7 +71,7 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # cut-in that stopped rendering, or a unit or terrain it could not draw, fails
 # here rather than in play.
 DEFAULT_MODES=(
-	attack resolve cutin capture build buildmenu endturn
+	attack resolve cutin cutin_ko capture build buildmenu endturn
 	load cargo drop transport supply divemenu dive mapmenu powermenu victory aiturn
 	powermenu+fog victory+fog ambush vanish
 	power_ready power_active power_banner commander_info commander_victory

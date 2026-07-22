@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BattleStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/cutscene/battle_style.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"small_arms"
+projectile = &"tracer"
+shots_per_figure = 3
+sfx = &"shot"
+travel_scale = 0.85
+arc = 0.0
+tint = Color(1, 0.94, 0.62, 1)
+muzzle = 9.0

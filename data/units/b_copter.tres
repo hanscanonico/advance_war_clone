@@ -22,3 +22,4 @@ transport_capacity = 0
 cargo_classes = Array[StringName]([])
 can_resupply = false
 atlas_col = 11
+battle_style = &"small_arms"
