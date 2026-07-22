@@ -78,7 +78,23 @@ func _save() -> void:
 func _apply_cmdline() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with(SPEED_ARG):
-			pin(StringName(arg.get_slice("=", 1).strip_edges()))
+			var wanted := StringName(arg.get_slice("=", 1).strip_edges())
+			# Checked here rather than inside pin(), which is only ever handed an
+			# id from the source: a capture must not pay for the check or risk a
+			# spurious error. A name nothing answers to is said out loud and then
+			# dropped entirely — the shape battle_setup answers an unknown --map=
+			# with. Half-applying it would be worse than ignoring it: the pin
+			# below latches the file shut, so a typo would silently stop writing
+			# every speed the player picked for the rest of the session.
+			if not GameSpeed.has_id(wanted):
+				push_error(
+					(
+						"Settings: unknown speed '%s'; keeping %s. Known: %s"
+						% [wanted, speed.id, ", ".join(GameSpeed.ids())]
+					)
+				)
+				continue
+			pin(wanted)
 			# Latched after that pin, so the flag's own lands and every later
 			# one — a capture's — is declined.
 			_flag_wins = true

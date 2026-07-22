@@ -89,6 +89,11 @@ static func ordered() -> Array[GameSpeed]:
 	if _ordered.is_empty():
 		for tier: Dictionary in TIERS:
 			_ordered.append(GameSpeed.new(tier))
+		# Handed out by reference to every caller, so the table itself is frozen
+		# rather than copied per call — the shared instances are the point. The
+		# freeze is the Array's; a tier's own fields are never written after
+		# _init.
+		_ordered.make_read_only()
 	return _ordered
 
 
@@ -107,6 +112,24 @@ static func by_id(wanted: StringName) -> GameSpeed:
 		if tier.id == wanted:
 			return tier
 	return default_speed()
+
+
+## True when `wanted` names a tier. `by_id` answering a stranger with the default
+## is right for stored state, which may predate a renamed tier, but wrong for an
+## id someone typed just now: a caller that must say so out loud asks this first.
+static func has_id(wanted: StringName) -> bool:
+	for tier in ordered():
+		if tier.id == wanted:
+			return true
+	return false
+
+
+## Every tier id in menu order — what a diagnostic lists when an id names none.
+static func ids() -> PackedStringArray:
+	var known := PackedStringArray()
+	for tier in ordered():
+		known.append(String(tier.id))
+	return known
 
 
 ## The tier after `wanted` in menu order, wrapping — what the in-battle Speed

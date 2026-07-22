@@ -36,7 +36,15 @@ func _ready() -> void:
 	if shot_path != "":
 		# The battle scene's rule, and for the same reason: a capture must not
 		# show — or depend on — the preference of the machine that took it.
-		Settings.pin(GameSpeed.CAPTURE_ID)
+		#
+		# Deliberately not the battle scene's tier, and don't unify the two: there
+		# the pin has work to do — it suppresses animations a still frame cannot
+		# photograph anyway, and buys `make smoke` its speedup — whereas this menu
+		# animates nothing, so the pin's only observable effect is the Speed
+		# dropdown's text. The default is exactly as machine-independent and shows
+		# the tier a fresh install actually ships with; CAPTURE_ID is Instant,
+		# which no player starts on.
+		Settings.pin(GameSpeed.DEFAULT_ID)
 	_populate_maps()
 	_populate_difficulties()
 	_populate_speeds()
