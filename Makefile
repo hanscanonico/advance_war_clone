@@ -1,4 +1,9 @@
 GODOT := bin/Godot.app/Contents/MacOS/Godot
+# Windowed launches go through a wrapper that hands window focus straight back
+# when the launch came from a script or an agent (no tty); from an interactive
+# terminal it execs $(GODOT) directly. See tools/godot_gui.sh for why the
+# steal can't be prevented outright.
+GODOT_GUI := GODOT="$(GODOT)" tools/godot_gui.sh
 BATTLE := scenes/battle/battle.tscn
 # The 36 source sprites the atlases are built from are vendored (CC0), so a
 # fresh clone rebuilds with no setup. Override to build from a full extracted
@@ -6,10 +11,10 @@ BATTLE := scenes/battle/battle.tscn
 PIXVOXEL ?= assets/sprites/pixvoxel_src
 
 run: import
-	$(GODOT) --path .
+	$(GODOT_GUI) --path .
 
 hotseat: import
-	$(GODOT) --path . $(BATTLE) -- --hotseat
+	$(GODOT_GUI) --path . $(BATTLE) -- --hotseat
 
 test:
 	$(GODOT) --headless --path . -s res://addons/gut/gut_cmdln.gd
@@ -133,15 +138,15 @@ import:
 
 # The battle scene is launched directly so demos and captures skip the menu.
 screenshot: import
-	$(GODOT) --path . $(BATTLE) -- --screenshot=$(CURDIR)/screenshot.png
+	$(GODOT_GUI) --path . $(BATTLE) -- --screenshot=$(CURDIR)/screenshot.png
 
 menu-screenshot: import
-	$(GODOT) --path . -- --screenshot=$(CURDIR)/screenshot.png
+	$(GODOT_GUI) --path . -- --screenshot=$(CURDIR)/screenshot.png
 
 # The G1 gate: renders a card for all thirteen commander records at once, so a
 # missing portrait or empty copy field shows up as a crash or a blank card.
 gallery-screenshot: import
-	$(GODOT) --path . scenes/menu/commander_gallery.tscn -- --screenshot=$(CURDIR)/screenshot.png
+	$(GODOT_GUI) --path . scenes/menu/commander_gallery.tscn -- --screenshot=$(CURDIR)/screenshot.png
 
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
 	sprites-check ground sprites unit-placeholders sfx portraits import screenshot \

@@ -29,6 +29,12 @@ set -uo pipefail
 
 GODOT="${GODOT:-bin/Godot.app/Contents/MacOS/Godot}"
 BATTLE="${BATTLE:-scenes/battle/battle.tscn}"
+# Every scenario opens a window. Launching through the wrapper keeps a
+# scripted/agent run (no tty) from stealing the user's window focus 26 times;
+# interactive runs exec $GODOT directly as before. The wrapper `exec`s the
+# engine, so run_with_timeout's kill still lands on the Godot process itself.
+export GODOT
+GODOT_GUI="$(cd "$(dirname "$0")" && pwd)/godot_gui.sh"
 # Generous: `aiturn` plays a whole AI turn with per-command animation delays.
 # This only has to catch a genuinely stuck scene, not time anything.
 SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-90}"
@@ -119,7 +125,7 @@ for mode in "${modes[@]}"; do
 	case "$demo" in
 		divemenu | dive) godot_args+=(--map=the_straits) ;;
 	esac
-	run_with_timeout "$SMOKE_TIMEOUT" "$GODOT" "${godot_args[@]}"
+	run_with_timeout "$SMOKE_TIMEOUT" "$GODOT_GUI" "${godot_args[@]}"
 	status=$?
 
 	if ((status == 124)); then
