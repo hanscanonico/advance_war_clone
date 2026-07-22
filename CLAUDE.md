@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** seven designs of record, all worth reading before an architectural decision.
+- **Status:** eight designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -37,6 +37,17 @@ three movement domains (land, air, sea), property capture and income, and a comp
   the one match loop, `make commander-balance` and `make difficulty-check` are byte-stable presets
   over it, and the merge bar for touching it is a fixed-seed byte-diff of both their reports — two
   committed documents rest on those numbers. `docs/balance_sim.md` is how to run and read it.
+  `.lavish/game-speed-plan.html` owns the game-speed setting — milestones GS1–GS3 and the four
+  locked decisions (D1 a device preference in `user://settings.cfg`, never `MatchConfig` and never
+  a save, so a resumed match plays at the speed you like today; D2 the numbers as constants on the
+  `GameSpeed` presentation class rather than a `.tres` under `data/`, deliberately breaking the
+  difficulty tiers' symmetry; D3 Normal is the default at twice the movement duration, with Quick
+  reproducing the old feel bit for bit; D4 Instant is an explicit branch, in the tradition of the
+  animator's `capturing` flag, not an animation scale of zero). D2 exists to protect the standing
+  invariant: **nothing under `core/` or `ai/` may import `GameSpeed` or read `Settings`**, which is
+  what keeps pacing unable to move an outcome, a save or a replay. Its GS3 subjective retune is
+  **not done** — the tier numbers are still the plan's starting values, characterized but not yet
+  adjusted against a full match played at each tier by a human.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
