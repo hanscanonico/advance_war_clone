@@ -24,7 +24,7 @@ target fails with "Godot binary not found". Symlink the one you already have:
 Then:
 
 ```sh
-make run             # boot the game — the menu (map, difficulty, commanders, fog, 1P / 2P / Continue)
+make run             # boot the game — the menu (map, difficulty, speed, commanders, fog, 1P / 2P / Continue)
 make hotseat         # skip the menu: straight into a two-player hot-seat match (no AI)
 make verify          # the merge gate: check + lint + format-check + test, in one command
 make smoke           # drive the battle scene's demo scenarios; prove each still renders
@@ -88,8 +88,8 @@ change: defeat is only ever checked when a unit dies, and the AI's planner alrea
 production when it has nothing to move.
 
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
-`--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
-second; either side may be left blank for no commander) — e.g.
+`--hotseat`, `--fog`, `--difficulty=hard`, `--speed=slow`, and `--co=alina_ward,viktor_draeg` (red
+first, blue second; either side may be left blank for no commander) — e.g.
 `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn -- --map=crossfire --fog`.
 
 Adding a map is dropping a `.txt` in `maps/` — the menu auto-discovers it and `tests/unit/`
@@ -105,8 +105,8 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 
 ## Main menu
 
-The game boots to the menu: pick a map and a **Difficulty**, toggle **Fog of war**, then start a
-**1 Player** match against the Blue AI or a **2 Player** hot-seat game. Either opens the
+The game boots to the menu: pick a map, a **Difficulty** and a **Speed**, toggle **Fog of war**,
+then start a **1 Player** match against the Blue AI or a **2 Player** hot-seat game. Either opens the
 **commander selection page**; **Continue** appears only when a save exists and skips selection,
 resuming the save with its own map, fog setting, difficulty, commanders, and AI sides. **Quit**
 exits.
@@ -236,6 +236,32 @@ doctrine has hidden is hidden from it too, so an invisibility power is not inert
 In a fogged hot-seat match a handoff
 screen blanks the board between turns so the incoming player never sees the outgoing one's
 vision.
+
+## Game speed
+
+Pick **Slow**, **Normal**, **Quick** or **Instant** in the menu, or from the `Speed:` row on the
+in-battle map menu (the one that opens on empty ground), which cycles through the four and takes
+effect on the very next animation. It scales how fast moves and battles *play out on screen* and
+nothing else: **no outcome, save, replay or seeded roll can change with it**, because no file under
+`core/` or `ai/` is ever handed the setting.
+
+- **Slow** — 0.18 s a tile; every step of a path is individually readable.
+- **Normal** — 0.12 s a tile. The default.
+- **Quick** — 0.06 s a tile, the pacing the game shipped with before the setting existed.
+- **Instant** — no tweens. Units appear at their destinations, casualties vanish, sounds still fire,
+  banners tighten to half a second, and the AI runs one command per frame so the board still
+  repaints. For grinding out the late game.
+
+It is a **device preference**, not match state: it lives in `user://settings.cfg` (beside the save's
+`user://save.json`), never enters `MatchConfig` or a save file, and both sides of a hot-seat share
+it. `--speed=<tier>` overrides it for one launch without writing anything, and outranks even the
+tier captures pin themselves to — which is how you photograph a tier you are tuning. Every number
+lives in one table at the top of `scenes/common/game_speed.gd`.
+
+Screenshots and `make smoke` pin **Instant**: a frame must not depend on which machine took it, and
+scenarios wait on the scene's state machine rather than a frame count, so skipping the theatre
+cannot change what is photographed. It is also four times faster on the scenario that plays a whole
+AI turn, for a byte-identical frame.
 
 ## Difficulty
 

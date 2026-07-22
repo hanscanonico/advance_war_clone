@@ -21,7 +21,13 @@ extends RefCounted
 const DEFAULT_ID := &"normal"
 ## Captures and scripted scenario runs pin this tier instead of reading the
 ## device preference: a screenshot must not depend on which machine took it.
-const CAPTURE_ID := &"quick"
+##
+## Instant, because a still frame has nothing to photograph in an animation and
+## every second one runs for is a second `make smoke` spends waiting. Scenarios
+## advance on the scene's own state machine rather than a frame count, which is
+## what makes that safe — see BattleScenarioDriver._until_state. An explicit
+## `--speed=` still wins, so a tier stays inspectable through a capture.
+const CAPTURE_ID := &"instant"
 
 ## The durations the game shipped with, before any tier scaled them. Quick is
 ## these values exactly — which is what makes it "today's game, bit for bit".
