@@ -262,7 +262,7 @@
             owned from day 1. Behind the front on purpose, same fuel logic Jet Stream wrote down:
             a bomber that overstays dies of its own tank.</li>
         <li>No port. The sea here is a frame, and giving it a coast means redrawing the map — that
-            is a new map, and new maps belong to the more-maps plan, not this one.</li>
+            is a new map, and new maps are future map work, out of scope for this plan.</li>
         <li>Property count 22 → 24, mirrored. Header symbol legend gains <span class="rf-code">A</span>.</li>
       </ul>
     </div>
@@ -405,8 +405,9 @@
     </table>
   </div>
   <p class="max-w-3xl text-sm opacity-80">
-    All of them live in <span class="rf-code">tests/unit/test_maps.gd</span> beside the invariants
-    the more-maps plan established — and all of them are written against
+    All of them live in <span class="rf-code">tests/unit/test_maps.gd</span> beside the map
+    invariants that file and <span class="rf-code">tests/unit/test_map_soak.gd</span> already
+    enforce — and all of them are written against
     <span class="rf-code">MapCatalog</span> rather than a list of names, so the 10th map with a port
     inherits them for free. The file went from 9 tests to 16, and the suite gained all seven.
   </p>
@@ -486,7 +487,7 @@
           <td>Scope creep — the project's standing top risk. Retrofitting invites redrawing:
               a coast for Ironworks, a port lake for Crossfire, "just one more" for Riverline.</td>
           <td>§8's out-of-scope list is the contract: conversions only, three maps only, the four
-              no's stay no. New coastlines and new boards belong to the more-maps plan.</td></tr>
+              no's stay no. New coastlines and new boards are future map work, not this plan's.</td></tr>
       </tbody>
     </table>
   </div>
@@ -539,7 +540,8 @@
     <div class="card-body py-4">
       <h3 class="font-bold">Out of scope — named so it stays out</h3>
       <ul class="text-sm space-y-1 list-disc pl-5">
-        <li>New maps, new coastlines, or any edit that adds/removes sea (→ more-maps plan).</li>
+        <li>New maps, new coastlines, or any edit that adds/removes sea — that is future map work,
+            and none of it may ride in on a retrofit.</li>
         <li>Retrofits for First Steps, Scrimmage, Timberline, Riverline — the four no's.</li>
         <li>Ports on lakes; reefs on retrofit maps (concealment stays a Straits signature for now).</li>
         <li>Starting air/naval units, AI ferry planning, balance-number changes in <span class="rf-code">data/</span> —
@@ -637,7 +639,7 @@
 
 <footer class="text-center text-sm opacity-60 pb-6">
   Grid Commander · Map retrofit proposal · audits maps against the naval/air domains shipped in N1–N4 ·
-  companions: <span class="rf-code">naval-air-units-plan.html</span> · <span class="rf-code">more-maps-plan.html</span>
+  companion: <span class="rf-code">naval-air-units-plan.html</span>
 </footer>
 
 </main>
