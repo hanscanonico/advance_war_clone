@@ -17,9 +17,10 @@ extends RefCounted
 ##
 ## [owners] and [units] must come after [terrain] (they need the bounds).
 ## Unit symbols are validated later by GameState.create, which has the UnitDB.
-## The playability invariants no parser can express — one HQ per team, a base
-## each, reachable HQs, and the symmetry the tag above claims — are asserted
-## over every shipped map by tests/unit/test_maps.gd.
+## The playability invariants no parser can express — the ones about HQs, bases,
+## reachability, the symmetry the tag above claims, and the water a port or a
+## shoal needs — are asserted over every shipped map by tests/unit/test_maps.gd,
+## which names each one and the failure it prevents.
 
 const NEUTRAL := 0
 ## Comment line that opts a map into the mirror check in tests/unit/test_maps.gd.

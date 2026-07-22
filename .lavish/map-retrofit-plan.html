@@ -52,7 +52,7 @@
   </p>
   <p class="text-sm opacity-60">Audit of all 9 shipped maps · milestones MR1–MR3 · engine changes: none — every edit is a map <span class="rf-code">.txt</span> plus four new test lints</p>
   <div class="alert alert-success text-sm max-w-3xl mx-auto">
-    <span><b>Shipped 2026-07-21.</b> All three retrofits are in, 436/436 tests green, and the build
+    <span><b>Shipped 2026-07-21.</b> All three retrofits are in, the whole suite green, and the build
     improved on this draft in one way worth reading before the rest: Isthmus's beaches became
     <em>road</em> conversions, not sea ones, which removed risk R3 outright. §9 records what shipped
     and the AI-vs-AI measurements that decided Crossfire's provisional verdict.</span>
@@ -392,12 +392,14 @@
               how an amphibious lane dies without anyone noticing.</td>
         </tr>
         <tr>
-          <td class="font-bold whitespace-nowrap">Two guard tests</td>
+          <td class="font-bold whitespace-nowrap">Three guard tests</td>
           <td>The shared-water and no-bridge lints, run against synthetic boards built to break
-              them: two harbours split by dry land, two islands joined by one beach.</td>
+              them: two harbours split by dry land, two islands joined by one beach — plus the
+              false positive the other way, an offshore beach touching no land at all, which the
+              no-bridge lint must <em>not</em> read as a bridge.</td>
           <td>All four lints above pass on all nine shipped maps, which is only reassuring if they
-              are capable of failing. These prove the mechanism, so "green" keeps meaning something
-              after the tenth map lands.</td>
+              are capable of failing — and of not failing on a legal board. These prove the
+              mechanism, so "green" keeps meaning something after the tenth map lands.</td>
         </tr>
       </tbody>
     </table>
@@ -406,7 +408,7 @@
     All of them live in <span class="rf-code">tests/unit/test_maps.gd</span> beside the invariants
     the more-maps plan established — and all of them are written against
     <span class="rf-code">MapCatalog</span> rather than a list of names, so the 10th map with a port
-    inherits them for free. The file went from 9 tests to 15; the suite from 433 to 436.
+    inherits them for free. The file went from 9 tests to 16, and the suite gained all seven.
   </p>
 </section>
 
@@ -551,9 +553,9 @@
 <section class="space-y-6">
   <h2 class="text-3xl font-bold">9 · What shipped, and what the measurements said</h2>
   <p class="max-w-3xl">
-    All three retrofits are in and the suite is green at 436 tests. MR1–MR3 landed together because
-    the work turned out to be smaller than drafted: no engine change, no data change, ten edited
-    cells across three <span class="rf-code">.txt</span> files, and six new tests.
+    All three retrofits are in and the suite is green. MR1–MR3 landed together because
+    the work turned out to be smaller than drafted: no engine change, no data change, eight edited
+    cells across three <span class="rf-code">.txt</span> files, and seven new tests.
   </p>
 
   <div class="card bg-base-100 shadow-sm rf-left rf-go">

@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** four designs of record, all worth reading before an architectural decision.
+- **Status:** five designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -21,6 +21,11 @@ three movement domains (land, air, sea), property capture and income, and a comp
   `.lavish/naval-air-units-plan.html` owns the air and naval domains — milestones N1–N4, decisions
   D1–D6, and risks R1–R6, of which R1 is the standing one: the AI cannot plan a ferry, so it never
   builds transports and a naval map has to let fleets reach each other without one.
+  `.lavish/map-retrofit-plan.html` owns which shipped boards carry a port or an airfield and which
+  stay land-only on purpose, and it supersedes that plan's "the existing maps stay byte-identical"
+  clause with the rule that replaced it: a map edit **converts** cells, never carves — land stays
+  passable to every land class, no cell becomes sea and no coastline is redrawn — because a save
+  stores its board by `map_path` and reloads the edited file from `res://`.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
