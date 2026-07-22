@@ -15,8 +15,12 @@ screenshot*.png.import
 
 # Balance runner output (tools/run_commander_balance.gd). The committed artifacts
 # of a balance pass are tuned data/commanders/*.tres and docs/commander_balance.md,
-# never the generated CSV/JSON.
-reports/
+# never the generated CSV/JSON. `reports/*` rather than `reports/`: git will not
+# look inside an excluded directory, so the marker below could not be re-included.
+reports/*
+# The one exception, and the reason the directory is tracked at all: it tells the
+# engine not to import a report as game data. See reports/.gdignore.
+!reports/.gdignore
 
 # Agent scratch space. .claude/worktrees holds nested checkouts of this repo,
 # which git would otherwise offer to commit as embedded repositories.
