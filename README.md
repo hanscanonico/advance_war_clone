@@ -1,11 +1,8 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. Four plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
-game (architecture, mechanics, milestones M0–M7), `.lavish/commanders-plan.html` for
-Commanders and Command Powers (milestones C1–C4), `.lavish/difficulty-modes-plan.html`
-for the Easy/Normal/Difficult tiers (milestones DF1–DF4), and
-`.lavish/naval-air-units-plan.html` for the air and naval domains (milestones N1–N4).
+typed GDScript. Six design plans ship with it under `.lavish/`; `CLAUDE.md` lists them and
+which decisions each one owns.
 
 ## Running
 
@@ -276,8 +273,8 @@ result, including one capability that measured *negative* and ships switched off
   with, so tuning its behaviour is a data edit rather than a code change — and the difficulty
   tiers in `data/difficulty/`, each of which is just a label plus one of those profiles).
 - `maps/` — plain-text maps: an ASCII terrain grid, a *starting* property-ownership section, and
-  a starting-units section. `MapData` (core) is authoritative for terrain and is never mutated by
-  play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
+  an optional starting-units section. `MapData` (core) is authoritative for terrain and is never
+  mutated by play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.
