@@ -226,7 +226,7 @@ func test_measuring_a_cell_never_moves_the_unit() -> void:
 
 ## The same guarantee across a whole Difficult turn on a real board: the sim
 ## changes when a command is *applied*, never while one is being planned. Guards
-## the restored read above from anything a future capability adds beside it.
+## the pure read above from anything a future capability adds beside it.
 func test_planning_a_difficult_turn_leaves_the_board_untouched() -> void:
 	var map := MapData.load_from_file("res://maps/first_steps.txt", terrain_db)
 	var state := GameState.create(map, unit_db, chart)
