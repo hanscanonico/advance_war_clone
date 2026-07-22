@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Game Speed Plan</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-locked { border-color: var(--gc-grass-dark); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-grass-dark) 30%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+    .gc-crosses li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-crosses li::before { content: "✗"; color: var(--gc-red); font-weight: 900; }
+    .gc-tier {
+      border: 2px solid var(--gc-water-dark);
+      border-radius: .6rem;
+      overflow: hidden;
+      background: white;
+    }
+    .gc-tier header { color: white; padding: .65rem .9rem; font-weight: 900; display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+    .gc-tier .body { padding: .8rem .9rem; font-size: .9rem; }
+    table.gc-nums td, table.gc-nums th { font-size: .85rem; }
+    table.gc-nums td:first-child { font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <div class="gc-shell">
+
+    <!-- ============================== HERO ============================== -->
+    <header class="gc-hero px-6 py-10 md:px-12">
+      <p class="gc-kicker opacity-80">Grid Commander · Stretch item · Shipped · rev 1</p>
+      <h1 class="text-3xl md:text-4xl font-black mt-2">Game Speed — Slow · Normal · Quick · Instant</h1>
+      <p class="mt-3 max-w-3xl opacity-90">
+        Units currently cross a tile in <strong>0.06&nbsp;s</strong> — a full infantry move is over in
+        the time of a blink, and an AI turn is a shower of teleports. This plan adds a
+        <strong>game-speed setting</strong>: a device preference that scales how fast moves and battles
+        <em>play out on screen</em>, pickable on the main menu and switchable mid-match. It is
+        presentation pacing and nothing else — <strong>no line of <span class="gc-file">core/</span> or
+        <span class="gc-file">ai/</span> ever learns the speed</strong>, so outcomes, saves, replays and
+        determinism are untouchable by construction.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <span class="badge badge-lg" style="background:var(--gc-grass); border:0;">Slow — every step readable</span>
+        <span class="badge badge-lg" style="background:var(--gc-road); border:0;">Normal — the new default</span>
+        <span class="badge badge-lg" style="background:var(--gc-blue); color:white; border:0;">Quick — today's game, bit for bit</span>
+        <span class="badge badge-lg" style="background:var(--gc-red); color:white; border:0;">Instant — results, not theatre</span>
+      </div>
+    </header>
+
+    <!-- ============================== 1 · SEAMS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">1</span>
+        <h2 class="text-2xl font-black">The seams already exist</h2>
+      </div>
+      <p class="max-w-3xl mb-4">
+        No new architecture is needed. Every second the battle scene ever waits is already a named
+        constant, and both sides of the match animate through the same code:
+      </p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Nine numbers, three files — that is the whole inventory</h3>
+          <p class="text-sm mt-1">A sweep of every <code>create_tween</code> / <code>create_timer</code>
+          in the presentation layer finds all gameplay pacing here:
+          <span class="gc-file">battle_animator.gd</span> (move step 0.06, turn banner 1.2, power
+          banner 1.1, camera shake, cursor pulse), <span class="gc-file">unit_sprite.gd</span>
+          (hit flash 0.08/0.12, death fade 0.25), <span class="gc-file">battle_ai_runner.gd</span>
+          (turn-open delay, 0.2 between AI commands). The only other tween in the game is a button
+          fade on the commander HUD chip — feedback, not pacing, and deliberately left alone.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The AI already animates through the player's pipes</h3>
+          <p class="text-sm mt-1"><span class="gc-file">battle_ai_runner.gd:10</span> promises that an
+          AI turn <em>"resolves and animates exactly as a player's does"</em> — it calls the same
+          <code>animate_path</code> / <code>animate_combat</code>. Scale the animator once and both
+          flows follow; there is no second animation system to keep in sync.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">"Suppress the animation" already has a precedent</h3>
+          <p class="text-sm mt-1">The animator's <code>capturing</code> flag
+          (<span class="gc-file">battle_animator.gd:29</span>) already skips the camera shake and
+          cursor pulse so screenshots settle. <strong>Instant</strong> is that idea generalised: an
+          explicit "don't tween, just show the result" branch, not a zero multiplied through the
+          maths.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The tooling was written for this day</h3>
+          <p class="text-sm mt-1"><span class="gc-file">battle_scenario_driver.gd:372</span> says it
+          outright: scenarios wait on the scene's state machine rather than frame counts <em>"so they
+          stay correct when animation timings change."</em> The menu's difficulty dropdown is the
+          model for the picker, and <span class="gc-file">core/save_game.gd</span> shows the
+          <code>user://</code> pattern the new settings file follows.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · THE TIERS ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">2</span>
+        <h2 class="text-2xl font-black">What each tier changes</h2>
+      </div>
+      <p class="max-w-3xl mb-4">
+        A tier is two knobs and one flag: an <strong>animation scale</strong> (movement, hit flash,
+        death fade), a <strong>pacing scale</strong> (the AI's think-beats), and <strong>instant</strong>
+        (skip the tweens entirely). Banners are information, not theatre — they hold at a readable
+        length at every tier and only tighten under Instant. The camera shake and cursor pulse never
+        scale: one is impact feedback, the other is idle UI.
+      </p>
+      <div class="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div class="gc-tier">
+          <header style="background:var(--gc-grass-dark);">Slow <span class="text-xs font-mono opacity-90">anim ×3</span></header>
+          <div class="body">Every step of a path is individually readable — 0.18&nbsp;s a tile. For
+          learning the game, watching a doctrine play out, or showing someone what just happened.
+          AI think-beats stretch a little so its turn reads as decisions, not a slideshow.</div>
+        </div>
+        <div class="gc-tier">
+          <header style="background:#b08d3f;">Normal <span class="text-xs font-mono opacity-90">anim ×2 · default</span></header>
+          <div class="body"><strong>The new default</strong>, and the fix for the complaint that started
+          this plan: 0.12&nbsp;s a tile, twice today's duration. Movement registers as movement;
+          combat still snaps. Everything else paces as the game always has.</div>
+        </div>
+        <div class="gc-tier">
+          <header style="background:var(--gc-blue);">Quick <span class="text-xs font-mono opacity-90">anim ×1</span></header>
+          <div class="body"><strong>Today's game, bit for bit</strong> — every constant at its current
+          value. Nobody who likes the present feel loses anything: it is one dropdown away, and the
+          plumbing milestone ships with this as the default to prove the routing changed nothing.</div>
+        </div>
+        <div class="gc-tier">
+          <header style="background:var(--gc-red);">Instant <span class="text-xs font-mono opacity-90">snap</span></header>
+          <div class="body">No tweens: sprites appear at their destinations, casualties vanish, sounds
+          still fire so actions register. Banners tighten to a 0.5&nbsp;s hold — a day change must
+          still be noticeable. The AI turn runs at one command per frame, so the board repaints and
+          the window stays live. For grinding out the late game.</div>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 border p-4">
+        <h3 class="font-black text-lg mb-2">Starting numbers</h3>
+        <p class="text-sm mb-3">All of these live in one constant table on the new
+        <span class="gc-file">GameSpeed</span> class — retuning a tier after playtest is a one-line
+        edit. "Today" is the current constant and its file.</p>
+        <div class="overflow-x-auto">
+          <table class="table gc-nums">
+            <thead>
+              <tr><th>duration</th><th>today</th><th>Slow</th><th>Normal</th><th>Quick</th><th>Instant</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>move step (s / tile)</td><td>0.06 · animator:15</td><td>0.18</td><td><strong>0.12</strong></td><td>0.06</td><td>snap</td></tr>
+              <tr><td>hit flash (in / out)</td><td>0.08 / 0.12 · sprite:84</td><td>0.24 / 0.36</td><td>0.16 / 0.24</td><td>0.08 / 0.12</td><td>skip</td></tr>
+              <tr><td>death fade</td><td>0.25 · sprite:92</td><td>0.75</td><td>0.50</td><td>0.25</td><td>skip</td></tr>
+              <tr><td>AI delay between commands</td><td>0.2 · runner:16</td><td>0.3</td><td>0.2</td><td>0.2</td><td>0 + 1 frame</td></tr>
+              <tr><td>turn banner hold</td><td>1.2 · animator:16</td><td>1.2</td><td>1.2</td><td>1.2</td><td>0.5</td></tr>
+              <tr><td>power banner hold</td><td>1.1 · animator:19</td><td>1.1</td><td>1.1</td><td>1.1</td><td>0.5</td></tr>
+              <tr><td>camera shake</td><td>5 × 0.04 · animator:133</td><td colspan="3">unchanged — impact feedback</td><td>skipped</td></tr>
+              <tr><td>cursor pulse</td><td>0.4 · animator:145</td><td colspan="4">never scales — idle UI, not pacing</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs mt-3 opacity-70">The AI's turn-open delay
+        (<span class="gc-file">battle_ai_runner.gd:15</span>) is today a <code>const</code> derived
+        from the banner hold; it becomes a value computed at call time from the active tier, so it
+        keeps tracking the banner automatically.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">3</span>
+        <h2 class="text-2xl font-black">Decisions</h2>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D1 · What kind of setting is this? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm">A <strong>device preference</strong>, not match state. A new
+        <span class="gc-file">autoload/settings.gd</span> singleton owns it, persists it to
+        <code>user://settings.cfg</code> (Godot's <code>ConfigFile</code>, beside
+        <span class="gc-file">SaveGame</span>'s <code>user://save.json</code>), and answers
+        <code>Settings.speed</code> to anyone in the presentation layer. It does <em>not</em> ride
+        <span class="gc-file">MatchConfig</span> and is <em>not</em> written into saves: resuming a
+        three-day-old save should play at the speed you like <em>today</em>, and a hot-seat pair share
+        one screen anyway. A <code>--speed=&lt;tier&gt;</code> CLI flag overrides for one run without
+        persisting, in the family of <code>--map</code> / <code>--fog</code> / <code>--difficulty</code>.
+        <strong>As built,</strong> the flag also outranks the tier a capture pins itself to — it is the
+        most specific thing anyone said, and asking for a capture <em>of</em> a tier is how you look at
+        one you are tuning. The pin itself lives on <span class="gc-file">Settings</span> rather than on
+        the animator, because the in-battle menu row reads its label from there too: pinning only the
+        animator would have produced a frame whose animations were machine-independent and whose text
+        was not.
+        Rejected: <code>Engine.time_scale</code> — a global hammer that would also speed menus, the
+        cursor pulse, and anything physics ever touches.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D2 · Where do the numbers live? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm">As <strong>constants on a <span class="gc-file">GameSpeed</span> presentation
+        class</strong> (<span class="gc-file">scenes/common/game_speed.gd</span>: id, display name,
+        the two scales, the instant flag, plus <code>by_id</code> / <code>ordered</code> /
+        <code>next</code> for the cycling menu row) — <em>not</em> as <code>.tres</code> files under
+        <span class="gc-file">data/</span>. This deliberately breaks the difficulty-tier symmetry, for
+        a principled reason: <span class="gc-file">data/</span> is for numbers the <em>sim</em> reads,
+        and the entire safety argument of this feature is that the sim <strong>cannot</strong> read the
+        speed. Pacing constants already live beside the animations they time; they stay there, just
+        gathered into one table.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D3 · Which tier is today's game — and which is the default? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm"><strong>Quick reproduces today bit for bit; Normal becomes the default at
+        twice the movement duration.</strong> The complaint that opened this plan is about the current
+        default, so the default is what moves — but the current feel stays one dropdown away, and the
+        plumbing milestone ships with Quick as the default first, precisely so "nothing changed" is
+        checkable before anything does change. The mid-match menu row means a wrong guess about
+        Normal costs the player two clicks, not a restart.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4">
+        <h3 class="font-black mb-2">D4 · What exactly does Instant do? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm">An <strong>explicit branch, in the tradition of <code>capturing</code></strong>
+        — not animation scale 0. <code>animate_path</code> sets the sprite's position and returns
+        (the flow already tolerates a same-frame return: one-cell "moves" take that path today,
+        <span class="gc-file">battle.gd:273</span>). Combat skips flash, fade and shake but keeps its
+        sounds — an attack you triggered must still register. Banners clamp to a 0.5&nbsp;s hold
+        rather than vanishing: whose day it is remains information. The AI runner drops its delays but
+        still awaits one <code>process_frame</code> per command, so a 40-command turn is forty repaints
+        the eye can track as a fast flicker, the window keeps pumping events, and the per-turn safety
+        cap keeps its meaning.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">4</span>
+        <h2 class="text-2xl font-black">Milestones — each one shippable</h2>
+      </div>
+      <div class="grid gap-4">
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">GS1 · The speed authority, invisible by default <span class="badge badge-sm">size S</span> <span class="badge badge-success badge-sm">shipped</span></h3>
+          <p class="text-sm mt-1 mb-2">All four tiers exist and every duration routes through them —
+          with the default pinned to <strong>Quick</strong>, so the game plays identically to today and
+          the routing is provably inert.</p>
+          <ul class="gc-checks text-sm">
+            <li><span class="gc-file">scenes/common/game_speed.gd</span> — the tier table (§2's numbers), lookup and cycling helpers.</li>
+            <li><span class="gc-file">autoload/settings.gd</span> — loads/saves <code>user://settings.cfg</code>, applies a <code>--speed=</code> override un-persisted; registered in <span class="gc-file">project.godot</span> (minimal, reviewable hand edit).</li>
+            <li>Route all nine sites: the animator's move step and banner holds, the sprite's flash/fade (durations handed in by the animator — the sprite stays dumb, deriving nothing but sim state), the runner's two delays. The Instant branches of D4 land here too, reachable only via <code>--speed=instant</code>.</li>
+            <li>Speed is read <em>at each use</em>, never cached at scene start — a mid-match change takes effect on the very next animation.</li>
+            <li>Capture and scenario runs (<code>--screenshot</code>, the scenario driver) pin their own profile and ignore <code>settings.cfg</code>: a screenshot must not depend on which machine took it.</li>
+            <li>Proof: <code>make screenshot</code> byte-identical intent, a played match indistinguishable, <code>make verify</code> green (nothing in <span class="gc-file">tests/</span> touches presentation — per the testing doctrine, none owed here).</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">GS2 · The two pickers, then the new default <span class="badge badge-sm">size S</span> <span class="badge badge-success badge-sm">shipped</span></h3>
+          <p class="text-sm mt-1 mb-2">Where a player meets the setting: once in the menu, once
+          mid-match. Only after both exist does the default flip to Normal.</p>
+          <ul class="gc-checks text-sm">
+            <li>Main menu: a "Speed" <code>OptionButton</code> beside Difficulty, writing <code>Settings</code> immediately — it is a device preference, so it deliberately does <em>not</em> flow through <code>_start</code> / <span class="gc-file">MatchConfig</span>. Tooltip in the house style: <em>"How fast moves and battles play out on screen. Never changes an outcome — pacing only. Changeable any time from the in-battle menu."</em></li>
+            <li>Battle: a <code>Speed: Normal</code> row on the map action menu (<span class="gc-file">battle_menus.gd · map_actions</span>), cycling Slow → Normal → Quick → Instant on choose and persisting. The row's label asks <code>Settings</code> — the same single-authority gating the rest of that file practices.</li>
+            <li>Flip <code>DEFAULT_ID</code> to <strong>normal</strong> — the original complaint is now fixed, and undoing it is two clicks, not a code edit.</li>
+            <li>Proof: cycle mid-match and watch the next move obey; quit and relaunch and the choice survives; hot-seat both sides share it.</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">GS3 · The tooling dividend, and the numbers pass <span class="badge badge-sm">size S</span> <span class="badge badge-warning badge-sm">shipped — retune outstanding</span></h3>
+          <p class="text-sm mt-1 mb-2">Spend the new capability on the pipeline, then settle the table
+          with played evidence.</p>
+          <ul class="gc-checks text-sm">
+            <li>Pin captures to <strong>Instant</strong>: <code>make screenshot</code> and the scenario gallery stop paying for animations they never photograph. The driver already waits on states, not frames (<span class="gc-file">battle_scenario_driver.gd:372</span>) — this is the payoff of that discipline.</li>
+            <li>Play a full match at each tier (including an AI mirror at Instant) and retune §2's starting numbers in the one place they live.</li>
+            <li>README: the setting, the flag, where <code>settings.cfg</code> lives.</li>
+          </ul>
+          <p class="text-sm mt-2"><strong>As built:</strong> the pin and the README landed, and every
+          tier was exercised through the resolve, transport and victory scenarios — wall clock scales
+          monotonically (2.07 / 1.72 / 1.24 / 1.01 s) and all four produce a byte-identical frame, so
+          the "pacing only" claim is measured rather than asserted. Pinning captures to Instant took
+          the whole-AI-turn scenario from 5.95 s to 1.48 s for the same frame. <strong>Outstanding:</strong>
+          the subjective retune — §2's numbers are still the plan's starting values, characterized but
+          not yet adjusted against a full match played at each tier by a human.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">5</span>
+        <h2 class="text-2xl font-black">Risks</h2>
+      </div>
+      <div class="grid gap-3">
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R1 · A future animation bypasses the authority</h3>
+          <p class="text-sm mt-1">Someone adds a tween with a literal <code>0.3</code> and it ignores
+          the setting forever. Mitigation: after GS1 the review rule is mechanical — <em>no literal
+          seconds in battle-scene tweens or timers; every duration is a <span class="gc-file">GameSpeed</span>
+          field or scaled through one</em> — and a <code>grep create_tween|create_timer</code> across
+          <span class="gc-file">scenes/</span> is the whole audit, nine sites today.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R2 · Instant turns the AI's move into a magic trick</h3>
+          <p class="text-sm mt-1">Forty commands in a blur; the player looks up and the front line has
+          moved. This is what Instant is <em>for</em>, but the plan keeps three tethers: one repaint
+          per command, the cursor still jumps to each acting unit, and banners clamp instead of
+          vanishing. If it still reads as a hang or a cheat in playtest, the honest fast tier is
+          Quick — Instant's numbers are not softened to split the difference.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R3 · Same-frame animation returns surprise a caller</h3>
+          <p class="text-sm mt-1">Low: the flow already survives exactly this. A one-cell "move" skips
+          the tween and calls the done-handler synchronously today
+          (<span class="gc-file">battle.gd:273</span>), and the scenario driver waits on states by
+          design. Instant widens a path the code already walks.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R4 · Determinism, saves, replays</h3>
+          <p class="text-sm mt-1">Structurally safe rather than carefully safe: no file in
+          <span class="gc-file">core/</span> or <span class="gc-file">ai/</span> gains an import, a
+          field, or a read. The save format is untouched, the command log is untouched, and the same
+          seed plus the same commands produce the same result at any speed — the sim cannot observe
+          the clock the theatre runs on.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">6</span>
+        <h2 class="text-2xl font-black">Explicitly out of scope</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Global slow-motion</h3>
+          <p class="text-sm mt-1"><code>Engine.time_scale</code> and any physics-clock trickery.
+          Rejected in D1: the setting paces the battle's theatre, not the engine.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Hold-to-fast-forward</h3>
+          <p class="text-sm mt-1">The genre's other answer (hold a button, the current animation
+          sprints). Genuinely nice, and GS1's routing makes it cheap later — but it is an input
+          feature, not a setting, and this plan ships the setting.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">UI transition speeds &amp; audio scaling</h3>
+          <p class="text-sm mt-1">Menu fades, the HUD chip's button feedback, the cursor pulse, and
+          any pitch/length change to sound effects. Feedback stays constant; only gameplay theatre
+          scales.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Per-match or per-save speeds</h3>
+          <p class="text-sm mt-1">The speed never enters <span class="gc-file">MatchConfig</span> or
+          the save file (D1). One device, one preference, changeable at any moment — there is nothing
+          a second copy of the truth could add except disagreement.</p>
+        </div>
+      </div>
+      <p class="text-xs opacity-70 mt-6">Grid Commander · game-speed plan rev 1 · pairs with
+      <span class="gc-file">.lavish/advance-wars-clone-plan.html</span> (base game),
+      <span class="gc-file">difficulty-modes-plan.html</span> (AI tiers) and
+      <span class="gc-file">naval-air-units-plan.html</span> (domains). Presentation-only by
+      construction: the sim never reads the speed.</p>
+    </section>
+
+  </div>
+</body>
+</html>
