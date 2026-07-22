@@ -61,8 +61,9 @@ UNIT_CROP="68x86+15+15"
 BLDG_CROP="81x91+6+12"
 
 # Column order is atlas_col from data/units/*.tres. The pack has no aircraft or
-# ships, so the columns past this list belong to tools/generate_unit_placeholders.gd,
-# which runs next and widens the atlas this step writes. Keep PIXVOXEL_COLS there
+# ships, so the columns past this list are re-pasted by tools/paste_unit_sprites.gd,
+# which runs next and widens the atlas this step writes; tools/generate_unit_placeholders.gd
+# then fills any column still lacking real art. Keep PIXVOXEL_COLS in the latter
 # equal to the length of this array.
 UNITS=(Infantry Infantry_T Supply_T Tank Tank_P Artillery_S Artillery Artillery_T Supply)
 # Columns 5, 6, 7 of the terrain atlas: city, base, hq.
