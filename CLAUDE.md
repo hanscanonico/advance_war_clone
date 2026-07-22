@@ -78,7 +78,7 @@ res://
 │  ├─ menu/     # main_menu.tscn — map and commander select, match options
 │  ├─ common/   # helpers shared by both scenes
 │  └─ ui/       # menus, panels, damage preview
-├─ autoload/    # singletons: EventBus, MatchConfig, Sfx
+├─ autoload/    # singletons: EventBus, MatchConfig, Settings, Sfx
 ├─ ai/          # ai_controller.gd — plans Commands; ai_profile.gd — its weights
 │              (NO Node references)
 ├─ maps/        # map scenes / map resources
