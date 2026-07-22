@@ -30,7 +30,7 @@ grow_vertical = 2
 
 [node name="Rows" type="VBoxContainer" parent="Center"]
 layout_mode = 2
-theme_override_constants/separation = 5
+theme_override_constants/separation = 3
 
 [node name="TitleLabel" type="Label" parent="Center/Rows"]
 layout_mode = 2
@@ -46,7 +46,7 @@ text = "an Advance Wars-style tactics game (working title)"
 
 [node name="Spacer1" type="Control" parent="Center/Rows"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 4)
+custom_minimum_size = Vector2(0, 2)
 
 [node name="MapRow" type="HBoxContainer" parent="Center/Rows"]
 layout_mode = 2
@@ -78,6 +78,21 @@ unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(140, 0)
 
+[node name="SpeedRow" type="HBoxContainer" parent="Center/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="SpeedLabel" type="Label" parent="Center/Rows/SpeedRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Speed"
+
+[node name="SpeedOption" type="OptionButton" parent="Center/Rows/SpeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(140, 0)
+
 [node name="FogCheck" type="CheckButton" parent="Center/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -85,7 +100,7 @@ text = "Fog of war"
 
 [node name="Spacer2" type="Control" parent="Center/Rows"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 4)
+custom_minimum_size = Vector2(0, 2)
 
 [node name="OnePlayerButton" type="Button" parent="Center/Rows"]
 unique_name_in_owner = true

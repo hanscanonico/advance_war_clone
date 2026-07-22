@@ -136,6 +136,11 @@ func _ready() -> void:
 	var driver := BattleScenarioDriver.new(self)
 	_capturing = driver.requested()
 	animator.capturing = _capturing
+	if _capturing:
+		# A capture pins its own pace and ignores the device preference: a frame
+		# must not depend on which machine took it, or on how fast whoever ran
+		# `make smoke` likes to watch their tanks move.
+		Settings.pin(GameSpeed.CAPTURE_ID)
 	animator.start_cursor_pulse()
 	_on_turn_started()  # day 1 gets the same banner/cursor/event as every turn
 	camera.position = cursor.position
@@ -405,7 +410,7 @@ func _handle_unit_action(action: StringName) -> void:
 			var dest: Vector2i = planned_path[planned_path.size() - 1]
 			var mover_sprite := view.release_sprite(selected)
 			command.apply(game)
-			mover_sprite.die()  # fade the merged-away sprite; fire and forget
+			animator.fade_out(mover_sprite)  # merged-away sprite; fire and forget
 			view.refresh_sprite(game.unit_at(dest))
 			_clear_selection()
 			_refresh_panel()
@@ -479,6 +484,13 @@ func _handle_map_action(action: StringName) -> void:
 		return
 	if action == &"commanders":
 		_open_commander_info()
+		return
+	if action == &"speed":
+		# Cycles Slow -> Normal -> Quick -> Instant and persists, so the next
+		# animation already obeys it. The banner confirms it the way Save does:
+		# the setting is otherwise invisible until something moves.
+		Settings.set_speed(GameSpeed.next(Settings.speed.id).id)
+		animator.show_banner("Speed: %s" % Settings.speed.display_name)
 		return
 	if action == &"save":
 		if SaveGame.save(game, ai_teams, SaveGame.SAVE_PATH, MatchConfig.difficulty):

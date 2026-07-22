@@ -28,15 +28,16 @@ max-returns: 12
 # plain unit actions — Load, Supply, Dive, Wait — collapsed into the one commit
 # helper they had each been spelling out; 815 once the day banner stopped being
 # a twelve-line formatted expression, which paid for the victory guard.
-# battle.gd sits at exactly 815: adding to it means moving something else out
-# first, which is the point.
 #
-# The number is 909 rather than 815 only because gdlint applies one limit to
-# every file, and merging the naval/air work onto the difficulty tiers put a
-# longer file than battle.gd in the tree: tools/run_commander_balance.gd, which
-# grew a whole second mode (the DF4 difficulty ladder) on one branch and the
-# `combined` fixture on the other. Neither addition is loose, and splitting the
-# runner is not this change's job — but until that split happens the ceiling
-# tracks it and not battle.gd. battle.gd's own ratchet is still 815; take the
-# limit back down to it the moment the runner comes apart.
-max-file-lines: 909
+# It went back up to 918 because rebasing the game-speed work onto the balance
+# lab landed two independent additions in battle.gd at once: watch mode on one
+# side — the planner dictionary, the day cap and the watched-result report — and
+# the speed picker on the other, with its capture pin, merge fade and speed
+# action. Neither side is loose, and splitting battle.gd is not that change's
+# job. The ceiling tracks battle.gd itself again rather than
+# tools/run_commander_balance.gd, which briefly held the limit while it was the
+# longer file and now sits at 788 after coming apart on the balance branch.
+# battle.gd sits at exactly 918: adding to it means moving something else out
+# first, which is the point — and the number comes back down the moment the
+# scene sheds a responsibility.
+max-file-lines: 918

@@ -16,7 +16,10 @@ extends RefCounted
 ## their commands, Supply asks SupplyCommand who is in reach, and production asks
 ## the terrain what it builds — exactly what BuildCommand checks.
 ##
-## Node-free, like the rest of the layers Battle delegates to.
+## No scene tree and no sprite here, like the rest of the layers Battle delegates
+## to. The one autoload it reads is Settings, for the speed row's label, and that
+## is the same rule as everything above rather than an exception to it: whoever
+## owns the answer is who gets asked.
 
 const CANCEL := {"id": &"cancel", "label": "Cancel"}
 
@@ -103,12 +106,18 @@ static func build_actions(
 ## Rows for the menu opened on empty ground: the turn-level actions. The HUD has
 ## a button for the Command Power, and this keeps it reachable from the keyboard
 ## too, which the rest of the game already is.
+##
+## The Speed row reads its label off Settings for the same reason every row above
+## asks its command: the tier the player is watching at has one owner, and a menu
+## that remembered its own copy would eventually show a speed the game is not
+## playing at. Choosing it cycles to the next tier — see Battle's map handler.
 static func map_actions(game: GameState) -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
 	var co_state := game.commander_state(game.current_team)
 	if co_state.is_ready():
 		actions.append({"id": &"power", "label": co_state.type.power_name})
 	actions.append({"id": &"commanders", "label": "Commanders"})
+	actions.append({"id": &"speed", "label": "Speed: %s" % Settings.speed.display_name})
 	actions.append({"id": &"end_turn", "label": "End Turn"})
 	actions.append({"id": &"save", "label": "Save"})
 	actions.append(CANCEL)

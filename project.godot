@@ -15,6 +15,7 @@ config/icon="res://assets/icon.png"
 
 EventBus="*res://autoload/event_bus.gd"
 MatchConfig="*res://autoload/match_config.gd"
+Settings="*res://autoload/settings.gd"
 Sfx="*res://autoload/sfx.gd"
 
 [display]

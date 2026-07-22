@@ -11,12 +11,20 @@ extends RefCounted
 ##
 ## Depends on BattleView to find sprites; never on Battle. Tweens need a Node
 ## to live on, so the scene root is passed in as a plain Node.
+##
+## Every duration it waits is a GameSpeed tier's, asked of `Settings` at the
+## moment the animation starts rather than cached at scene load, so a speed
+## changed mid-match lands on the very next move. The sprite it hands durations
+## to derives nothing, and BattleAiRunner paces its turn off the same answer. No
+## literal seconds below: a tween timed by a number written here would ignore the
+## player's setting forever.
 
-const MOVE_STEP_SECONDS := 0.06
-const BANNER_SECONDS := 1.2
-## How long the Command Power activation card holds before it slides away. Inside
-## the plan's 0.9-1.2 s window.
-const POWER_BANNER_SECONDS := 1.1
+## The two durations that deliberately do *not* follow the setting: the shake is
+## impact feedback and the pulse is idle UI, and neither is gameplay theatre.
+## Named rather than written inline so the exception is visibly meant, and so
+## "no bare seconds in a battle tween" stays a grep anyone can run.
+const SHAKE_STEP_SECONDS := 0.04
+const CURSOR_PULSE_SECONDS := 0.4
 
 ## Assigned by Battle before first use, like BattleView's nodes.
 var node: Node
@@ -37,13 +45,21 @@ var _power_banner_tween: Tween
 
 
 ## Tweens a sprite along a path without touching the sim. Awaitable.
+##
+## Instant sets the destination and returns in the same frame — a path the flow
+## already walks, since a one-cell "move" has always returned without a tween.
 func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 	if path.size() < 2:
 		return
 	Sfx.play(&"move", -6.0)
+	var tier := Settings.speed
+	if tier.instant:
+		sprite.position = BattleView.cell_center(path[path.size() - 1])
+		return
 	var tween := node.create_tween()
 	for i in range(1, path.size()):
-		tween.tween_property(sprite, "position", BattleView.cell_center(path[i]), MOVE_STEP_SECONDS)
+		var step := BattleView.cell_center(path[i])
+		tween.tween_property(sprite, "position", step, tier.move_step_seconds())
 	await tween.finished
 
 
@@ -52,28 +68,44 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 
 ## Plays out one already-resolved exchange: the hit, the shake, whichever side
 ## died, and the counter. Awaitable, so the flow resumes once the dust settles.
+##
+## Under Instant the flash, fade and shake all fall away but the sounds stay: an
+## attack the player triggered has to register even when there is nothing to see.
 func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
 	var defender_sprite := view.sprite_for(defender)
 	var attacker_sprite := view.sprite_for(attacker)
 	view.refresh_sprite(attacker)  # snap to the committed destination
 	Sfx.play(&"shot")
-	await defender_sprite.flash_hit()
+	await flash_hit(defender_sprite)
 	shake_camera()
 	if result.defender_died:
 		Sfx.play(&"explosion")
 		view.release_sprite(defender)
-		await defender_sprite.die()
+		await fade_out(defender_sprite)
 	else:
 		view.refresh_sprite(defender)
 	if result.countered:
 		Sfx.play(&"shot")
-		await attacker_sprite.flash_hit()
+		await flash_hit(attacker_sprite)
 	if result.attacker_died:
 		view.release_sprite(attacker)
-		await attacker_sprite.die()
+		await fade_out(attacker_sprite)
 	else:
 		view.refresh_sprite(attacker)
 	view.sync_sprites()
+
+
+## The white hit flash, at the active tier's pace. Awaitable.
+func flash_hit(sprite: UnitSprite) -> void:
+	var tier := Settings.speed
+	await sprite.flash_hit(tier.flash_in_seconds(), tier.flash_out_seconds())
+
+
+## Fades a sprite out and frees it, at the active tier's pace. Awaitable, and
+## the single place a death fade's length is decided — Battle's Join merge fades
+## a sprite outside combat entirely and comes through here for that reason.
+func fade_out(sprite: UnitSprite) -> void:
+	await sprite.die(Settings.speed.death_fade_seconds())
 
 
 # --- banner ------------------------------------------------------------------
@@ -91,7 +123,7 @@ func _set_banner(text: String) -> void:
 func show_banner(text: String) -> void:
 	_set_banner(text)
 	_banner_tween = node.create_tween()
-	_banner_tween.tween_interval(BANNER_SECONDS)
+	_banner_tween.tween_interval(Settings.speed.banner_seconds())
 	_banner_tween.tween_callback(turn_banner.hide)
 
 
@@ -116,7 +148,7 @@ func show_power_banner(commander: CommanderType) -> void:
 	if capturing:
 		return
 	_power_banner_tween = node.create_tween()
-	_power_banner_tween.tween_interval(POWER_BANNER_SECONDS)
+	_power_banner_tween.tween_interval(Settings.speed.power_banner_seconds())
 	_power_banner_tween.tween_callback(power_banner.hide)
 
 
@@ -130,14 +162,17 @@ func show_power_banner(commander: CommanderType) -> void:
 ## so it offsets the whole board by a few pixels and makes two otherwise
 ## identical captures differ everywhere — noise that would hide a real
 ## rendering regression.
+##
+## Skipped under Instant too, which is the one tier where it is theatre rather
+## than feedback: there is no hit animation left for it to punctuate.
 func shake_camera(strength: float = 3.0) -> void:
-	if capturing:
+	if capturing or Settings.speed.instant:
 		return
 	var tween := node.create_tween()
 	for i in 4:
 		var offset := Vector2(randf_range(-strength, strength), randf_range(-strength, strength))
-		tween.tween_property(camera, "offset", offset, 0.04)
-	tween.tween_property(camera, "offset", Vector2.ZERO, 0.04)
+		tween.tween_property(camera, "offset", offset, SHAKE_STEP_SECONDS)
+	tween.tween_property(camera, "offset", Vector2.ZERO, SHAKE_STEP_SECONDS)
 
 
 ## Skipped while capturing, for the same reason as `shake_camera`: a loop has
@@ -148,10 +183,13 @@ func start_cursor_pulse() -> void:
 	var tween := node.create_tween().set_loops()
 	(
 		tween
-		. tween_property(cursor, "scale", Vector2(1.15, 1.15), 0.4)
+		. tween_property(cursor, "scale", Vector2(1.15, 1.15), CURSOR_PULSE_SECONDS)
 		. set_trans(Tween.TRANS_SINE)
 		. set_ease(Tween.EASE_IN_OUT)
 	)
-	tween.tween_property(cursor, "scale", Vector2.ONE, 0.4).set_trans(Tween.TRANS_SINE).set_ease(
-		Tween.EASE_IN_OUT
+	(
+		tween
+		. tween_property(cursor, "scale", Vector2.ONE, CURSOR_PULSE_SECONDS)
+		. set_trans(Tween.TRANS_SINE)
+		. set_ease(Tween.EASE_IN_OUT)
 	)

@@ -45,6 +45,6 @@ func _ready() -> void:
 		grid.add_child(card)
 		card.bind(commander)
 
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--screenshot="):
-			ScreenshotUtil.capture_and_quit(self, arg.get_slice("=", 1))
+	var shot_path := ScreenshotUtil.requested()
+	if shot_path != "":
+		ScreenshotUtil.capture_and_quit(self, shot_path)
