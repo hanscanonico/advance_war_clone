@@ -73,6 +73,60 @@ func test_forecast_no_counter_from_indirect_defender() -> void:
 	assert_eq(forecast.counter_damage, -1, "artillery never counters")
 
 
+## forecast() is the convenience for the defender's real cell, so the two must
+## agree there or every existing caller has quietly changed answer.
+func test_forecast_at_the_defenders_own_cell_matches_forecast() -> void:
+	var state := _state("[terrain]\n...\n[units]\n1 t 0 0\n2 i 1 0")
+	var convenience := CombatResolver.forecast(
+		state, state.units[0], Vector2i(0, 0), state.units[1]
+	)
+	var explicit := CombatResolver.forecast_at(
+		state, state.units[0], Vector2i(0, 0), state.units[1], state.units[1].cell
+	)
+	assert_eq(explicit.can_attack, convenience.can_attack)
+	assert_eq(explicit.attack_damage, convenience.attack_damage)
+	assert_eq(explicit.counter_damage, convenience.counter_damage)
+
+
+## The point of the explicit cell: the cover the defender *would* have there,
+## not the cover it has now.
+func test_forecast_at_reads_the_cover_of_the_cell_it_is_given() -> void:
+	# The infantry stands on road (0 stars); the mountain beside it is 4.
+	var state := _state("[terrain]\n.=M.\n[units]\n1 t 3 0\n2 i 1 0")
+	var tank := state.units[0]
+	var infantry := state.units[1]
+	var on_road := CombatResolver.forecast(state, tank, Vector2i(3, 0), infantry)
+	var on_mountain := CombatResolver.forecast_at(
+		state, tank, Vector2i(3, 0), infantry, Vector2i(2, 0)
+	)
+	assert_eq(on_road.attack_damage, 25, "where it actually stands: road, 25 * 1.0")
+	assert_eq(on_mountain.attack_damage, 15, "where it is asked about: mountain, 25 * 0.6")
+
+
+## The counter is a question about distance, so it has to be measured from the
+## effective cell too — a defender that could not reach the attacker from where
+## it stands may well reach it from the cell being scored.
+func test_forecast_at_measures_the_counter_from_the_effective_cell() -> void:
+	var state := _state("[terrain]\n....\n[units]\n1 t 0 0\n2 i 3 0")
+	var tank := state.units[0]
+	var infantry := state.units[1]
+	var far := CombatResolver.forecast_at(state, tank, Vector2i(0, 0), infantry, Vector2i(3, 0))
+	var beside := CombatResolver.forecast_at(state, tank, Vector2i(0, 0), infantry, Vector2i(1, 0))
+	assert_eq(far.counter_damage, -1, "three tiles from the tank nothing shoots back")
+	# Beside the tank the counter lands: 5 * 0.8 * 0.9 = 3.6 -> 4.
+	assert_eq(beside.counter_damage, 4, "asked about the cell beside the tank, it is answered")
+
+
+## The whole reason the parameter exists: asking about a cell is a pure read.
+func test_forecast_at_never_moves_the_defender() -> void:
+	var state := _state("[terrain]\n.M..\n[units]\n1 t 0 0\n2 i 3 0")
+	var infantry := state.units[1]
+	CombatResolver.forecast_at(state, state.units[0], Vector2i(0, 0), infantry, Vector2i(1, 0))
+	assert_eq(infantry.cell, Vector2i(3, 0), "the defender was never stood anywhere")
+	assert_eq(state.unit_at(Vector2i(3, 0)), infantry, "and the board still finds it there")
+	assert_null(state.unit_at(Vector2i(1, 0)), "the measured cell stayed empty")
+
+
 func test_resolve_luck_bounds_and_hp() -> void:
 	var state := _state("[terrain]\n...\n[units]\n1 t 0 0\n2 i 1 0")
 	state.rng.seed = 1234

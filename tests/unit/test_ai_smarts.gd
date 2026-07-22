@@ -207,24 +207,26 @@ func test_an_unreachable_enemy_threatens_nothing() -> void:
 	)
 
 
-## The map measures a cell by standing the unit on it — the terrain it would move
-## onto is exactly what changes the damage — and puts it straight back. The read
-## is restored, so nothing about it may survive the call.
-func test_measuring_a_cell_puts_the_unit_straight_back() -> void:
+## The map measures a cell by asking what the damage would be with the defender
+## *at* it — the terrain it would move onto is exactly what changes the number —
+## and asks through an effective cell rather than by moving anything. Scoring a
+## move must leave no trace on the board at all.
+func test_measuring_a_cell_never_moves_the_unit() -> void:
 	var state := _state(ARTILLERY_RING_BOARD)
 	var tank := state.units_of(1)[0]
 	var origin := tank.cell
+	var before := _board_snapshot(state)
 	var map := ThreatMap.build(state, state.units_of(2))
 	assert_gt(
 		map.incoming_damage(state, tank, Vector2i(7, 0)), 0, "the ring must actually threaten"
 	)
-	assert_eq(tank.cell, origin, "the measured unit is stood on the cell and put back")
+	assert_eq(_board_snapshot(state), before, "measuring a cell changed the board")
 	assert_eq(state.unit_at(origin), tank, "and the board still finds it where it was")
 
 
 ## The same guarantee across a whole Difficult turn on a real board: the sim
 ## changes when a command is *applied*, never while one is being planned. Guards
-## the restored read above from anything a future capability adds beside it.
+## the pure read above from anything a future capability adds beside it.
 func test_planning_a_difficult_turn_leaves_the_board_untouched() -> void:
 	var map := MapData.load_from_file("res://maps/first_steps.txt", terrain_db)
 	var state := GameState.create(map, unit_db, chart)

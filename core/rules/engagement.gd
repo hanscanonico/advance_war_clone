@@ -18,6 +18,8 @@ var attacker_cell: Vector2i
 ## Displayed HP (1-10) the formula should use for the attacker.
 var attacker_hp: int
 var defender: Unit
+## The cell the shot is scored against — not always `defender.cell`; a forecast
+## may ask about a cell the defender has not moved to (CombatResolver.forecast_at).
 var defender_cell: Vector2i
 ## Displayed HP (1-10) the formula should use for the defender.
 var defender_hp: int

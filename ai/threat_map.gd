@@ -9,7 +9,7 @@ extends RefCounted
 ##
 ## Node-free like the rest of ai/. Reuses the single authorities and re-derives
 ## no rules: MovementResolver for each enemy's reach, AttackRange for its firing
-## ring, CombatResolver.forecast for the damage. Forecast is luck-free and draws
+## ring, CombatResolver.forecast_at for the damage. Forecast is luck-free and draws
 ## no RNG, so a Difficult match stays as deterministic and replayable as any
 ## other tier.
 ##
@@ -86,24 +86,21 @@ func _mark_ring(state: GameState, enemy: Unit, from: Vector2i, low: int, high: i
 ## attackers cannot cost more than the unit is worth.
 ##
 ## Evaluates the shot with the defender *at* `cell`, which is the whole point:
-## the terrain it would move onto changes how hard it is hit. Because
-## CombatResolver.forecast reads the defender's own cell, the unit is stood on
-## `cell` for the calculation and put straight back — a synchronous, restored
-## read that never leaves the board changed. The enemy's firing cell does not
-## affect outgoing damage (only the defender's terrain does), so any in-range
-## origin gives the same number and the stored per-cell list is enough.
+## the terrain it would move onto changes how hard it is hit. `forecast_at`
+## takes that position as an effective value, so scoring a hypothetical move
+## asks a question without ever standing the unit somewhere to ask it. The
+## enemy's firing cell does not affect outgoing damage (only the defender's
+## terrain does), so any in-range origin gives the same number and the stored
+## per-cell list is enough.
 func incoming_damage(state: GameState, defender: Unit, cell: Vector2i) -> int:
 	var enemies: Array = _by_cell.get(cell, [])
 	if enemies.is_empty():
 		return 0
-	var origin := defender.cell
-	defender.cell = cell
 	var total := 0
 	for enemy: Unit in enemies:
 		if not state.damage_chart.can_attack(enemy.type.id, defender.type.id):
 			continue
-		var forecast := CombatResolver.forecast(state, enemy, enemy.cell, defender)
+		var forecast := CombatResolver.forecast_at(state, enemy, enemy.cell, defender, cell)
 		if forecast.can_attack:
 			total += forecast.attack_damage
-	defender.cell = origin
 	return mini(total, defender.hp)

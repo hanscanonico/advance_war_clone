@@ -128,7 +128,10 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
   effective values a shot is resolved with: the cell it is *actually* fired from and the HP the
   formula should use. A forecast fires from a cell the attacker has not moved to yet, and a
   forecast's counter uses projected post-attack HP — handing hooks the effective values is what
-  keeps the damage preview and the resolved attack on identical numbers.
+  keeps the damage preview and the resolved attack on identical numbers. The *defender's* cell is
+  an effective value for the same reason: `CombatResolver.forecast_at` takes the cell to score the
+  shot against, so the AI can ask "how hard am I hit if I stop here?" without standing a live unit
+  somewhere to ask it. Forecasting is a pure read — if a query has to mutate the board, it is wrong.
 - Two more single authorities, same rule as vision below — ask them, never re-derive:
   `core/rules/attack_range.gd` owns **who** a unit may shoot and **how far** — `can_engage` and
   `covers` — and `core/movement_resolver.gd` owns the movement budget and per-step terrain cost,

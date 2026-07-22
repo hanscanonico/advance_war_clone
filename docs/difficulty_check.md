@@ -49,10 +49,11 @@ which compares a full AI turn command for command.
 
 - **S1 threat awareness — two dials on one map.** Builds a per-turn `ThreatMap`
   (`ai/threat_map.gd`): for every visible enemy, its `MovementResolver` reach ×
-  its `AttackRange` firing ring, and the damage a `CombatResolver.forecast`
+  its `AttackRange` firing ring, and the damage a `CombatResolver.forecast_at`
   says it would do to the unit standing there. Reuses the single authorities and
   re-derives no rules; forecast is luck-free, so it draws no RNG and the replay
-  guarantee holds. Cached once per turn, keyed on the day and the enemy set, so a
+  guarantee holds. `forecast_at` takes the defender's cell as an effective value,
+  so scoring a hypothetical move is a pure read — nothing is moved to ask. Cached once per turn, keyed on the day and the enemy set, so a
   new day always rebuilds it and a counter-kill mid-turn does too.
 
   The map is read by two weights, because the two paths that read it do not score
