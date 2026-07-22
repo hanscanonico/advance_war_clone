@@ -207,7 +207,9 @@ make balance-watch SIM="--map=clash --red=viktor_draeg:hard --blue=cass_orlov:ea
 ```
 
 Nothing is recorded or streamed from the harness — the scene simply runs the same
-deterministic pipeline with animation between commands. That works because the AI
+deterministic pipeline, animated at whatever game speed this device is set to
+(README's *Game speed*; `--speed=instant` skips the theatre for one run and is
+the quickest way to watch a long match out). That works because the AI
 plans from state alone (lookahead-free, RNG-free) and only `CombatResolver` draws
 from the seeded `state.rng`; `BattleAiRunner`'s pacing delays are pure
 presentation and touch no sim state.
