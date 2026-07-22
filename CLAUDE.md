@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** six designs of record, all worth reading before an architectural decision.
+- **Status:** seven designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -30,6 +30,13 @@ three movement domains (land, air, sea), property capture and income, and a comp
   `steelworks` — and its D1: **zero starting units is an omitted `[units]` section**, not a flag and
   not a parser change, which is why the trio shipped with no engine change at all. Its D3 keeps them
   land-only, deferring to the naval plan's standing R1.
+  `.lavish/balance-simulator-plan.html` owns the offline balance instruments — milestones BS1–BS4,
+  all shipped — and its D2: **the telemetry observes, it never instruments the sim.** Nothing under
+  `core/` or `ai/` gained a signal, hook or field for it, so what the Lab measures is bit-for-bit
+  what ships. Its D1 is the standing constraint on the toolchain: `tools/balance/match_engine.gd` is
+  the one match loop, `make commander-balance` and `make difficulty-check` are byte-stable presets
+  over it, and the merge bar for touching it is a fixed-seed byte-diff of both their reports — two
+  committed documents rest on those numbers. `docs/balance_sim.md` is how to run and read it.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
@@ -76,7 +83,7 @@ res://
 │              (NO Node references)
 ├─ maps/        # map scenes / map resources
 ├─ assets/      # sprites, audio, fonts  (+ LICENSES.md)
-└─ tests/       # GUT tests — target core/ and ai/ only
+└─ tests/       # GUT tests — target the Node-free layers only (see Testing)
 ```
 
 ## GDScript conventions
@@ -100,10 +107,13 @@ Follow the official Godot GDScript style guide. Key points:
 ## Testing
 
 - Tests use **GUT** (Godot Unit Test) and live in `tests/`, mirroring `core/` and `ai/`.
-- **Test the pure-simulation layers exclusively** — `core/`, plus `ai/`, which is Node-free for
-  exactly this reason. That's where the rules live and where bugs hurt. Movement range, path
-  math, the combat resolver, capture points, turn/economy logic, and AI planning all get unit
-  tests. Presentation is verified by playing the scene, not by unit tests.
+- **Test the pure-simulation layers exclusively** — `core/`, plus `ai/` and the offline balance
+  harness in `tools/balance/`, all of which are Node-free for exactly this reason. That's where the
+  rules live and where bugs hurt. Movement range, path math, the combat resolver, capture points,
+  turn/economy logic, AI planning, and the balance engine's determinism and telemetry attribution
+  all get unit tests. Presentation is verified by playing the scene, not by unit tests — which is
+  why watch mode announces its winner and day: it makes a presentation-layer claim (the watched
+  match *is* the harness's match) checkable by diffing two lines instead of watching a window.
 - Every bugfix in `core/` or `ai/` should come with a failing test that the fix makes pass.
 - Keep tests deterministic: seed the RNG explicitly.
 

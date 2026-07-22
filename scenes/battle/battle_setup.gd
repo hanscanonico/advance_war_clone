@@ -24,6 +24,19 @@ class BuiltMatch:
 	## The tier the computer plays at. Never null — DifficultyDB always answers —
 	## and the source of both the AI's profile and the id the save records.
 	var difficulty: Difficulty
+	## team -> Difficulty, when the sides play at *different* tiers. Only watch
+	## mode fills it; a normal match has one computer opponent at one tier, and
+	## `difficulty` above is that tier and the one the save records.
+	var per_team_difficulty: Dictionary = {}
+	## `--watch`: both seats are the computer's and the match came from a Balance
+	## Lab spec. The scene prints its result and exits when the match ends, so a
+	## watched run can be diffed against the CSV row it was launched from.
+	var watching := false
+	## Watch mode only: the day after which a match nobody has won is scored on
+	## the harness's own tiebreak, so a `day_cap` row can be watched to the same
+	## line it was launched from. `--days=`, matching the Lab's flag. Normal play
+	## ignores it entirely — a hot-seat or player-vs-AI match has no day limit.
+	var days_cap := BalanceMatchEngine.DEFAULT_DAYS
 
 
 static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: CommanderDB) -> BuiltMatch:
@@ -35,18 +48,53 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 	var fog: bool = MatchConfig.fog_enabled
 	var picked: Dictionary = MatchConfig.commanders.duplicate()
 	var tier: StringName = MatchConfig.difficulty
+	var seed_val := -1
+	var sides: Dictionary = {}  # team -> BalanceSideSpec, from --red / --blue
 	result.ai_teams = MatchConfig.ai_teams.duplicate()
+	var watching := "--watch" in args
 	for arg in args:
 		if arg.begins_with("--map="):
-			map_path = "res://maps/%s.txt" % arg.get_slice("=", 1)
+			# Through MapCatalog so a balance fixture resolves by the same name the
+			# headless Lab knows it by — a watched match must be the same board its
+			# CSV row was played on. A name nothing answers to is said out loud
+			# rather than quietly played on the default board: a watched match on
+			# the wrong map still prints a result line, and that line is what the
+			# replay-fidelity check diffs.
+			var wanted := arg.get_slice("=", 1)
+			var resolved := MapCatalog.resolve(wanted)
+			if resolved == "":
+				push_error(
+					(
+						"battle: unknown map '%s'; playing %s instead. Known: %s"
+						% [wanted, map_path, ", ".join(MapCatalog.resolvable_names())]
+					)
+				)
+			else:
+				map_path = resolved
+		elif arg.begins_with("--days="):
+			result.days_cap = maxi(1, int(arg.get_slice("=", 1)))
 		elif arg.begins_with("--co="):
 			picked = parse_co_flag(arg.get_slice("=", 1))
 		elif arg.begins_with("--difficulty="):
 			tier = StringName(arg.get_slice("=", 1).strip_edges())
+		elif arg.begins_with("--red="):
+			sides[GameState.TEAMS[0]] = arg.get_slice("=", 1)
+		elif arg.begins_with("--blue="):
+			sides[GameState.TEAMS[1]] = arg.get_slice("=", 1)
+		elif arg.begins_with("--seed="):
+			seed_val = maxi(0, int(arg.get_slice("=", 1)))
 	if "--hotseat" in args:
 		result.ai_teams = []
 	if "--fog" in args:
 		fog = true
+	if watching:
+		# Watch mode (balance plan BS3): both seats are the computer's, each with
+		# its own commander and its own tier, and the match RNG is pinned. That is
+		# the whole difference from a normal launch — the sim, the planners and
+		# the animations are the shipped ones, which is what makes the watched
+		# match the same match as its headless row (plan D7).
+		result.ai_teams = GameState.TEAMS.duplicate()
+		result.watching = true
 	_apply_difficulty(result, difficulty_db, tier)
 	if MatchConfig.load_save and SaveGame.has_save():
 		MatchConfig.load_save = false
@@ -71,10 +119,33 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 	assert(result.game != null, "failed to build game state from %s" % map_path)
 	result.game.map_path = map_path
 	result.game.fog_enabled = fog
-	result.game.rng.randomize()
+	# A pinned seed is what makes a watched match *the* match rather than another
+	# one like it: the AI is lookahead-free and RNG-free, so the seed is the only
+	# thing left that could make two runs of one spec diverge.
+	if seed_val >= 0:
+		result.game.rng.seed = seed_val
+	else:
+		result.game.rng.randomize()
 	for team: int in picked:
 		result.game.set_commander(team, commander_db.by_id(picked[team]))
+	_apply_side_specs(result, commander_db, difficulty_db, sides)
 	return result
+
+
+## `--red=<co>:<tier>` / `--blue=<co>:<tier>`: the Balance Lab's side grammar,
+## read through the Lab's own parser so a spec means the same thing in the window
+## as it did in the report. Sets each side's commander and records its tier, so
+## the scene can hand each team a planner of its own.
+static func _apply_side_specs(
+	result: BuiltMatch, commander_db: CommanderDB, difficulty_db: DifficultyDB, sides: Dictionary
+) -> void:
+	for team: int in sides:
+		var spec := BalanceSideSpec.parse(sides[team], commander_db, difficulty_db)
+		if spec.error != "":
+			push_error("battle: %s" % spec.error)
+			continue
+		result.game.set_commander(team, commander_db.by_id(spec.commander))
+		result.per_team_difficulty[team] = difficulty_db.by_id(spec.tier)
 
 
 ## Resolves the tier and makes MatchConfig agree with it, so the id the save

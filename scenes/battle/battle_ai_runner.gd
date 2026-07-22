@@ -15,7 +15,12 @@ extends RefCounted
 const START_DELAY := BattleAnimator.BANNER_SECONDS + 0.1
 const COMMAND_DELAY := 0.2
 ## Safety net: a planner bug can never hang the match, only force a turn to end.
-const MAX_COMMANDS_PER_TURN := 300
+## Read from the harness rather than declared here, because the headless engine
+## applies the identical cut (balance plan D7) — if the two drifted apart, a
+## watched match could be trimmed where its headless row was let run, and the
+## replay-fidelity check would fail for a reason that has nothing to do with the
+## sim.
+const MAX_COMMANDS_PER_TURN := BalanceMatchEngine.MAX_COMMANDS_PER_TURN
 
 var _battle: Battle
 
@@ -33,7 +38,10 @@ func run() -> void:
 		if game.winner != 0:
 			_leave()
 			return
-		var command := _battle.ai.plan_next_command(game)
+		# Asked per command, not cached for the turn: an EndTurnCommand hands play
+		# to the other side mid-loop, and in watch mode that side has a planner of
+		# its own.
+		var command := _battle.planner_for(game.current_team).plan_next_command(game)
 		var error := command.validate(game)
 		if error != "":
 			push_error("AI command rejected (%s); ending the AI turn" % error)

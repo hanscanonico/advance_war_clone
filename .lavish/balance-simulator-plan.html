@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Balance Lab: any map, any commanders, any tier, full telemetry</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    pre.gc-code {
+      background: #0d1f30;
+      color: #d7e7f5;
+      border-radius: .5rem;
+      padding: .9rem 1.1rem;
+      overflow-x: auto;
+      font-size: .8rem;
+      line-height: 1.55;
+    }
+    pre.gc-code .c { color: #7fa7c8; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+    .gc-milestone { border-top: 4px solid var(--gc-blue); }
+  </style>
+</head>
+<body class="py-6">
+<div class="gc-shell rounded-box overflow-hidden">
+
+  <!-- ============================== HERO ============================== -->
+  <header class="gc-hero px-6 py-8 md:px-10">
+    <p class="gc-kicker opacity-80">Grid Commander · Balance instrument · Plan for review</p>
+    <h1 class="text-3xl md:text-4xl font-black mt-2">Balance Lab — any map, any commanders, any tier, full telemetry</h1>
+    <p class="mt-3 max-w-3xl opacity-90">
+      One headless tool that pits <strong>two independent AIs</strong> against each other on
+      <strong>any shipped map</strong>, each side carrying <strong>any commander at any difficulty
+      tier</strong>, over N seeded matches with both seats swapped — and records not just who won,
+      but a <strong>turn-by-turn timeline</strong>: each side's funds, what it built, what it
+      killed, what it lost, every capture and every power. Win-rate summaries flag what's
+      unbalanced; the timeline shows <em>why</em>. And any matchup the Lab can score it can also
+      <strong>show</strong>: the same spec and seed boot the real game window with both sides
+      AI-driven, so a suspicious row in the report becomes a battle you watch live.
+    </p>
+    <div class="mt-5 flex flex-wrap gap-2">
+      <span class="badge badge-success badge-lg font-bold">SHIPPED — BS1–BS4 complete</span>
+      <span class="badge badge-outline badge-lg text-white">generalizes the shipped runner</span>
+      <span class="badge badge-outline badge-lg text-white">0 changes under core/ and ai/</span>
+      <span class="badge badge-outline badge-lg text-white">Q1 yes · Q3 yes</span>
+    </div>
+    <div class="mt-4 rounded-box bg-white/10 p-4 text-sm">
+      <strong>Status.</strong> All four milestones are in. The instrument is
+      <code>make balance-sim</code>, watch mode is <code>make balance-watch</code>, and
+      <span class="gc-file">docs/balance_sim.md</span> is the committed record — how to run it, how to
+      read it, and what it measured on its first calibration run. Review answered <strong>Q1 yes</strong>
+      (the HTML report ships) and <strong>Q3 yes</strong> (the per-command JSONL ships, on by default,
+      <code>--no-commands</code> to skip); <strong>Q2</strong> took the plan's own recommendation — the two
+      presets stay, because two committed documents cite their exact flags.
+      D1's merge bar held: both shipped gates are byte-identical across the extraction.
+    </div>
+  </header>
+
+  <main class="px-6 md:px-10 py-8 space-y-12">
+
+    <!-- ============================== 1 · GAP ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">1</span> What exists, what's missing</h2>
+      <p class="max-w-3xl">
+        This is <strong>not</strong> a from-scratch build. <span class="gc-file">tools/run_commander_balance.gd</span>
+        already plays deterministic AI-vs-AI headlessly, side-swaps seats, ranks day-cap games on the
+        Advance Wars timed-match tiebreak, and writes CSV/JSON with win-rate bands — it's the committed
+        instrument behind two standing documents (<span class="gc-file">docs/commander_balance.md</span>,
+        <span class="gc-file">docs/difficulty_check.md</span>). But its two modes each fix a dimension
+        the Balance Lab must free:
+      </p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full">
+          <thead><tr><th>Dimension</th><th>Today</th><th>Balance Lab</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="font-bold">Maps</td>
+              <td>3 synthetic fixtures embedded in the script (commander mode); <span class="gc-file">scrimmage</span> + <span class="gc-file">ironworks</span> only (difficulty mode)</td>
+              <td class="font-semibold">All 12 shipped <span class="gc-file">maps/*.txt</span> via <code>MapCatalog</code>, plus the 3 fixtures — <code>--map=</code> anything</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Sides</td>
+              <td>Commanders <em>or</em> tiers, never both: commander mode runs one shared Normal planner; difficulty mode forbids commanders</td>
+              <td class="font-semibold">Per-side <code>commander:tier</code> — e.g. Gideon Holt on Difficult vs Cass Orlov on Easy</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Stats</td>
+              <td>End-of-match row only: winner, termination, day, final funds/units/properties</td>
+              <td class="font-semibold">Everything above <em>plus</em> a per-turn timeline: funds, income, spend, builds, kills, losses, captures, power charge — per side, per day</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Sweeps</td>
+              <td>Fixed matrices: all commander pairs, or adjacent tier pairs</td>
+              <td class="font-semibold">One free dimension per run: sweep commanders, maps, or tier pairings, others pinned</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Watching</td>
+              <td>AI-vs-AI runs headless only; the battle scene hosts <em>one</em> AI profile at a time (built for player-vs-AI)</td>
+              <td class="font-semibold">Any Lab spec boots the battle scene windowed, both sides AI with per-side profiles — same seed ⇒ the exact match from the CSV, live</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+        <h3 class="font-bold">What this instrument immediately unlocks</h3>
+        <p class="text-sm">Two standing debts are waiting for exactly this tool: the DF4 difficulty
+          ladder must be re-run after the planner fixes (<span class="gc-file">docs/difficulty_check.md</span> §4
+          says its numbers describe a superseded planner <em>and</em> a superseded board), and the
+          +14.9 pp first-side bias accepted during the air/naval work belongs to a base-game balance
+          pass that needs per-map bias numbers. Both become one-command runs here.</p>
+      </div></div>
+    </section>
+
+    <!-- ============================== 2 · ARCHITECTURE ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">2</span> Architecture — the sim is already a simulator</h2>
+      <p class="max-w-3xl">
+        The simulation/presentation split does all the heavy lifting: <span class="gc-file">core/</span> and
+        <span class="gc-file">ai/</span> are Node-free, <code>GameState</code> owns a seedable RNG, and the AI
+        is driven one command at a time by whoever hosts it. A headless match is ~15 lines, and the
+        per-side-planner shape already exists in the runner's <code>_play_tiers</code>
+        (<span class="gc-file">tools/run_commander_balance.gd:714</span>):
+      </p>
+      <pre class="gc-code"><span class="c"># the whole match loop — MatchEngine generalizes exactly this</span>
+var map := MapData.load_from_file(map_path, terrain_db)   <span class="c"># any maps/*.txt</span>
+var state := GameState.create(map, unit_db, chart)
+state.rng.seed = seed_val                                  <span class="c"># deterministic</span>
+state.set_commander(1, commander_db.by_id(red.commander))
+state.set_commander(2, commander_db.by_id(blue.commander))
+var planners := {                                          <span class="c"># two independent AIs</span>
+	1: AIController.new(unit_db, difficulty_db.by_id(red.tier).profile()),
+	2: AIController.new(unit_db, difficulty_db.by_id(blue.tier).profile()),
+}
+while state.winner == 0 and state.day &lt;= days_cap and commands &lt; COMMAND_CAP:
+	var command: Command = planners[state.current_team].plan_next_command(state)
+	if command.validate(state) != "":                  <span class="c"># planner/rules disagreement = hard failure</span>
+		rejected += 1
+		command = EndTurnCommand.new()
+	recorder.before_apply(state, command)               <span class="c"># NEW: telemetry hook (harness-side)</span>
+	command.apply(state)
+	recorder.after_apply(state, command)
+	commands += 1</pre>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-black">Zero changes to the game rules</h3>
+          <p class="text-sm">All measurement lands under <span class="gc-file">tools/balance/</span>. The recorder
+            <em>observes</em>: it inspects each command before/after <code>apply</code> and reads public
+            <code>GameState</code> fields. No signals added to <span class="gc-file">core/</span>, no new hooks in
+            <span class="gc-file">ai/</span> — the thing being measured is bit-for-bit the shipped game. The one
+            change outside <span class="gc-file">tools/</span> is presentation: the battle scene learns to host a
+            planner per team for watch mode (BS3).</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-black">Determinism inherited</h3>
+          <p class="text-sm">Same map + seed + side specs ⇒ byte-identical CSV rows <em>and</em> timeline, because
+            the AI is lookahead-free and RNG-free and only <code>CombatResolver</code> draws from the seeded
+            <code>state.rng</code>. A tuning change is attributable to the change, never to noise.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-black">Scoring rules shared, verbatim</h3>
+          <p class="text-sm">Day-cap games rank by the existing tiebreak — properties, then units, then funds —
+            with the same termination labels (<code>rout</code>/<code>hq</code>/<code>day_cap</code>/<code>command_cap</code>)
+            and the same hard invariants (0 rejected commands, 0 cap stalls). Balance Lab numbers stay
+            comparable with both standing docs.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · CLI ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">3</span> The tool — one matchup spec, three sweep axes</h2>
+      <p class="max-w-3xl">A side is <code>&lt;commander&gt;:&lt;tier&gt;</code> — commander id or
+        <code>none</code>, tier <code>easy</code>/<code>normal</code>/<code>hard</code>, defaults
+        <code>none:normal</code>. Every seed is played <strong>both seats</strong> (the pairing the
+        existing runner already uses), so a first-move advantage cancels out of win rates and is
+        reported separately as bias.</p>
+      <pre class="gc-code"><span class="c"># one matchup, full telemetry — "why does Gideon crush Cass here?"</span>
+make balance-sim SIM="--map=ironworks --red=gideon_holt:normal --blue=cass_orlov:normal --seeds=10"
+
+<span class="c"># mixed tiers and doctrines — "is Difficult worth a commander handicap?"</span>
+make balance-sim SIM="--map=scrimmage --red=cass_orlov:hard --blue=gideon_holt:easy --seeds=15"
+
+<span class="c"># sweep axis 1 — every commander (vs neutral) at one tier on one board</span>
+make balance-sim SIM="--map=the_straits --sweep=commanders --tier=normal --seeds=4"
+
+<span class="c"># sweep axis 2 — map fairness: identical mirror on every shipped board</span>
+make balance-sim SIM="--sweep=maps --red=none:normal --blue=none:normal --seeds=6"
+
+<span class="c"># sweep axis 3 — the DF4 ladder, now with doctrines allowed on both sides</span>
+make balance-sim SIM="--sweep=tiers --map=scrimmage --commander=alina_ward --seeds=15"
+
+<span class="c"># watch a match from the report live in the game window — same spec + seed = the same battle</span>
+make balance-watch SIM="--map=ironworks --red=gideon_holt:normal --blue=cass_orlov:normal --seed=1003"</pre>
+      <p class="max-w-3xl text-sm">Remaining flags carry over from the existing runner:
+        <code>--seeds=</code>, <code>--days=</code> (default 20), <code>--out=</code>. Output goes to
+        <span class="gc-file">reports/balance_sim/&lt;run-name&gt;/</span> (gitignored like all reports):
+        <span class="gc-file">matches.csv</span> — one row per match;
+        <span class="gc-file">timeline.csv</span> — one row per side per day, keyed by <code>match_id</code>;
+        <span class="gc-file">summary.json</span> — aggregates and flags (§5, BS2).</p>
+    </section>
+
+    <!-- ============================== 4 · TELEMETRY ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">4</span> The timeline — what gets recorded every turn</h2>
+      <p class="max-w-3xl">One <span class="gc-file">timeline.csv</span> row per <strong>played turn</strong>
+        (match × day × side). A row covers everything from that side's income tick to its
+        <code>EndTurnCommand</code>, so every event in the game lands in exactly one row:</p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full">
+          <thead><tr><th>Column group</th><th>Columns</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="font-bold">Key</td>
+              <td><code>match_id · day · team · commander · tier</code></td>
+              <td>Joins to <span class="gc-file">matches.csv</span> for map, seed, seats, outcome.</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Money</td>
+              <td><code>funds_start · income · spent · funds_end</code></td>
+              <td><code>funds_start</code> is read <em>after</em> the income/upkeep tick of
+                <code>TurnRules.begin_turn</code>; <code>spent</code> is the sum of applied
+                <code>BuildCommand</code> costs, so <code>funds_start − spent = funds_end</code> reconciles
+                (modulo commander economy hooks, which then become <em>visible</em> as the residual).</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Production</td>
+              <td><code>built · built_value</code></td>
+              <td>Unit ids with counts (<code>tank;infantry×2</code>) and their summed cost — the build
+                order, turn by turn.</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Combat</td>
+              <td><code>killed · lost · killed_value · lost_value</code></td>
+              <td>Enemy units destroyed this turn / own units destroyed this turn (counter-fire and
+                power effects included), as unit-id lists plus summed cost. Attribution is by command,
+                not blind diffing — §D3.</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Board</td>
+              <td><code>unit_count · army_value · properties · captures</code></td>
+              <td>End-of-turn strength (<code>army_value</code> = Σ cost × HP fraction — the honest number,
+                since a 2 HP tank isn't a tank), property count, captures <em>completed</em> this turn.</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Powers</td>
+              <td><code>power_charge · power_fired</code></td>
+              <td>Meter percentage at turn end; whether the Command Power fired this turn.</td>
+            </tr>
+            <tr>
+              <td class="font-bold">Cost</td>
+              <td><code>commands · planning_ms</code></td>
+              <td>Commands issued and AI planning time — keeps the R3 turn-time watch item measurable
+                for free on every run.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="max-w-3xl text-sm">Reading it is deliberately boring: filter one <code>match_id</code> in any
+        spreadsheet and you watch the game — day 3 Blue banks for a bomber, day 5 Red's army value
+        collapses to a power spike, day 8 the property lines cross. That's the "why" behind every
+        win-rate number in <span class="gc-file">summary.json</span>.</p>
+    </section>
+
+    <!-- ============================== 5 · MILESTONES ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">5</span> Milestones — each one ships something usable</h2>
+      <div class="space-y-4">
+        <div class="card bg-base-100 shadow gc-milestone"><div class="card-body p-5 md:p-6">
+          <h3 class="font-black text-lg">BS1 · The engine, one matchup, full detail <span class="badge badge-success badge-sm align-middle">done</span></h3>
+          <p class="text-sm max-w-3xl mt-1">Extract the match loop into
+            <span class="gc-file">tools/balance/match_engine.gd</span> (per-side planners, from
+            <code>_play_tiers</code>) and add <span class="gc-file">tools/balance/match_recorder.gd</span>.
+            New entry <span class="gc-file">tools/run_balance_sim.gd</span> + <code>make balance-sim</code>:
+            single matchup — <code>--map=</code> any shipped map or fixture, <code>--red=</code>/<code>--blue=</code>
+            side specs, paired seeds both seats. Writes all three files of §3.</p>
+          <ul class="gc-checks text-sm space-y-1 mt-3">
+            <li>Rerun of the same spec is byte-identical (matches.csv <em>and</em> timeline.csv)</li>
+            <li><code>make commander-balance</code> and <code>make difficulty-check</code> outputs are byte-identical before/after the extraction (fixed-seed diff)</li>
+            <li>Reconciliation test green: timeline sums equal the final board and funds of every match</li>
+          </ul>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-milestone"><div class="card-body p-5 md:p-6">
+          <h3 class="font-black text-lg">BS2 · Sweeps and the imbalance report <span class="badge badge-success badge-sm align-middle">done</span></h3>
+          <p class="text-sm max-w-3xl mt-1">The three <code>--sweep=</code> axes of §3, and a
+            <span class="gc-file">summary.json</span> that judges: side-normalized win rate per swept value
+            with the standing bands (45–55% preferred, 40–60% warning — same thresholds as
+            <span class="gc-file">docs/commander_balance.md</span>), first-side bias per map, termination
+            mix with a low-confidence flag when day-cap tiebreaks dominate (§R2), and per-1000-funds
+            efficiency from the timeline. Plus <span class="gc-file">docs/balance_sim.md</span> — how to run
+            it, how to read it, what the flags mean.</p>
+          <ul class="gc-checks text-sm space-y-1 mt-3">
+            <li>Neutral mirror sweep across all 12 maps produces the per-map bias table (the base-game bias debt gets its numbers)</li>
+            <li>Known outliers reproduce: Gideon Holt / Tomas Reed flag high, Cass Orlov / Rhea Sol low — the instrument agrees with the committed record</li>
+            <li>Full 12-map neutral sweep at 6 seeds finishes in single-digit minutes headless</li>
+          </ul>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-milestone"><div class="card-body p-5 md:p-6">
+          <h3 class="font-black text-lg">BS3 · Watch any match live <span class="badge badge-success badge-sm align-middle">done</span></h3>
+          <p class="text-sm max-w-3xl mt-1">The same side-spec grammar boots the <em>real battle scene</em>,
+            windowed, both teams AI-driven: <code>make balance-watch</code>. One presentation-layer change
+            makes it possible — <span class="gc-file">scenes/battle/battle.gd</span> +
+            <span class="gc-file">battle_setup.gd</span> learn to host <strong>a planner per team</strong>
+            (the harness's <code>planners</code> dict, brought into the scene) instead of today's single
+            shared <code>AIController</code>, and a <code>--seed=</code> flag routes to
+            <code>state.rng.seed</code> instead of <code>randomize()</code>. Because the sim and both
+            planners are deterministic, the windowed run replays the harness's command sequence exactly:
+            pick a strange row in <span class="gc-file">matches.csv</span>, feed its spec and seed back,
+            and watch that very game. Launched through the focus-safe wrapper
+            (<span class="gc-file">tools/godot_gui.sh</span>) like every windowed target.</p>
+          <ul class="gc-checks text-sm space-y-1 mt-3">
+            <li>Replay fidelity: a watched spec + seed ends with the same winner on the same day as its harness row</li>
+            <li>A mixed matchup (different commander <em>and</em> tier per side) visibly plans differently per side</li>
+            <li>Still zero changes under <span class="gc-file">core/</span> and <span class="gc-file">ai/</span> — the scene hosts planners; the sim and the AI are untouched</li>
+          </ul>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-milestone"><div class="card-body p-5 md:p-6">
+          <h3 class="font-black text-lg">BS4 · The reading surface <span class="badge badge-success badge-sm align-middle">done</span></h3>
+          <p class="text-sm max-w-3xl mt-1">A self-contained HTML report generated per run from
+            <span class="gc-file">summary.json</span> + <span class="gc-file">timeline.csv</span>: win-rate
+            heat-map for sweeps, per-map bias chart, and per-match funds / army-value curves — the
+            timeline §4 promises, drawn instead of eyeballed in a spreadsheet. Static file, no server,
+            gitignored with the rest of the report.</p>
+          <ul class="gc-checks text-sm space-y-1 mt-3">
+            <li>One command produces the report next to the CSVs it renders</li>
+            <li>Every number in it is read from the run's files — the generator computes nothing the CSVs don't already say</li>
+          </ul>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · DECISIONS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">6</span> Decisions</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D1 · Extract the engine; the two shipped gates stay byte-stable</h3>
+          <p class="text-sm">The shared loop moves to <span class="gc-file">tools/balance/</span>;
+            <span class="gc-file">run_commander_balance.gd</span> keeps its CLI and both committed gates
+            (commander matrix, DF4 ladder) as thin presets over the engine. The merge bar is a
+            fixed-seed byte-diff of their reports before/after — the instruments behind two standing
+            documents must not drift while gaining a sibling.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D2 · Telemetry observes; the sim is untouched</h3>
+          <p class="text-sm">No signals, hooks or fields are added under <span class="gc-file">core/</span> or
+            <span class="gc-file">ai/</span>. The recorder reads public state around each
+            <code>command.apply()</code> — which the harness already brokers. What the Lab measures is
+            therefore exactly what ships, and the tool can never bend the game toward measurability.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D3 · Kill/loss attribution is by command, never blind diffing</h3>
+          <p class="text-sm">A unit vanishing from the board is not always a death:
+            <code>JoinCommand</code> merges two units, <code>LoadCommand</code> embarks one into a transport.
+            The recorder classifies removals by the command that caused them — <code>AttackCommand</code>
+            (both directions: target death and counter-fire death), <code>PowerCommand</code> effects,
+            join-merges, embarks. A reconciliation test (BS1) makes miscounting a red build, not a
+            quiet lie in the data.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D4 · One timeline row per played turn, one CSV per run</h3>
+          <p class="text-sm">Per-turn is the requested grain and it keeps a full run in one
+            spreadsheet-friendly file (~70k rows for the biggest batch imaginable — trivial).
+            A per-command event log — every move and shot with coordinates, i.e. a replay — is
+            deliberately out of scope here and parked as Q3.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D5 · Sweep one axis per run</h3>
+          <p class="text-sm">Commanders × tiers × maps × seeds ≈ 12²·3²·12·N — a six-figure matrix nobody
+            reads. A run pins everything except one swept axis, so every batch answers one question
+            and finishes in minutes. Broad sweeps are a sequence of runs, which the deterministic
+            seeds make exactly reproducible and comparable.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D6 · Tiers stay honest, per the difficulty plan's lock</h3>
+          <p class="text-sm">A side's tier is only <em>which <code>AIProfile</code> plans its moves</em> —
+            the Lab adds no handicap, no income tilt, no friendlier dice at any tier, in either
+            direction (difficulty plan D2/D3). Mixing tier and commander per side is new
+            <em>measurement</em>, not new mechanics.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow md:col-span-2"><div class="card-body p-5">
+          <h3 class="font-bold">D7 · Watching is the same match, not a re-creation</h3>
+          <p class="text-sm">Watch mode doesn't record or stream anything from the harness — it simply
+            runs the same deterministic pipeline with animation between commands. That works because
+            the AI plans from state alone (lookahead-free, RNG-free) and only
+            <code>CombatResolver</code> draws from the seeded <code>state.rng</code>;
+            <code>BattleAiRunner</code>'s pacing delays are pure presentation and touch no sim state.
+            The replay-fidelity check in BS3 pins the equivalence — if the scene ever consumed the
+            RNG or reordered a command, the watched winner would diverge from the CSV row and the
+            check goes red. One alignment detail rides along: the scene's per-turn command cap and the
+            harness's match-level cap are unified in the shared engine so neither can cut a game the
+            other would let run.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 7 · RISKS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">7</span> Risks</h2>
+      <div class="space-y-3">
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-4">
+          <h3 class="font-bold">R1 · On naval boards the Lab measures the AI, not the map</h3>
+          <p class="text-sm">The naval plan's standing R1 holds: the AI never plans a ferry, so on
+            <span class="gc-file">isthmus</span> and <span class="gc-file">the_straits</span> its results reflect
+            what the AI can express there, not what humans would find. Mitigation: the summary
+            annotates naval-board rows as AI-bounded rather than hiding them. This is a documented
+            reading rule, not a fix — fixing it is AI work owned by the naval plan.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-4">
+          <h3 class="font-bold">R2 · Day-cap tiebreak noise can blind a board</h3>
+          <p class="text-sm"><span class="gc-file">docs/difficulty_check.md</span> finding (a) is the caution:
+            <span class="gc-file">ironworks</span> scored the <em>known-weaker</em> Easy even with Normal
+            because day-cap tiebreaks turned over on noise. Mitigation: the summary reports the
+            termination mix and marks any swept value low-confidence when decisive endings
+            (<code>rout</code>/<code>hq</code>) are a minority of its games; <code>--days=</code> stays a
+            flag for probing whether a longer cap resolves a board.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-4">
+          <h3 class="font-bold">R3 · The refactor could silently move the two shipped gates</h3>
+          <p class="text-sm">Extracting the engine touches the code both standing documents rest on.
+            That's why D1's byte-diff is a merge bar, not a nicety — if the fixed-seed reports differ
+            by one byte, the extraction is wrong, whatever the diff says it "improved".</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-4">
+          <h3 class="font-bold">R4 · Mixed-tier matchups conflate map bias with tier strength</h3>
+          <p class="text-sm">Held in check by construction: every seed plays both seats, win rates are
+            side-normalized, and bias is reported as its own number per map — the same discipline the
+            existing runner already applies to commander pairings.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-4">
+          <h3 class="font-bold">R5 · Telemetry cost</h3>
+          <p class="text-sm">Recording is reads and appends; matches stay tens-to-hundreds of
+            milliseconds headless. Timeline rows ≈ matches × days × 2 — a few MB of CSV for the
+            largest batch, written buffered. <code>planning_ms</code> lands in every row, so if the
+            recorder ever <em>did</em> get expensive it would be visible in its own output.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 8 · VALIDATION ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">8</span> Validation</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-black">Correctness gates</h3>
+          <ul class="gc-checks text-sm space-y-1 mt-2">
+            <li>Determinism: identical spec ⇒ byte-identical matches.csv and timeline.csv</li>
+            <li>Reconciliation: per match, timeline funds arithmetic closes and built − lost = final army, per side</li>
+            <li>Attribution unit tests: kill vs counter-death vs join vs embark vs power-kill each pinned by a GUT test (the recorder is Node-free precisely so GUT can drive it)</li>
+            <li>Hard invariants inherited: 0 rejected commands, 0 command-cap stalls, or the run exits 1</li>
+          </ul>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-black">Instrument sanity</h3>
+          <ul class="gc-checks text-sm space-y-1 mt-2">
+            <li>Control run: neutral Normal mirror ⇒ ~50% side-normalized, as the difficulty doc's control measured</li>
+            <li>Both shipped gates byte-stable across the extraction (D1)</li>
+            <li>Known commander outliers reproduce on the fixtures (BS2)</li>
+            <li>Runtime budget measured and recorded in <span class="gc-file">docs/balance_sim.md</span></li>
+          </ul>
+        </div></div>
+      </div>
+      <p class="max-w-3xl text-sm">Like its siblings, the Lab stays <strong>out of</strong>
+        <code>make verify</code>/<code>make test</code> — it's an opt-in instrument, not a merge gate.
+        Only its own unit tests (recorder attribution, engine determinism) join the suite.</p>
+    </section>
+
+    <!-- ============================== 9 · OPEN QUESTIONS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">9</span> Open questions — answered at review</h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-bold">Q1 · Is the HTML report in scope? <span class="badge badge-success badge-sm">yes</span></h3>
+          <p class="text-sm">CSVs + summary flags answer "what's unbalanced" on their own; the report
+            makes the timeline <em>pleasant</em> to read. Ship BS3 with this work, or land BS1–BS2 and
+            decide once you've read a few runs raw?</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-5">
+          <h3 class="font-bold">Q2 · Fold the old CLIs in, eventually? <span class="badge badge-info badge-sm">keep them</span></h3>
+          <p class="text-sm">D1 keeps <code>make commander-balance</code> / <code>make difficulty-check</code>
+            as byte-stable presets. Should they <em>stay</em> forever, or be re-expressed as documented
+            Balance Lab invocations once it has earned trust? (Recommendation: keep the presets — two
+            committed docs cite their exact flags.)</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-5">
+          <h3 class="font-bold">Q3 · Per-command replay log? <span class="badge badge-success badge-sm">yes</span></h3>
+          <p class="text-sm">A finer JSONL — every command with coordinates, effectively a replay file —
+            would let a suspicious match be stepped through move by move. Real value, real scope.
+            Not in this plan unless you want it; the per-turn grain is the committed deliverable.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <footer class="pt-4 border-t text-sm opacity-70">
+      Drafted 2026-07-22 · builds on <span class="gc-file">tools/run_commander_balance.gd</span> and the
+      standing records in <span class="gc-file">docs/commander_balance.md</span> /
+      <span class="gc-file">docs/difficulty_check.md</span> · 0 changes under
+      <span class="gc-file">core/</span> and <span class="gc-file">ai/</span> ·
+      shipped 2026-07-22 — the committed record is <span class="gc-file">docs/balance_sim.md</span>.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

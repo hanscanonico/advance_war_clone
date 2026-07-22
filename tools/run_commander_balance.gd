@@ -32,8 +32,15 @@ extends SceneTree
 ## swapped, gated on DIFFICULTY_GATE_PCT. Difficulty ships no economy or damage
 ## handicap, so that win rate *is* the whole claim (plan D2).
 
-const COMMAND_CAP := 3000
-const DEFAULT_DAYS := 20
+## Both modes are presets over BalanceMatchEngine (plan D1): the match loop,
+## the day-cap tiebreak and the termination labels live there now and are shared
+## with the Balance Lab, so a number one tool reports means the same thing in the
+## other. This file keeps its CLI and its two committed reports unchanged —
+## `docs/commander_balance.md` and `docs/difficulty_check.md` cite these exact
+## flags, and the merge bar for the extraction was a fixed-seed byte-diff of both
+## reports before and after it.
+const COMMAND_CAP := BalanceMatchEngine.COMMAND_CAP
+const DEFAULT_DAYS := BalanceMatchEngine.DEFAULT_DAYS
 const DEFAULT_SEEDS := 4
 const SEED_BASE := 1000
 const DAMAGE_CHART_PATH := "res://data/damage_chart.tres"
@@ -94,96 +101,13 @@ const DIFFICULTY_CSV_COLUMNS: Array[String] = [
 ## to the day cap in 430 of 432 matches, and produced a twenty-point first-side
 ## bias out of the tiebreak alone. A fixture that does not resolve measures the
 ## clock, not the doctrines.
-const SCENARIOS := {
-	"clash":
-	"""
-[terrain]
-............
-.Q.C...F....
-.B..F.......
-.....F......
-............
-......F.....
-.......F..B.
-....F...C.Q.
-............
-[owners]
-1 1 1
-1 1 2
-2 10 7
-2 10 6
-[units]
-1 i 4 2
-1 m 5 3
-1 t 4 3
-1 r 3 2
-2 i 7 6
-2 m 6 5
-2 t 7 5
-2 r 8 6
-""",
-	"ridge":
-	"""
-[terrain]
-.Q.B....F..C
-..........M.
-....F.......
-...M....C...
-...C....M...
-.......F....
-.M..........
-C..F....B.Q.
-[owners]
-1 1 0
-1 3 0
-2 10 7
-2 8 7
-[units]
-1 t 4 1
-1 i 3 1
-1 r 5 2
-1 m 2 2
-2 t 7 6
-2 i 8 6
-2 r 6 5
-2 m 9 5
-""",
-	"combined":
-	"""
-[terrain]
-.QB.A........
-.....CS......
-.....SSS...C.
-C...FSSSS....
-...PSSSSSP...
-....SSSSF...C
-.C...SSS.....
-......SC.....
-........A.BQ.
-[owners]
-1 1 0
-2 11 8
-1 2 0
-2 10 8
-1 4 0
-2 8 8
-1 3 4
-2 9 4
-[units]
-1 i 2 3
-2 i 10 5
-1 m 3 3
-2 m 9 5
-1 t 4 3
-2 t 8 5
-1 r 2 5
-2 r 10 3
-1 h 4 5
-2 h 8 3
-1 c 5 4
-2 c 7 4
-"""
-}
+##
+## The three live in maps/fixtures/ rather than as strings in this file, so the
+## Balance Lab can name one with `--map=` and the battle scene can boot one for
+## watch mode. That directory is deliberately *not* maps/ itself: MapCatalog
+## scans only the top level, so a fixture stays out of the menu, out of the map
+## lint, and out of the shipped roster.
+const SCENARIO_NAMES: Array[String] = ["clash", "ridge", "combined"]
 
 const CSV_COLUMNS: Array[String] = [
 	"scenario",
@@ -223,6 +147,11 @@ var _days_cap := DEFAULT_DAYS
 var _include_neutral := false
 var _difficulty_check := false
 var _out_dir := ""
+var _boards: Dictionary = {}  # name -> MapData, resolved once and shared
+## Turns the shared engine cut short at MAX_COMMANDS_PER_TURN, across the whole
+## run. Must stay zero: a cut turn resolves differently from the committed report
+## this gate stands behind, and neither CSV has a column that would say so.
+var _turn_cap_hits := 0
 
 
 func _init() -> void:
@@ -258,9 +187,7 @@ func _load_dbs() -> void:
 
 func _parse_args() -> void:
 	_commander_ids = _all_commander_ids()
-	_scenario_names = []
-	for name: String in SCENARIOS:
-		_scenario_names.append(name)
+	_scenario_names = SCENARIO_NAMES.duplicate()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--commanders="):
 			_commander_ids = _parse_commander_list(arg.get_slice("=", 1))
@@ -303,11 +230,28 @@ func _parse_scenario_list(value: String) -> Array[String]:
 	var names: Array[String] = []
 	for token in value.split(",", false):
 		var name := token.strip_edges()
-		if SCENARIOS.has(name):
+		if name in SCENARIO_NAMES:
 			names.append(name)
 		else:
 			push_error("balance: unknown scenario '%s', skipping" % name)
 	return names
+
+
+## A board by name — a fixture for the commander matrix, a shipped map for the
+## difficulty ladder — read once per run and shared across the matches played on
+## it. Safe to share: GameState.create copies the ownership it needs and never
+## writes back, which is the same reason the battle scene hands one MapData
+## around.
+##
+## Both modes come through here so "which board is <name>?" has one answer for
+## every tool in the repo (MapCatalog.resolve). A second, hand-built path would
+## drift the day a board moves, and the gate would be the one that could not find
+## it.
+func _board(name: String) -> MapData:
+	if not _boards.has(name):
+		_boards[name] = MapData.load_from_file(MapCatalog.resolve(name), terrain_db)
+	var map: MapData = _boards[name]
+	return map
 
 
 ## Fails loudly if a scenario is not 180-degree rotationally symmetric with the
@@ -315,7 +259,7 @@ func _parse_scenario_list(value: String) -> Array[String]:
 ## have a mirror belonging to the other side. A broken map would quietly bias the
 ## whole run, which is the one thing the paired design exists to prevent.
 func _assert_symmetric(name: String) -> bool:
-	return _assert_map_symmetric(name, MapData.parse(SCENARIOS[name], terrain_db))
+	return _assert_map_symmetric(name, _board(name))
 
 
 ## The same check against any already-parsed board, so the difficulty gate can
@@ -345,11 +289,7 @@ func _assert_map_symmetric(name: String, map: MapData) -> bool:
 
 
 func _swap_team(team: int) -> int:
-	if team == 1:
-		return 2
-	if team == 2:
-		return 1
-	return team
+	return BalanceMatchEngine.swap_team(team)
 
 
 func _fatal(message: String) -> bool:
@@ -373,14 +313,13 @@ func _run_all() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	var done := 0
 	for scenario in _scenario_names:
-		var map_str: String = SCENARIOS[scenario]
 		for pair in pairings:
 			for s in _seed_count:
 				# Paired seeds: the same seed set for every pairing, so A-vs-B and
 				# B-vs-A (ordered pairs) meet on identical luck and the side-swap is
 				# clean. Seeds vary by scenario so the two boards are not correlated.
 				var seed_val := SEED_BASE + s + hash(scenario) % 1000
-				rows.append(_play(scenario, map_str, pair[0], pair[1], seed_val))
+				rows.append(_play(scenario, pair[0], pair[1], seed_val))
 				done += 1
 				if done % 100 == 0:
 					print("balance: %d / %d matches" % [done, total])
@@ -402,105 +341,52 @@ func _pairings() -> Array:
 	return pairs
 
 
-## Plays one match to a decision, a day cap, or the command cap, tallying the
-## per-match metrics the plan's report calls for. Mirrors the AI-vs-AI soak's
-## loop exactly, so it inherits the same "planner never proposes an illegal
-## command" guarantee — a rejection is counted here rather than asserted, so the
-## batch finishes and the summary reports how many and where.
-func _play(
-	scenario: String, map_str: String, red: StringName, blue: StringName, seed_val: int
-) -> Dictionary:
-	var map := MapData.parse(map_str, terrain_db)
-	var state := GameState.create(map, unit_db, chart)
-	state.rng.seed = seed_val
-	state.set_commander(1, commander_db.by_id(red))
-	state.set_commander(2, commander_db.by_id(blue))
+## Plays one match and tallies the per-match metrics the plan's report calls for.
+##
+## The loop itself is BalanceMatchEngine's. What stays here is the one thing this
+## mode does differently and must keep doing: **both seats share a single
+## AIController instance**, as they have since this runner was written. The
+## difficulty ladder below gives each side its own, because there the planners
+## differ; here they do not, and changing it would move every committed number in
+## docs/commander_balance.md for no reason.
+func _play(scenario: String, red: StringName, blue: StringName, seed_val: int) -> Dictionary:
 	var ai := AIController.new(unit_db)
-
-	var powers := {1: 0, 2: 0}
-	var first_ready := {1: -1, 2: -1}
-	var first_fired := {1: -1, 2: -1}
-	var rejected := 0
-	var commands := 0
-	while state.winner == 0 and state.day <= _days_cap and commands < COMMAND_CAP:
-		var team := state.current_team
-		var co_state := state.commander_state(team)
-		if first_ready[team] < 0 and co_state.is_ready():
-			first_ready[team] = state.day
-		var command := ai.plan_next_command(state)
-		if command.validate(state) != "":
-			rejected += 1
-			command = EndTurnCommand.new()
-			if command.validate(state) != "":
-				break
-		if command is PowerCommand:
-			powers[team] += 1
-			if first_fired[team] < 0:
-				first_fired[team] = state.day
-		command.apply(state)
-		commands += 1
-
-	var cap_stall := commands >= COMMAND_CAP
-	# A rule-based AI rarely races to an HQ, so most matches reach the day cap
-	# undecided. Rather than throw that data away as a draw, decide day-cap games
-	# on score — properties, then units, then funds, the way Advance Wars itself
-	# ranks a timed match. `termination` still records that it went to the cap, so
-	# natural wins and scored wins stay distinguishable in the CSV.
-	var winner: int = state.winner
-	if winner == 0 and not cap_stall:
-		winner = _tiebreak(state)
+	var setup := BalanceMatchEngine.Setup.new()
+	setup.map = _board(scenario)
+	setup.unit_db = unit_db
+	setup.chart = chart
+	setup.seed_val = seed_val
+	setup.days_cap = _days_cap
+	setup.command_cap = COMMAND_CAP
+	setup.commanders = {1: commander_db.by_id(red), 2: commander_db.by_id(blue)}
+	setup.planners = {1: ai, 2: ai}
+	var outcome := BalanceMatchEngine.play(setup)
+	_turn_cap_hits += outcome.turn_cap_hits
+	var state := outcome.state
 	return {
 		"scenario": scenario,
 		"seed": seed_val,
 		"red": String(red),
 		"blue": String(blue),
-		"winner": winner,
-		"termination": _termination(state, cap_stall),
-		"day_ended": state.day,
-		"commands": commands,
-		"red_powers": powers[1],
-		"blue_powers": powers[2],
-		"red_first_ready": first_ready[1],
-		"red_first_fired": first_fired[1],
-		"blue_first_ready": first_ready[2],
-		"blue_first_fired": first_fired[2],
+		"winner": outcome.winner,
+		"termination": outcome.termination,
+		"day_ended": outcome.day_ended,
+		"commands": outcome.commands,
+		"red_powers": outcome.powers[1],
+		"blue_powers": outcome.powers[2],
+		"red_first_ready": outcome.first_ready[1],
+		"red_first_fired": outcome.first_fired[1],
+		"blue_first_ready": outcome.first_ready[2],
+		"blue_first_fired": outcome.first_fired[2],
 		"red_units": state.units_of(1).size(),
 		"blue_units": state.units_of(2).size(),
 		"red_props": state.properties_of(1).size(),
 		"blue_props": state.properties_of(2).size(),
 		"red_funds": int(state.funds.get(1, 0)),
 		"blue_funds": int(state.funds.get(2, 0)),
-		"rejected": rejected,
-		"cap_stall": 1 if cap_stall else 0,
+		"rejected": outcome.rejected,
+		"cap_stall": 1 if outcome.cap_stall else 0,
 	}
-
-
-## rout (loser has no units), hq (loser was routed off its HQ but still has
-## units), day_cap (reached the day limit; the row's winner was decided on
-## score), or command_cap (a match that would not resolve — a bug, and a hard
-## failure of the run).
-func _termination(state: GameState, cap_stall: bool) -> String:
-	if state.winner != 0:
-		var loser := _swap_team(state.winner)
-		return "rout" if state.units_of(loser).is_empty() else "hq"
-	if cap_stall:
-		return "command_cap"
-	return "day_cap"
-
-
-## Ranks a timed match on properties, then surviving units, then funds — the
-## standard Advance Wars timed-match order. 0 only when every measure ties, which
-## on a symmetric board is the honest outcome of two identical doctrines (a mirror
-## pairing) playing to a standstill.
-func _tiebreak(state: GameState) -> int:
-	for measure: Array in [
-		[state.properties_of(1).size(), state.properties_of(2).size()],
-		[state.units_of(1).size(), state.units_of(2).size()],
-		[int(state.funds.get(1, 0)), int(state.funds.get(2, 0))],
-	]:
-		if measure[0] != measure[1]:
-			return 1 if measure[0] > measure[1] else 2
-	return 0
 
 
 # --- summary -----------------------------------------------------------------
@@ -596,33 +482,37 @@ func _band_flag(rate: float) -> String:
 
 
 func _write_reports(rows: Array[Dictionary], summary: Dictionary) -> void:
-	var dir := ProjectSettings.globalize_path("res://").path_join(_out_dir)
-	DirAccess.make_dir_recursive_absolute(dir)
-	_write_csv(dir.path_join("matches.csv"), rows, CSV_COLUMNS)
-	_write_json(dir.path_join("summary.json"), summary)
+	var dir := BalanceReportWriter.prepare_dir(_out_dir)
+	BalanceReportWriter.write_csv(dir.path_join("matches.csv"), rows, CSV_COLUMNS)
+	BalanceReportWriter.write_json(dir.path_join("summary.json"), summary)
 	print("balance: wrote matches.csv and summary.json to %s" % _out_dir)
 
 
-func _write_csv(path: String, rows: Array[Dictionary], columns: Array[String]) -> void:
-	var lines: Array[String] = [",".join(columns)]
-	for row in rows:
-		var cells: Array[String] = []
-		for column in columns:
-			cells.append(str(row[column]))
-		lines.append(",".join(cells))
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		push_error("balance: cannot write %s" % path)
+## Says out loud when the shared engine had to cut a turn short. Neither report
+## has a column for it, and a cut turn moves the numbers this file's two
+## committed documents were written from — so silence would look like agreement.
+##
+## Printed rather than written into matches.csv or summary.json on purpose: both
+## are byte-diffed across any change to this runner (plan D1), and a new column
+## would break that bar to report something that is zero on every run so far.
+func _warn_turn_caps() -> void:
+	if _turn_cap_hits == 0:
 		return
-	file.store_string("\n".join(lines) + "\n")
-
-
-func _write_json(path: String, summary: Dictionary) -> void:
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		push_error("balance: cannot write %s" % path)
-		return
-	file.store_string(JSON.stringify(summary, "\t"))
+	print(
+		(
+			(
+				"WARNING: %d turn(s) hit the %d-command per-turn cap and were force-ended. "
+				% [_turn_cap_hits, BalanceMatchEngine.MAX_COMMANDS_PER_TURN]
+			)
+			+ "Those matches did not resolve the way the committed report's did."
+		)
+	)
+	push_warning(
+		(
+			"balance: %d turn(s) hit the per-turn command cap; the report is not comparable"
+			% _turn_cap_hits
+		)
+	)
 
 
 func _print_summary(summary: Dictionary) -> void:
@@ -652,6 +542,7 @@ func _print_summary(summary: Dictionary) -> void:
 	print("commander            win%%   n   band")
 	for co: Dictionary in summary["commanders"]:
 		print("  %-18s %5.1f  %3d  %s" % [co["id"], co["win_rate"], co["matches"], co["flag"]])
+	_warn_turn_caps()
 	if summary["total_rejected"] > 0 or summary["total_cap_stalls"] > 0:
 		print("FAIL: rejected commands or cap stalls — the AI and the rules disagree.")
 	else:
@@ -666,7 +557,7 @@ func _print_summary(summary: Dictionary) -> void:
 ## doctrine would be noise in a measurement of planning alone.
 func _run_difficulty_check() -> void:
 	for name in DIFFICULTY_MAPS:
-		if not _assert_map_symmetric(name, _difficulty_map(name)):
+		if not _assert_map_symmetric(name, _board(name)):
 			return
 	for pair: Array in DIFFICULTY_PAIRINGS:
 		for id: StringName in pair:
@@ -704,10 +595,6 @@ func _run_difficulty_check() -> void:
 	quit(0 if summary["passed"] else 1)
 
 
-func _difficulty_map(name: String) -> MapData:
-	return MapData.load_from_file("res://maps/%s.txt" % name, terrain_db)
-
-
 ## One tier-versus-tier match. `high_is_red` swaps which seat the stronger tier
 ## takes, and each side gets its own AIController — its own profile, and its own
 ## per-turn threat map.
@@ -719,37 +606,26 @@ func _play_tiers(
 	seed_val: int,
 	timing: Dictionary
 ) -> Dictionary:
-	var state := GameState.create(_difficulty_map(map_name), unit_db, chart)
-	state.rng.seed = seed_val
 	var red_tier: StringName = high if high_is_red else low
 	var blue_tier: StringName = low if high_is_red else high
-	var planners := {
+	var tiers := {1: red_tier, 2: blue_tier}
+	var setup := BalanceMatchEngine.Setup.new()
+	setup.map = _board(map_name)
+	setup.unit_db = unit_db
+	setup.chart = chart
+	setup.seed_val = seed_val
+	setup.days_cap = _days_cap
+	setup.command_cap = COMMAND_CAP
+	setup.tiers = tiers
+	setup.planners = {
 		1: AIController.new(unit_db, difficulty_db.by_id(red_tier).profile()),
 		2: AIController.new(unit_db, difficulty_db.by_id(blue_tier).profile()),
 	}
-	var tiers := {1: red_tier, 2: blue_tier}
-
-	var rejected := 0
-	var commands := 0
-	while state.winner == 0 and state.day <= _days_cap and commands < COMMAND_CAP:
-		var team := state.current_team
-		var planner: AIController = planners[team]
-		var tier: StringName = tiers[team]
-		var started := Time.get_ticks_usec()
-		var command := planner.plan_next_command(state)
-		_record_time(timing, tier, Time.get_ticks_usec() - started, command is EndTurnCommand)
-		if command.validate(state) != "":
-			rejected += 1
-			command = EndTurnCommand.new()
-			if command.validate(state) != "":
-				break
-		command.apply(state)
-		commands += 1
-
-	var cap_stall := commands >= COMMAND_CAP
-	var winner: int = state.winner
-	if winner == 0 and not cap_stall:
-		winner = _tiebreak(state)
+	# No commanders on either side: a doctrine would be noise in a measurement of
+	# planning alone (difficulty plan DF4).
+	var outcome := BalanceMatchEngine.play(setup)
+	_turn_cap_hits += outcome.turn_cap_hits
+	_record_time(timing, tiers, outcome)
 	var high_team := 1 if high_is_red else 2
 	return {
 		"map": map_name,
@@ -757,26 +633,29 @@ func _play_tiers(
 		"low_tier": String(low),
 		"high_tier": String(high),
 		"high_side": "red" if high_is_red else "blue",
-		"winner": winner,
-		"high_won": 1 if winner == high_team else 0,
-		"termination": _termination(state, cap_stall),
-		"day_ended": state.day,
-		"commands": commands,
-		"rejected": rejected,
-		"cap_stall": 1 if cap_stall else 0,
+		"winner": outcome.winner,
+		"high_won": 1 if outcome.winner == high_team else 0,
+		"termination": outcome.termination,
+		"day_ended": outcome.day_ended,
+		"commands": outcome.commands,
+		"rejected": outcome.rejected,
+		"cap_stall": 1 if outcome.cap_stall else 0,
 	}
 
 
-## Planning wall-clock per tier, a turn counted each time one ends. The only
-## number here that is not reproducible run to run, so it is reported and never
-## gated on — it answers R3: does the extra thinking cost a perceptible pause?
-func _record_time(timing: Dictionary, tier: StringName, usec: int, ended_turn: bool) -> void:
-	var key := String(tier)
-	if not timing.has(key):
-		timing[key] = {"usec": 0, "turns": 0}
-	timing[key]["usec"] += usec
-	if ended_turn:
-		timing[key]["turns"] += 1
+## Folds one match's planning wall-clock into the per-tier totals, a turn counted
+## each time one ends. The only number here that is not reproducible run to run,
+## so it is reported and never gated on — it answers R3: does the extra thinking
+## cost a perceptible pause?
+func _record_time(
+	timing: Dictionary, tiers: Dictionary, outcome: BalanceMatchEngine.Outcome
+) -> void:
+	for team: int in tiers:
+		var key := String(tiers[team])
+		if not timing.has(key):
+			timing[key] = {"usec": 0, "turns": 0}
+		timing[key]["usec"] += int(outcome.planning_usec.get(team, 0))
+		timing[key]["turns"] += int(outcome.planning_turns.get(team, 0))
 
 
 func _summarise_difficulty(rows: Array[Dictionary], timing: Dictionary) -> Dictionary:
@@ -859,10 +738,9 @@ func _turn_times(timing: Dictionary) -> Array:
 
 
 func _write_difficulty_reports(rows: Array[Dictionary], summary: Dictionary) -> void:
-	var dir := ProjectSettings.globalize_path("res://").path_join(_out_dir)
-	DirAccess.make_dir_recursive_absolute(dir)
-	_write_csv(dir.path_join("matches.csv"), rows, DIFFICULTY_CSV_COLUMNS)
-	_write_json(dir.path_join("summary.json"), summary)
+	var dir := BalanceReportWriter.prepare_dir(_out_dir)
+	BalanceReportWriter.write_csv(dir.path_join("matches.csv"), rows, DIFFICULTY_CSV_COLUMNS)
+	BalanceReportWriter.write_json(dir.path_join("summary.json"), summary)
 	print("difficulty: wrote matches.csv and summary.json to %s" % _out_dir)
 
 
@@ -903,6 +781,7 @@ func _print_difficulty_summary(summary: Dictionary) -> void:
 	print("mean AI planning per turn:")
 	for entry: Dictionary in summary["turn_ms"]:
 		print("  %-7s %7.1f ms over %d turns" % [entry["tier"], entry["mean_ms"], entry["turns"]])
+	_warn_turn_caps()
 	if summary["passed"]:
 		print("PASS: every higher tier clears the gate.")
 	else:

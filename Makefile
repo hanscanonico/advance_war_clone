@@ -70,6 +70,27 @@ difficulty-check:
 	$(GODOT) --headless --path . -s res://tools/run_commander_balance.gd -- \
 		--difficulty-check $(DIFF)
 
+# The Balance Lab: the general instrument the two presets above are special
+# cases of. Any shipped map, any commander at any tier per side, N seeded
+# matches with both seats swapped, and a turn-by-turn timeline of how each one
+# went. Like its two siblings it is an opt-in instrument, not a merge gate, so
+# it stays out of `make verify` and `make test`; only its own unit tests
+# (recorder attribution, engine determinism) are in the suite.
+# docs/balance_sim.md has every flag and how to read the output. Examples:
+#   make balance-sim SIM="--map=ironworks --red=gideon_holt:normal --blue=cass_orlov:normal --seeds=10"
+#   make balance-sim SIM="--sweep=maps --seeds=6"
+SIM ?=
+balance-sim:
+	$(GODOT) --headless --path . -s res://tools/run_balance_sim.gd -- $(SIM)
+
+# Watch a match from a report play out in the real game window, both sides AI.
+# Same spec grammar and the same seed, so a suspicious row in matches.csv
+# becomes the exact battle it describes:
+#   make balance-watch SIM="--map=ironworks --red=gideon_holt:normal --blue=cass_orlov:normal --seed=1003"
+# Windowed, so it goes through the focus-safe wrapper like every other GUI target.
+balance-watch: import
+	$(GODOT_GUI) --path . $(BATTLE) -- --watch $(SIM)
+
 # Every .gd file that is actually ours: skips the engine cache, vendored addons,
 # the engine binary, and .claude/worktrees, which holds whole nested checkouts of
 # this same repo and would otherwise be linted as if it were project source.
@@ -164,4 +185,5 @@ gallery-screenshot: import
 .PHONY: run hotseat test verify smoke check lint format format-check tiles \
 	sprites-check unit-sprites-check ground sprites unit-sprites unit-placeholders \
 	sfx portraits import \
-	screenshot menu-screenshot gallery-screenshot commander-balance difficulty-check
+	screenshot menu-screenshot gallery-screenshot commander-balance difficulty-check \
+	balance-sim balance-watch
