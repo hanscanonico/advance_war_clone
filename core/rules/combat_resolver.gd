@@ -55,6 +55,23 @@ class CombatResult:
 static func forecast(
 	state: GameState, attacker: Unit, attacker_cell: Vector2i, defender: Unit
 ) -> Forecast:
+	return forecast_at(state, attacker, attacker_cell, defender, defender.cell)
+
+
+## The same prediction with the defender's position given explicitly, for a
+## caller asking about a cell the defender has not moved to — the AI's threat
+## map scoring "how hard am I hit if I stop here?".
+##
+## Both positions are effective values carried by Engagement, exactly like the
+## attacker's planned firing cell, so asking the question moves nothing on the
+## board: this is a pure query whatever cell it is asked about.
+static func forecast_at(
+	state: GameState,
+	attacker: Unit,
+	attacker_cell: Vector2i,
+	defender: Unit,
+	defender_cell: Vector2i
+) -> Forecast:
 	var result := Forecast.new()
 	if not attacker.has_ammo():
 		return result
@@ -65,7 +82,7 @@ static func forecast(
 			attacker_cell,
 			attacker.displayed_hp(),
 			defender,
-			defender.cell,
+			defender_cell,
 			defender.displayed_hp()
 		)
 	)
@@ -74,12 +91,15 @@ static func forecast(
 	result.can_attack = true
 	result.attack_damage = damage
 	var hp_after := maxi(0, defender.hp - damage)
-	if hp_after > 0 and _defender_can_counter(state, defender, attacker, attacker_cell):
+	if (
+		hp_after > 0
+		and _defender_can_counter(state, defender, defender_cell, attacker, attacker_cell)
+	):
 		result.counter_damage = _damage_pct(
 			state,
 			Engagement.create(
 				defender,
-				defender.cell,
+				defender_cell,
 				ceili(hp_after / 10.0),
 				attacker,
 				attacker_cell,
@@ -118,7 +138,7 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 		result.defender_died = true
 		state.remove_unit(defender)
 		return result
-	if not _defender_can_counter(state, defender, attacker, attacker.cell):
+	if not _defender_can_counter(state, defender, defender.cell, attacker, attacker.cell):
 		return result
 	var counter := Engagement.create(
 		defender,
@@ -145,7 +165,11 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 
 
 static func _defender_can_counter(
-	state: GameState, defender: Unit, attacker: Unit, attacker_cell: Vector2i
+	state: GameState,
+	defender: Unit,
+	defender_cell: Vector2i,
+	attacker: Unit,
+	attacker_cell: Vector2i
 ) -> bool:
 	# Deliberately the unit type's own range rather than AttackRange: countering
 	# is adjacency, and a doctrine that extends how far a unit can *initiate*
@@ -158,7 +182,7 @@ static func _defender_can_counter(
 		return false
 	if defender.dived:
 		return false  # a submarine that is hiding does not give itself away
-	var dist := absi(attacker_cell.x - defender.cell.x) + absi(attacker_cell.y - defender.cell.y)
+	var dist := absi(attacker_cell.x - defender_cell.x) + absi(attacker_cell.y - defender_cell.y)
 	if dist != 1:
 		return false  # an indirect attacker fires from beyond counter reach
 	# The same authority the opening shot went through, which is what gives the
