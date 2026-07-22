@@ -310,7 +310,7 @@ func _run(jobs: Array[Job], recorder: BalanceMatchRecorder) -> Array[Dictionary]
 	print(
 		(
 			"balance-sim: %s, %d seeds, day cap %d -> %d matches"
-			% [_axis_label(), _seed_count, _days_cap, jobs.size()]
+			% [_axis_label(), _seeds_played(), _days_cap, jobs.size()]
 		)
 	)
 	var rows: Array[Dictionary] = []
@@ -436,10 +436,18 @@ func _config() -> Dictionary:
 		"map": "(swept)" if _sweep == "maps" else _map_name,
 		"red": _red_text,
 		"blue": _blue_text,
-		"seeds": _seed_count,
+		"seeds": _seeds_played(),
+		"seed": _pinned_seed,
 		"days_cap": _days_cap,
 		"command_log": _log_commands,
 	}
+
+
+## Seeds this run actually plays: `--seed=` pins exactly one, and reporting the
+## `--seeds=` default beside a single played match would be a number the run
+## never measured.
+func _seeds_played() -> int:
+	return 1 if _pinned_seed >= 0 else _seed_count
 
 
 func _axis_label() -> String:
@@ -456,6 +464,12 @@ func _axis_label() -> String:
 ## Derived from the spec, never from a clock — so rerunning the same batch
 ## overwrites its own directory instead of littering a new one, and two runs of
 ## the same question are diffable file for file.
+##
+## **Every flag that changes the numbers is in the name.** The pinned seed and the
+## day cap are part of the spec, not decoration: two `--seed=` replays of one
+## matchup are different matches, and a 25-day run of it is a different question
+## from a 20-day one. Leaving either out silently overwrote one run's report with
+## another's.
 func _run_name() -> String:
 	var parts: Array[String] = []
 	parts.append(_sweep if _sweep != "" else "matchup")
@@ -466,7 +480,11 @@ func _run_name() -> String:
 		parts.append(String(_sweep_tier))
 	if _sweep == "tiers":
 		parts.append(String(_sweep_commander))
-	parts.append("s%d" % _seed_count)
+	if _pinned_seed >= 0:
+		parts.append("seed%d" % _pinned_seed)
+	else:
+		parts.append("s%d" % _seed_count)
+	parts.append("d%d" % _days_cap)
 	return "_".join(parts).replace(":", "-").replace(" ", "").replace("(", "").replace(")", "")
 
 

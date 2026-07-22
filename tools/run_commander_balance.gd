@@ -147,7 +147,11 @@ var _days_cap := DEFAULT_DAYS
 var _include_neutral := false
 var _difficulty_check := false
 var _out_dir := ""
-var _scenario_maps: Dictionary = {}
+var _boards: Dictionary = {}  # name -> MapData, resolved once and shared
+## Turns the shared engine cut short at MAX_COMMANDS_PER_TURN, across the whole
+## run. Must stay zero: a cut turn resolves differently from the committed report
+## this gate stands behind, and neither CSV has a column that would say so.
+var _turn_cap_hits := 0
 
 
 func _init() -> void:
@@ -233,13 +237,20 @@ func _parse_scenario_list(value: String) -> Array[String]:
 	return names
 
 
-## A fixture board, read once per run and shared across the matches played on it.
-## Safe to share: GameState.create copies the ownership it needs and never writes
-## back, which is the same reason the battle scene hands one MapData around.
-func _scenario_map(name: String) -> MapData:
-	if not _scenario_maps.has(name):
-		_scenario_maps[name] = MapData.load_from_file(MapCatalog.resolve(name), terrain_db)
-	var map: MapData = _scenario_maps[name]
+## A board by name — a fixture for the commander matrix, a shipped map for the
+## difficulty ladder — read once per run and shared across the matches played on
+## it. Safe to share: GameState.create copies the ownership it needs and never
+## writes back, which is the same reason the battle scene hands one MapData
+## around.
+##
+## Both modes come through here so "which board is <name>?" has one answer for
+## every tool in the repo (MapCatalog.resolve). A second, hand-built path would
+## drift the day a board moves, and the gate would be the one that could not find
+## it.
+func _board(name: String) -> MapData:
+	if not _boards.has(name):
+		_boards[name] = MapData.load_from_file(MapCatalog.resolve(name), terrain_db)
+	var map: MapData = _boards[name]
 	return map
 
 
@@ -248,7 +259,7 @@ func _scenario_map(name: String) -> MapData:
 ## have a mirror belonging to the other side. A broken map would quietly bias the
 ## whole run, which is the one thing the paired design exists to prevent.
 func _assert_symmetric(name: String) -> bool:
-	return _assert_map_symmetric(name, _scenario_map(name))
+	return _assert_map_symmetric(name, _board(name))
 
 
 ## The same check against any already-parsed board, so the difficulty gate can
@@ -341,7 +352,7 @@ func _pairings() -> Array:
 func _play(scenario: String, red: StringName, blue: StringName, seed_val: int) -> Dictionary:
 	var ai := AIController.new(unit_db)
 	var setup := BalanceMatchEngine.Setup.new()
-	setup.map = _scenario_map(scenario)
+	setup.map = _board(scenario)
 	setup.unit_db = unit_db
 	setup.chart = chart
 	setup.seed_val = seed_val
@@ -350,6 +361,7 @@ func _play(scenario: String, red: StringName, blue: StringName, seed_val: int) -
 	setup.commanders = {1: commander_db.by_id(red), 2: commander_db.by_id(blue)}
 	setup.planners = {1: ai, 2: ai}
 	var outcome := BalanceMatchEngine.play(setup)
+	_turn_cap_hits += outcome.turn_cap_hits
 	var state := outcome.state
 	return {
 		"scenario": scenario,
@@ -476,6 +488,33 @@ func _write_reports(rows: Array[Dictionary], summary: Dictionary) -> void:
 	print("balance: wrote matches.csv and summary.json to %s" % _out_dir)
 
 
+## Says out loud when the shared engine had to cut a turn short. Neither report
+## has a column for it, and a cut turn moves the numbers this file's two
+## committed documents were written from — so silence would look like agreement.
+##
+## Printed rather than written into matches.csv or summary.json on purpose: both
+## are byte-diffed across any change to this runner (plan D1), and a new column
+## would break that bar to report something that is zero on every run so far.
+func _warn_turn_caps() -> void:
+	if _turn_cap_hits == 0:
+		return
+	print(
+		(
+			(
+				"WARNING: %d turn(s) hit the %d-command per-turn cap and were force-ended. "
+				% [_turn_cap_hits, BalanceMatchEngine.MAX_COMMANDS_PER_TURN]
+			)
+			+ "Those matches did not resolve the way the committed report's did."
+		)
+	)
+	push_warning(
+		(
+			"balance: %d turn(s) hit the per-turn command cap; the report is not comparable"
+			% _turn_cap_hits
+		)
+	)
+
+
 func _print_summary(summary: Dictionary) -> void:
 	print("\n=== commander balance ===")
 	print(
@@ -503,6 +542,7 @@ func _print_summary(summary: Dictionary) -> void:
 	print("commander            win%%   n   band")
 	for co: Dictionary in summary["commanders"]:
 		print("  %-18s %5.1f  %3d  %s" % [co["id"], co["win_rate"], co["matches"], co["flag"]])
+	_warn_turn_caps()
 	if summary["total_rejected"] > 0 or summary["total_cap_stalls"] > 0:
 		print("FAIL: rejected commands or cap stalls — the AI and the rules disagree.")
 	else:
@@ -517,7 +557,7 @@ func _print_summary(summary: Dictionary) -> void:
 ## doctrine would be noise in a measurement of planning alone.
 func _run_difficulty_check() -> void:
 	for name in DIFFICULTY_MAPS:
-		if not _assert_map_symmetric(name, _difficulty_map(name)):
+		if not _assert_map_symmetric(name, _board(name)):
 			return
 	for pair: Array in DIFFICULTY_PAIRINGS:
 		for id: StringName in pair:
@@ -555,10 +595,6 @@ func _run_difficulty_check() -> void:
 	quit(0 if summary["passed"] else 1)
 
 
-func _difficulty_map(name: String) -> MapData:
-	return MapData.load_from_file("res://maps/%s.txt" % name, terrain_db)
-
-
 ## One tier-versus-tier match. `high_is_red` swaps which seat the stronger tier
 ## takes, and each side gets its own AIController — its own profile, and its own
 ## per-turn threat map.
@@ -574,7 +610,7 @@ func _play_tiers(
 	var blue_tier: StringName = low if high_is_red else high
 	var tiers := {1: red_tier, 2: blue_tier}
 	var setup := BalanceMatchEngine.Setup.new()
-	setup.map = _difficulty_map(map_name)
+	setup.map = _board(map_name)
 	setup.unit_db = unit_db
 	setup.chart = chart
 	setup.seed_val = seed_val
@@ -588,6 +624,7 @@ func _play_tiers(
 	# No commanders on either side: a doctrine would be noise in a measurement of
 	# planning alone (difficulty plan DF4).
 	var outcome := BalanceMatchEngine.play(setup)
+	_turn_cap_hits += outcome.turn_cap_hits
 	_record_time(timing, tiers, outcome)
 	var high_team := 1 if high_is_red else 2
 	return {
@@ -744,6 +781,7 @@ func _print_difficulty_summary(summary: Dictionary) -> void:
 	print("mean AI planning per turn:")
 	for entry: Dictionary in summary["turn_ms"]:
 		print("  %-7s %7.1f ms over %d turns" % [entry["tier"], entry["mean_ms"], entry["turns"]])
+	_warn_turn_caps()
 	if summary["passed"]:
 		print("PASS: every higher tier clears the gate.")
 	else:

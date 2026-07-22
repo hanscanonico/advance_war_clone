@@ -130,6 +130,56 @@ func test_an_empty_tank_at_turn_start_is_the_owner_s_loss() -> void:
 	assert_eq(recorder.unattributed(), 0)
 
 
+func test_a_unit_stranded_in_the_final_tick_still_files_its_row() -> void:
+	# The match ends on the tick that *opened* a turn — the day cap fell before
+	# anyone could play it. Nobody issued a command in that turn, but the fighter
+	# it stranded is really gone: drop the row and the loss goes with it, and a
+	# perfectly correct match then fails its own census.
+	var state := _state("[terrain]\n....\n....\n[units]\n1 i 0 0\n2 f 2 1\n2 i 3 1")
+	var fighter := state.units[1]
+	fighter.fuel = 1
+	var recorder := _recorder(state)
+	_close(recorder, state)  # red ends its turn; blue's tick runs inside that apply
+	var before := recorder.rows().size()
+	recorder.end_match(state)
+	assert_eq(recorder.rows().size(), before + 1, "a turn nobody played still owes its death")
+	var row := recorder.rows()[before]
+	assert_eq(row["team"], 2)
+	assert_eq(row["commands"], 0, "which is exactly why it would have been dropped")
+	assert_eq(row["lost"], "fighter")
+	assert_eq(
+		recorder.reconcile(state, {1: 1, 2: 2}),
+		"",
+		"2 started - 1 lost = 1 on the board: the census closes only if the row is filed"
+	)
+
+
+func test_the_tick_that_routs_a_side_files_its_row_too() -> void:
+	# The same seam reached the other way: the stranded unit was the side's last,
+	# so the tick ends the match then and there.
+	var state := _state("[terrain]\n....\n....\n[units]\n1 i 0 0\n2 f 2 1")
+	state.units[1].fuel = 1
+	var recorder := _recorder(state)
+	_close(recorder, state)
+	assert_eq(state.winner, 1, "blue's only unit fell out of the sky")
+	recorder.end_match(state)
+	var row := recorder.rows()[recorder.rows().size() - 1]
+	assert_eq(row["team"], 2)
+	assert_eq(row["lost"], "fighter")
+	assert_eq(recorder.reconcile(state, {1: 1, 2: 1}), "")
+
+
+func test_an_unplayed_final_turn_with_no_death_in_it_is_dropped() -> void:
+	# The other half of the rule: "one row per *played* turn" still holds for a
+	# turn the cap cut off before anything at all happened in it.
+	var state := _state("[terrain]\n..\n[units]\n1 i 0 0\n2 i 1 0")
+	var recorder := _recorder(state)
+	_close(recorder, state)
+	var before := recorder.rows().size()
+	recorder.end_match(state)
+	assert_eq(recorder.rows().size(), before, "nothing happened in it and nothing is filed")
+
+
 # --- the row's own arithmetic -------------------------------------------------
 
 

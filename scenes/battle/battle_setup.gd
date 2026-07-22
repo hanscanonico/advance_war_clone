@@ -32,6 +32,11 @@ class BuiltMatch:
 	## Lab spec. The scene prints its result and exits when the match ends, so a
 	## watched run can be diffed against the CSV row it was launched from.
 	var watching := false
+	## Watch mode only: the day after which a match nobody has won is scored on
+	## the harness's own tiebreak, so a `day_cap` row can be watched to the same
+	## line it was launched from. `--days=`, matching the Lab's flag. Normal play
+	## ignores it entirely — a hot-seat or player-vs-AI match has no day limit.
+	var days_cap := BalanceMatchEngine.DEFAULT_DAYS
 
 
 static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: CommanderDB) -> BuiltMatch:
@@ -51,9 +56,23 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 		if arg.begins_with("--map="):
 			# Through MapCatalog so a balance fixture resolves by the same name the
 			# headless Lab knows it by — a watched match must be the same board its
-			# CSV row was played on.
-			var resolved := MapCatalog.resolve(arg.get_slice("=", 1))
-			map_path = resolved if resolved != "" else map_path
+			# CSV row was played on. A name nothing answers to is said out loud
+			# rather than quietly played on the default board: a watched match on
+			# the wrong map still prints a result line, and that line is what the
+			# replay-fidelity check diffs.
+			var wanted := arg.get_slice("=", 1)
+			var resolved := MapCatalog.resolve(wanted)
+			if resolved == "":
+				push_error(
+					(
+						"battle: unknown map '%s'; playing %s instead. Known: %s"
+						% [wanted, map_path, ", ".join(MapCatalog.resolvable_names())]
+					)
+				)
+			else:
+				map_path = resolved
+		elif arg.begins_with("--days="):
+			result.days_cap = maxi(1, int(arg.get_slice("=", 1)))
 		elif arg.begins_with("--co="):
 			picked = parse_co_flag(arg.get_slice("=", 1))
 		elif arg.begins_with("--difficulty="):

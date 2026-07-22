@@ -31,6 +31,33 @@ QB......
 2 t 5 3
 """
 
+## A board nothing can happen on: a sea channel no ground unit crosses, and a
+## fighter neither side can shoot (a fighter hits only air, and nothing here
+## shoots air). All that happens over twenty days is the fighter burning fuel —
+## 5 of its 99 a turn, so the twentieth start-of-turn tick strands it. That tick
+## runs inside the previous side's EndTurnCommand, which is the seam these two
+## tests are about.
+const STRANDED_BOARD := """
+[terrain]
+..SS..
+..SS..
+[units]
+1 i 0 0
+1 f 0 1
+2 i 5 0
+"""
+
+## The same board with red's infantry gone, so the stranded fighter is red's last
+## unit and the tick that takes it also ends the match.
+const ROUTED_BOARD := """
+[terrain]
+..SS..
+..SS..
+[units]
+1 f 0 1
+2 i 5 0
+"""
+
 
 func before_each() -> void:
 	terrain_db = TerrainDB.load_default()
@@ -145,8 +172,70 @@ func test_every_played_turn_gets_exactly_one_row_per_side() -> void:
 		var key := "%d/%d" % [row["day"], row["team"]]
 		assert_false(seen.has(key), "day %s appears twice" % key)
 		seen[key] = true
-		assert_gt(int(row["commands"]), 0, "a filed row is a turn that was played")
+		var played: bool = int(row["commands"]) > 0
+		var carries_a_death: bool = row["killed"] != "" or row["lost"] != ""
+		assert_true(
+			played or carries_a_death,
+			"a filed row is a turn that was played, or the tick that ended the match in one"
+		)
 	assert_true(outcome.day_ended >= 1)
+
+
+## The day the first unit leaves the board, from a timeline. 0 if none does.
+static func _day_of_first_loss(rows: Array[Dictionary]) -> int:
+	for row in rows:
+		if row["lost"] != "":
+			return int(row["day"])
+	return 0
+
+
+func test_a_unit_stranded_in_the_final_tick_reaches_the_census() -> void:
+	# The day cap falls on the turn the tick just opened, so nobody plays it. The
+	# recorder must still file that row: the loss is real, and losing it would fail
+	# a correct match's reconciliation and abort the whole batch.
+	#
+	# The dry day is measured rather than assumed. Fuel is spent on movement as
+	# well as upkeep, so how long the tank lasts is how far the planner chooses to
+	# fly — its business, not this test's. Capping the match one day short of it is
+	# what puts the death in a turn nobody plays.
+	var probe := BalanceMatchRecorder.new()
+	var probe_setup := _setup(17, 25)
+	probe_setup.map = MapData.parse(STRANDED_BOARD, terrain_db)
+	BalanceMatchEngine.play(probe_setup, probe)
+	var dry_day := _day_of_first_loss(probe.rows())
+	assert_gt(dry_day, 1, "the fighter has nowhere to refuel and must fall out of the sky")
+
+	var setup := _setup(17, dry_day - 1)
+	setup.map = MapData.parse(STRANDED_BOARD, terrain_db)
+	var recorder := BalanceMatchRecorder.new()
+	var outcome := BalanceMatchEngine.play(setup, recorder)
+	assert_eq(outcome.termination, "day_cap")
+	assert_eq(outcome.state.units_of(1).size(), 1, "the fighter ran its tank dry on the last tick")
+	assert_eq(
+		recorder.reconcile(outcome.state, outcome.starting_units),
+		"",
+		"the timeline must still add up to the final board"
+	)
+	var last: Dictionary = recorder.rows()[recorder.rows().size() - 1]
+	assert_eq(int(last["day"]), dry_day, "the turn the cap cut off")
+	assert_eq(int(last["team"]), 1)
+	assert_eq(int(last["commands"]), 0, "nobody got to play it")
+	assert_eq(last["lost"], "fighter", "and it still reports what the tick took")
+
+
+func test_the_tick_that_routs_a_side_reaches_the_census_too() -> void:
+	# The same seam reached by the other exit: the stranded unit was the side's
+	# last, so the match ends on the tick rather than on the cap.
+	var setup := _setup(17, 25)
+	setup.map = MapData.parse(ROUTED_BOARD, terrain_db)
+	var recorder := BalanceMatchRecorder.new()
+	var outcome := BalanceMatchEngine.play(setup, recorder)
+	assert_eq(outcome.termination, "rout")
+	assert_eq(outcome.winner, 2, "red has nothing left to play with")
+	assert_eq(recorder.reconcile(outcome.state, outcome.starting_units), "")
+	var last: Dictionary = recorder.rows()[recorder.rows().size() - 1]
+	assert_eq(int(last["team"]), 1)
+	assert_eq(last["lost"], "fighter")
 
 
 # --- scoring -------------------------------------------------------------------

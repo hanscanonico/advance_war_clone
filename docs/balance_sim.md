@@ -81,14 +81,16 @@ runs, which the deterministic seeds make exactly reproducible and comparable.
 
 The run directory is named after the spec, never a timestamp, so rerunning a
 question overwrites its own directory and two runs of it are diffable file for
-file.
+file. Every flag that changes the numbers is in that name — including `--seed=`
+and `--days=`, so two seed replays of one matchup, or a 20- and a 25-day run of
+it, land in directories of their own instead of overwriting each other.
 
 ## What it writes
 
 | File | Grain |
 |---|---|
 | `matches.csv` | one row per match |
-| `timeline.csv` | one row per side per **played turn**, keyed by `match_id` |
+| `timeline.csv` | one row per side per **played turn**, keyed by `match_id` (plus the one edge case below) |
 | `commands.jsonl` | one line per applied command (plan Q3) |
 | `summary.json` | the aggregates, the flags and the reading rules |
 | `report.html` | the same numbers drawn — open it off disk, no server |
@@ -114,6 +116,13 @@ property lines cross.
 seam matters: a side's income, its paid repairs and any unit that dies with a dry
 tank all happen inside the *previous* side's `EndTurnCommand`, and they belong to
 the incoming side's row.
+
+The one row that is *not* a played turn is that seam's own edge. A match can end
+on the tick that opens a turn nobody then plays — the day cap falls, or the tick
+strands a side's last aircraft and routs it. When that tick took a unit off the
+board the row is filed anyway, with `commands = 0`: the death is real, the census
+below has to see it, and it is worth reading in the timeline rather than only
+balancing an equation. An otherwise empty final row is dropped.
 
 **`income` is the whole start-of-turn tick** — property income less any repairs
 paid on it — because that is what can be observed without re-deriving a rule the
@@ -206,6 +215,12 @@ presentation and touch no sim state.
 The scene prints `watch: team N wins on day D` and exits when the match ends, so
 the fidelity check is a diff against the `matches.csv` row, not someone watching
 a window and remembering.
+
+**Watch mode honours `--days=` too** (default 20, the Lab's default). Most rows
+terminate `day_cap` — a rule-based AI rarely races to an HQ — and those are
+scored on the same `BalanceMatchEngine.tiebreak` the harness uses, so a capped
+row can be watched to the same line as a decisive one. The cap is watch mode's
+alone: a hot-seat or player-versus-AI match still runs until somebody wins.
 
 One alignment detail rides along: the scene's per-turn command cap and the
 harness's now come from one constant (`BalanceMatchEngine.MAX_COMMANDS_PER_TURN`),

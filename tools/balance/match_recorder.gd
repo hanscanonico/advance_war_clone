@@ -21,6 +21,12 @@ extends RefCounted
 ## the incoming side's row, which is why the row is opened in `after_apply` of
 ## that command rather than before it.
 ##
+## The one exception is that seam's own edge: a match can end on the tick that
+## opens a turn nobody then plays — the day cap falls, or the tick strands a
+## side's last aircraft and routs it. Such a row is filed anyway *when it carries
+## a unit leaving the board*, because the death is real and the census has to see
+## it; an otherwise empty one is dropped. See `end_match`.
+##
 ## ## Attribution (plan D3)
 ##
 ## A unit leaving the board is not always a death. Removals are diffed against a
@@ -188,16 +194,31 @@ func after_apply(state: GameState, command: Command) -> void:
 
 
 ## Closes whatever turn is still open. A match ends mid-turn (a rout or an HQ
-## taken) or immediately after an EndTurnCommand opened a turn the day cap will
-## not let anyone play — the latter has no commands in it and is dropped, so
-## "one row per *played* turn" stays literally true.
+## taken) or immediately after an EndTurnCommand opened a turn nobody then plays
+## — because the day cap fell, or because that turn's own start-of-turn tick
+## routed the side it belongs to.
+##
+## An unplayed turn has no commands in it and is dropped, so "one row per
+## *played* turn" holds — **unless the tick that opened it took a unit off the
+## board**. That death is already filed in this row, and dropping it would take
+## the tally with it: `reconcile()` would then fail on a perfectly correct match
+## and abort the batch. So a row carrying attribution is filed, which also keeps
+## the loss visible in timeline.csv rather than merely balancing the census.
 func end_match(state: GameState) -> void:
 	if _turn == null:
 		return
-	if _turn.commands == 0:
+	if _turn.commands == 0 and not _carries_attribution(_turn):
 		_turn = null
 		return
 	_close_turn(state)
+
+
+## Whether a row records a unit leaving the board — the three tallies the census
+## closes over. A turn nobody played can still hold one: the incoming side's
+## start-of-turn tick runs inside the *previous* side's EndTurnCommand, and a dry
+## tank strands a unit there.
+static func _carries_attribution(turn: TurnRow) -> bool:
+	return not turn.killed.is_empty() or not turn.lost.is_empty() or turn.merged > 0
 
 
 # --- output ------------------------------------------------------------------

@@ -96,6 +96,15 @@ var _capturing := false
 ## match came from a Balance Lab spec. Makes the scene announce its result and
 ## exit, which is what turns BS3's replay-fidelity check into a diff.
 var _watching := false
+## Watch mode's day cap, from `--days=`. Read **only** while `_watching`: normal
+## play has no day limit and must not grow one, so a hot-seat or player-vs-AI
+## match is untouched by this.
+var _watch_days_cap := BalanceMatchEngine.DEFAULT_DAYS
+## The team the victory lockup and the watch line report. `game.winner` for a
+## match the board decided; a watched match stopped by the day cap is scored on
+## BalanceMatchEngine.tiebreak instead — the harness's own authority, so the
+## window and the CSV row agree — and that scored winner is not sim state.
+var _result_winner := 0
 
 
 func _ready() -> void:
@@ -109,6 +118,7 @@ func _ready() -> void:
 	game = built.game
 	ai_teams = built.ai_teams
 	_watching = built.watching
+	_watch_days_cap = built.days_cap
 	_build_planners(built)
 	view = _build_view()
 	view.setup()
@@ -573,6 +583,8 @@ func _begin_turn() -> void:
 	if game.winner != 0:
 		_enter_victory()
 		return
+	if _end_watch_on_day_cap():
+		return
 	Sfx.play(&"fanfare", -8.0)
 	var team_name: String = TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team))
 	animator.show_banner("Day %d - %s" % [game.day, team_name])
@@ -644,15 +656,33 @@ func _refresh_fog() -> void:
 	view.refresh_fog(_viewing_team(), state == State.HANDOFF)
 
 
+## Watch mode only (balance plan BS3), and true when it ended the match here. The
+## harness plays while `day <= days_cap` and scores what is left on the board, so
+## most of its rows terminate `day_cap`; without the same seam a watched replay of
+## one would run forever and never print the line the fidelity check diffs. It is
+## scored on the harness's own tiebreak and held beside the sim rather than
+## written into `game.winner`, because the board did not decide this one. Gated on
+## `_watching`: a hot-seat or player-versus-AI match has no day limit and must not
+## grow one.
+func _end_watch_on_day_cap() -> bool:
+	if not _watching or game.winner != 0 or game.day <= _watch_days_cap:
+		return false
+	_result_winner = BalanceMatchEngine.tiebreak(game)
+	_enter_victory()
+	return true
+
+
 ## Idempotent: a rout resolved inside _begin_turn is seen again by whatever was
 ## driving that turn, and the match is only won once however many callers notice.
 func _enter_victory() -> void:
 	if state == State.VICTORY:
 		return
 	state = State.VICTORY
+	if _result_winner == 0:
+		_result_winner = game.winner
 	animator.hide_banner()
 	Sfx.play(&"fanfare")
-	victory_label.text = "%s wins!" % TerrainPanel.TEAM_NAMES.get(game.winner, str(game.winner))
+	victory_label.text = _result_text()
 	victory_sub_label.text = "Day %d" % game.day
 	_bind_victory_commander()
 	victory_screen.show()
@@ -662,22 +692,40 @@ func _enter_victory() -> void:
 		_report_watched_result()
 
 
+## "Blue wins!", or "Draw" for the one case that has no winner: a watched match
+## that reached the day cap with every tiebreak measure level. A match the board
+## decided always names a side.
+func _result_text() -> String:
+	if _result_winner == 0:
+		return "Draw"
+	return "%s wins!" % TerrainPanel.TEAM_NAMES.get(_result_winner, str(_result_winner))
+
+
 ## The one line BS3's replay-fidelity check reads: a watched match must end with
 ## the same winner on the same day as the matches.csv row it was launched from.
 ## Printed rather than asserted here, because the assertion belongs to whoever is
 ## comparing the two — and printing it is what lets that be a diff instead of
 ## someone watching a window and remembering.
+##
+## The wording is fixed, day-cap rows included: the row's `winner` and
+## `day_ended` are what it is checked against, and a scored win is still that
+## row's winner.
 func _report_watched_result() -> void:
-	print("watch: team %d wins on day %d" % [game.winner, game.day])
+	print("watch: team %d wins on day %d" % [_result_winner, game.day])
 	await get_tree().create_timer(1.5).timeout  # let the lockup land on screen
 	get_tree().quit()
 
 
 ## Fronts the victory screen with the winning commander's portrait and faction. A
 ## side that played without one renders gracefully: the portrait and faction line
-## simply hide, leaving the plain "<team> wins!" lockup.
+## simply hide, leaving the plain "<team> wins!" lockup — as does a draw, which
+## has no winner to front at all.
 func _bind_victory_commander() -> void:
-	var winner := game.commander_of(game.winner)
+	if _result_winner == 0:
+		victory_portrait.visible = false
+		victory_faction_label.visible = false
+		return
+	var winner := game.commander_of(_result_winner)
 	var has_co := winner.id != CommanderType.NEUTRAL_ID
 	victory_portrait.visible = has_co
 	victory_faction_label.visible = has_co
