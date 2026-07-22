@@ -1,0 +1,26 @@
+# Balance fixture: open and decisive, both armies in reach on day one.
+# symmetric
+[terrain]
+............
+.Q.C...F....
+.B..F.......
+.....F......
+............
+......F.....
+.......F..B.
+....F...C.Q.
+............
+[owners]
+1 1 1
+1 1 2
+2 10 7
+2 10 6
+[units]
+1 i 4 2
+1 m 5 3
+1 t 4 3
+1 r 3 2
+2 i 7 6
+2 m 6 5
+2 t 7 5
+2 r 8 6

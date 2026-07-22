@@ -54,7 +54,12 @@ var unit_db: UnitDB
 var commander_db: CommanderDB
 var map: MapData
 var game: GameState
-var ai: AIController
+## team -> AIController. One planner per team rather than one for the scene:
+## a normal match gives both entries the same tier's planner and nothing changes,
+## while watch mode (balance plan BS3) can put a different commander *and* a
+## different tier on each side and have each plan with its own profile and its
+## own per-turn threat map.
+var planners: Dictionary = {}
 ## Teams played by the computer. Blue by default; `--hotseat` clears it.
 var ai_teams: Array[int] = [2]
 var cursor_cell := Vector2i.ZERO
@@ -87,6 +92,10 @@ var _scenario_driver: BattleScenarioDriver
 ## two open-ended animations — see BattleAnimator — so captured frames of the
 ## same scenario can be compared to each other.
 var _capturing := false
+## True for a `make balance-watch` run: both sides are the computer's and the
+## match came from a Balance Lab spec. Makes the scene announce its result and
+## exit, which is what turns BS3's replay-fidelity check into a diff.
+var _watching := false
 
 
 func _ready() -> void:
@@ -99,7 +108,8 @@ func _ready() -> void:
 	map = built.map
 	game = built.game
 	ai_teams = built.ai_teams
-	ai = AIController.new(unit_db, built.difficulty.profile())  # the one lever difficulty pulls
+	_watching = built.watching
+	_build_planners(built)
 	view = _build_view()
 	view.setup()
 	animator = _build_animator()
@@ -129,6 +139,26 @@ func _ready() -> void:
 		camera.position_smoothing_enabled = false
 		_scenario_driver = driver
 		_scenario_driver.run()
+
+
+## Gives every team its planner. The tier is the one lever difficulty pulls —
+## which AIProfile weighs the moves, never the economy, vision, damage or luck
+## (difficulty plan D2/D3) — so a per-side tier is a per-side profile and nothing
+## more. Each team gets its own AIController even when the tiers match, because a
+## controller caches a threat map for the turn it is planning and two teams
+## sharing one would be reading each other's.
+func _build_planners(built: BattleSetup.BuiltMatch) -> void:
+	for team in GameState.TEAMS:
+		var tier: Difficulty = built.per_team_difficulty.get(team, built.difficulty)
+		planners[team] = AIController.new(unit_db, tier.profile())
+
+
+## The planner for a team. Never null: a team the setup did not name still gets
+## the match's tier, so nothing can reach a turn with nobody to plan it.
+func planner_for(team: int) -> AIController:
+	if not planners.has(team):
+		planners[team] = AIController.new(unit_db)
+	return planners[team]
 
 
 ## The banner belongs to the animator, but dismissing it is something a caller
@@ -628,6 +658,19 @@ func _enter_victory() -> void:
 	victory_screen.show()
 	victory_screen.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	rematch_button.grab_focus()
+	if _watching:
+		_report_watched_result()
+
+
+## The one line BS3's replay-fidelity check reads: a watched match must end with
+## the same winner on the same day as the matches.csv row it was launched from.
+## Printed rather than asserted here, because the assertion belongs to whoever is
+## comparing the two — and printing it is what lets that be a diff instead of
+## someone watching a window and remembering.
+func _report_watched_result() -> void:
+	print("watch: team %d wins on day %d" % [game.winner, game.day])
+	await get_tree().create_timer(1.5).timeout  # let the lockup land on screen
+	get_tree().quit()
 
 
 ## Fronts the victory screen with the winning commander's portrait and faction. A

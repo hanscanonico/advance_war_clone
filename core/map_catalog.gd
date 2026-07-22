@@ -11,6 +11,11 @@ extends RefCounted
 ## Node-free like the rest of core/, so tests read exactly what the menu reads.
 
 const MAPS_DIR := "res://maps"
+## Boards that exist to be measured on rather than played: the balance fixtures.
+## Deliberately a subdirectory, because `paths()` below scans only the top level
+## — so a fixture is reachable by name from the offline tools and the battle
+## scene, and still absent from the menu, the map lint and the per-map AI soak.
+const FIXTURES_DIR := "res://maps/fixtures"
 
 
 ## Every shipped map, alphabetically by filename — a stable order that does not
@@ -50,6 +55,44 @@ static func ordered(db: TerrainDB) -> Array[MapData]:
 ## The dropdown label for a map path: "first_steps.txt" -> "First Steps".
 static func display_name(path: String) -> String:
 	return path.get_file().trim_suffix(".txt").capitalize()
+
+
+## A bare board name — what a `--map=` flag carries — to the file it names, or ""
+## when nothing answers to it. Shipped maps win over fixtures on a name clash,
+## which is the right way round: the roster is the game, the fixtures are
+## instruments.
+##
+## The single answer to "which board is `ironworks`?", so the offline balance
+## tools and the battle scene resolve a spec identically — a watched match has to
+## be played on the same board its headless row was, and two resolvers would
+## eventually disagree about that.
+static func resolve(name: String) -> String:
+	var bare := name.strip_edges().trim_suffix(".txt")
+	if bare == "":
+		return ""
+	for dir in [MAPS_DIR, FIXTURES_DIR]:
+		var path: String = dir.path_join("%s.txt" % bare)
+		if ResourceLoader.exists(path) or FileAccess.file_exists(path):
+			return path
+	return ""
+
+
+## Every name `resolve()` answers to, shipped roster first then fixtures — what a
+## tool prints when a `--map=` flag names something that does not exist.
+static func resolvable_names() -> Array[String]:
+	var names: Array[String] = []
+	for path in paths():
+		names.append(path.get_file().trim_suffix(".txt"))
+	var dir := DirAccess.open(FIXTURES_DIR)
+	if dir == null:
+		return names
+	var files := dir.get_files()
+	files.sort()
+	for file in files:
+		var map_file := file.trim_suffix(".remap")
+		if map_file.ends_with(".txt"):
+			names.append(map_file.trim_suffix(".txt"))
+	return names
 
 
 static func _smaller_first(a: MapData, b: MapData) -> bool:

@@ -45,6 +45,8 @@ make menu-screenshot # the same, for the main menu
 make gallery-screenshot   # render all thirteen commander cards (the G1 gate)
 make commander-balance    # offline AI-vs-AI balance matrix -> reports/ (a release task)
 make difficulty-check     # AI-vs-AI difficulty ladder gate -> reports/ (a release task)
+make balance-sim          # the Balance Lab: any board, any commanders, any tiers, full telemetry
+make balance-watch        # watch a Balance Lab match play out live, both sides AI
 ```
 
 `make verify` is the one command to run before merging: it parse-checks, lints, checks formatting,
@@ -282,10 +284,12 @@ result, including one capability that measured *negative* and ships switched off
   and the sound-effect player.
 - `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
   and portrait generators, the air/naval sprite paste step, plus the PixVoxel atlas builder (see
-  Assets below); and the offline
-  AI-vs-AI runner, which serves both the commander-balance matrix (`docs/commander_balance.md`)
-  and the difficulty ladder gate (`docs/difficulty_check.md`).
-- `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) only.
+  Assets below); and the offline balance
+  toolchain under `tools/balance/`, whose shared match engine serves the commander-balance matrix
+  (`docs/commander_balance.md`), the difficulty ladder gate (`docs/difficulty_check.md`) and the
+  Balance Lab (`docs/balance_sim.md`) alike.
+- `tests/` — GUT tests, targeting the pure-simulation layers (`core/` and `ai/`) plus the Node-free
+  offline balance harness under `tools/balance/`, which is written that way for exactly this reason.
 - `addons/gut/` — vendored [GUT](https://github.com/bitwes/Gut) 9.6.1 (MIT).
 
 ## Assets
