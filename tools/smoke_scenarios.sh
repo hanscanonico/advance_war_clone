@@ -35,8 +35,9 @@ BATTLE="${BATTLE:-scenes/battle/battle.tscn}"
 # engine, so run_with_timeout's kill still lands on the Godot process itself.
 export GODOT
 GODOT_GUI="$(cd "$(dirname "$0")" && pwd)/godot_gui.sh"
-# Generous: `aiturn` plays a whole AI turn with per-command animation delays.
-# This only has to catch a genuinely stuck scene, not time anything.
+# Generous: `aiturn` plans and applies a whole AI turn. Captures pin the Instant
+# game speed, so no tween is being waited on; this only has to catch a genuinely
+# stuck scene, not time anything.
 SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-90}"
 # A frame that renders the map is tens of KB; anything this small is a blank or
 # truncated capture, which means the scene never really came up.

@@ -219,8 +219,9 @@ Mean AI planning per turn, measured during the standing run:
 | Difficult | 102.1 | 1160 turns |
 | Easy | 144.3 | 1154 turns |
 
-Well inside the budget: `BattleAiRunner` already waits 0.2 s between commands,
-so none of this is perceptible in play. Easy was the slowest tier, not Difficult —
+Well inside the budget: `BattleAiRunner` waits a think-beat between commands —
+0.2 s at the default game speed, one frame at Instant — so none of this is
+perceptible in play. Easy was the slowest tier, not Difficult —
 its high `min_useful_score` sends more units down the advance path, which
 evaluates threat for every reachable cell, while Difficult's lower one usually
 finds an attack first.

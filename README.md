@@ -307,7 +307,8 @@ result, including one capability that measured *negative* and ships switched off
   mutated by play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
-  and the sound-effect player.
+  the device preferences this machine keeps between launches (`Settings` — today just the game
+  speed above), and the sound-effect player.
 - `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
   and portrait generators, the air/naval sprite paste step, plus the PixVoxel atlas builder (see
   Assets below); and the offline balance
