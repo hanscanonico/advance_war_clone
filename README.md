@@ -67,15 +67,25 @@ so two scenarios run both ways by default.
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
-Nine maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
-`riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`, `the_straits`, `ironworks` — so it
-opens on `scrimmage`, the quick match, and shows each one's size, property count and a one-line
-pitch as a tooltip. `jet_stream` and `the_straits` are the boards air and naval units were added
-for: the first puts an airfield behind each front, the second a port on each coast of one shared
-channel. Three of the older boards have since been retrofitted with the domains that suit them —
-`isthmus` gained a port and a landing beach per side, `ironworks` and `crossfire` an airfield each —
-while `first_steps`, `scrimmage`, `timberline` and `riverline` deliberately stay land-only, because
-each is built on a barrier that wings or hulls would simply erase.
+Twelve maps ship. The main menu lists them smallest board first — `scrimmage`, `forge`,
+`timberline`, `arsenal`, `riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`,
+`the_straits`, `ironworks`, `steelworks` — so it opens on `scrimmage`, the quick match, and shows
+each one's size, property count and a one-line pitch as a tooltip. `jet_stream` and `the_straits`
+are the boards air and naval units were added for: the first puts an airfield behind each front, the
+second a port on each coast of one shared channel. Three of the older boards have since been
+retrofitted with the domains that suit them — `isthmus` gained a port and a landing beach per side,
+`ironworks` and `crossfire` an airfield each — while `first_steps`, `scrimmage`, `timberline` and
+`riverline` deliberately stay land-only, because each is built on a barrier that wings or hulls
+would simply erase.
+
+`forge`, `arsenal` and `steelworks` are the production boards, and the only ones that hand out **no
+starting units at all**: what you get instead is factories — two to four bases a side where the rest
+of the roster tops out at two, an owned airport a side on the larger two, and neutral bases and
+airports to expand production itself. The opening is a build order rather than a march, and
+`steelworks` at 26×18 is the largest board in the game. An empty day 1 is legal without any rules
+change: defeat is only ever checked when a unit dies, and the AI's planner already falls through to
+production when it has nothing to move.
+
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
 `--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
 second; either side may be left blank for no commander) — e.g.

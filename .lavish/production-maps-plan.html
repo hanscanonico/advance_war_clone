@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Production Maps: No Armies, Only Factories</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-choice:has(input:checked) { border-color: var(--gc-blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-blue) 28%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+
+    /* --- map preview renderer --------------------------------------------- */
+    .map-frame { overflow-x: auto; padding: .35rem; }
+    .map-grid {
+      --cell: 14px;
+      display: grid;
+      gap: 1px;
+      width: max-content;
+      padding: 3px;
+      background: var(--gc-water-dark);
+      border-radius: 4px;
+      margin: 0 auto;
+    }
+    .map-grid > div {
+      width: var(--cell);
+      height: var(--cell);
+      border-radius: 1px;
+      display: grid;
+      place-items: center;
+      font: 800 calc(var(--cell) * .62)/1 ui-monospace, monospace;
+      color: rgba(255,255,255,.92);
+    }
+    .map-grid > div.neutral { color: rgba(23,40,56,.72); }
+    .map-legend { display: flex; flex-wrap: wrap; gap: .4rem .9rem; justify-content: center; font-size: .78rem; }
+    .map-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+    .map-legend i { width: .8rem; height: .8rem; border-radius: 2px; display: inline-block; border: 1px solid rgba(0,0,0,.18); }
+  </style>
+</head>
+<body class="py-6">
+<div class="gc-shell rounded-box overflow-hidden">
+
+  <!-- ============================== HERO ============================== -->
+  <header class="gc-hero px-6 py-8 md:px-10">
+    <p class="gc-kicker opacity-80">Grid Commander · Map roster · Design of record</p>
+    <h1 class="text-3xl md:text-4xl font-black mt-2">Production Maps — no armies, only factories</h1>
+    <p class="mt-3 max-w-3xl opacity-90">
+      Three new boards — <strong>small, medium, big</strong> — that hand each commander
+      <strong>zero starting units</strong> and more bases than any map in the roster.
+      Every fight on them is manufactured: the opening is a build order, the mid-game an income
+      race for neutral cities, and on the two larger boards a race for <em>neutral bases and
+      airports</em> that expand production itself. All three landed as plain
+      <span class="gc-file">maps/*.txt</span> files — the menu auto-discovers them,
+      <strong>zero engine code</strong> changed.
+    </p>
+    <div class="mt-5 flex flex-wrap gap-2">
+      <span class="badge badge-success badge-lg font-bold">SHIPPED AS DESIGNED — review resolved 2026-07-22</span>
+      <span class="badge badge-outline badge-lg text-white">3 maps · 0 engine changes</span>
+      <span class="badge badge-outline badge-lg text-white">make test · 441/441 green</span>
+    </div>
+  </header>
+
+  <main class="px-6 md:px-10 py-8 space-y-12">
+
+    <!-- ============================== 1 · PREMISE ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">1</span> The premise — production as the whole game</h2>
+      <p class="max-w-3xl">
+        All nine shipped maps hand out an army and let production reinforce it. These three invert
+        that: <strong>nothing on the board moves on day 1</strong>. What you get instead is
+        factories — two to four owned bases a side where the roster tops out at two, plus an owned
+        airport on the two larger boards. The map <em>is</em> the economy. Rows added by this work
+        are highlighted; the table is in menu order (smallest board first, ties alphabetical —
+        which is why <span class="gc-file">arsenal</span> lands one slot above
+        <span class="gc-file">riverline</span> at the same 18×13).
+      </p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full">
+          <thead>
+            <tr><th>Map</th><th>Size</th><th>Bases</th><th>Airports</th><th>Ports</th><th>Cities</th><th>Starting units</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="gc-file">scrimmage</td><td>12×9</td><td>2</td><td>–</td><td>–</td><td>2</td><td>yes</td></tr>
+            <tr class="bg-success/15 font-semibold"><td class="gc-file">forge · NEW</td><td>12×10</td><td><b>4</b></td><td>–</td><td>–</td><td>8</td><td><b>none</b></td></tr>
+            <tr><td class="gc-file">timberline</td><td>16×14</td><td>2</td><td>–</td><td>–</td><td>8</td><td>yes</td></tr>
+            <tr class="bg-success/15 font-semibold"><td class="gc-file">arsenal · NEW</td><td>18×13</td><td><b>6 + 2 neutral</b></td><td>2</td><td>–</td><td>10</td><td><b>none</b></td></tr>
+            <tr><td class="gc-file">riverline</td><td>18×13</td><td>2</td><td>–</td><td>–</td><td>8</td><td>yes</td></tr>
+            <tr><td class="gc-file">isthmus</td><td>20×12</td><td>2</td><td>–</td><td>–</td><td>10</td><td>yes</td></tr>
+            <tr><td class="gc-file">jet_stream</td><td>20×14</td><td>4</td><td>4</td><td>–</td><td>6</td><td>yes</td></tr>
+            <tr><td class="gc-file">crossfire</td><td>20×15</td><td>2</td><td>–</td><td>–</td><td>8</td><td>yes</td></tr>
+            <tr><td class="gc-file">first_steps</td><td>20×15</td><td>2</td><td>–</td><td>–</td><td>7</td><td>yes</td></tr>
+            <tr><td class="gc-file">the_straits</td><td>20×16</td><td>4</td><td>2</td><td>4</td><td>16</td><td>yes</td></tr>
+            <tr><td class="gc-file">ironworks</td><td>24×16</td><td>4</td><td>–</td><td>–</td><td>16</td><td>yes</td></tr>
+            <tr class="bg-success/15 font-semibold"><td class="gc-file">steelworks · NEW</td><td><b>26×18</b></td><td><b>8 + 2 neutral</b></td><td><b>2 + 2 neutral</b></td><td>–</td><td>18</td><td><b>none</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm opacity-75 max-w-3xl"><span class="gc-file">steelworks</span> at 26×18 becomes the
+        largest board in the game, past <span class="gc-file">ironworks</span> (24×16).</p>
+    </section>
+
+    <!-- ============================== 2 · RULES AUDIT ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">2</span> Why an empty board is legal — verified before building</h2>
+      <p class="max-w-3xl">A zero-unit start only works if the rules never mistake "no army yet" for "defeated",
+        and the AI knows to buy before it fights. Both hold, by code that already exists:</p>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-black">Defeat can't fire at start</h3>
+          <p class="text-sm">The winner is only ever set in two places: HQ capture
+            (<span class="gc-file">core/commands/capture_command.gd</span>) and rout in
+            <span class="gc-file">GameState._check_rout</span> — and the rout check is called from
+            <em>one</em> place, <code>remove_unit</code>. No unit ever dies on an empty board, so
+            an armyless day 1 is simply a quiet day, not a loss.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-black">The AI builds first, unprompted</h3>
+          <p class="text-sm"><span class="gc-file">ai/ai_controller.gd::plan_next_command</span> scores unit
+            actions first and falls through to <code>_plan_build</code> when there are none — with
+            zero units that happens immediately, so both sides open with production on day 1.
+            No AI changes needed.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-black">The parser already agrees</h3>
+          <p class="text-sm">In <span class="gc-file">core/map_data.gd</span> the
+            <code>[units]</code> section is optional — <code>starting_units</code> just stays empty
+            and <span class="gc-file">GameState.create</span> skips an empty loop. Day-1 funds come
+            from <span class="gc-file">core/rules/turn_rules.gd</span>: 1,000 per owned property.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · THE BOARDS ============================== -->
+    <section class="space-y-6">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">3</span> The three boards</h2>
+      <div id="legend" class="map-legend"></div>
+
+      <!-- forge -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-5 md:p-6 space-y-3">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 class="font-black text-lg">forge <span class="opacity-60 font-bold text-sm">· small · 12×10</span></h3>
+            <span class="badge badge-outline">2 bases a side</span>
+            <span class="badge badge-outline">8 neutral cities</span>
+            <span class="badge badge-outline">3,000/turn opening income</span>
+          </div>
+          <p class="text-sm max-w-3xl italic opacity-80">"A cramped foundry duel: no starting armies, two bases a side, one river between them."</p>
+          <div class="map-frame"><div class="map-grid" data-rows='[".QB...~..F..",".B.C..~.C...","..====+===C.",".F....~.....","..C...~..M..","..M..~...C..",".....~....F.",".C===+====..","...C.~..C.b.","..F..~...bq."]'></div></div>
+          <ul class="text-sm space-y-1 max-w-3xl list-disc pl-5">
+            <li>Twice <span class="gc-file">scrimmage</span>'s production in nearly the same footprint — the opening is a build-order puzzle, not a march.</li>
+            <li>An S-bend river splits the board; the two bridges sit on the road spine, so every land push funnels through a chokepoint.</li>
+            <li>Each side's nearest neutral city is 2 tiles from a base — a day-1 infantry captures it comfortably inside the soak's 10-day gate.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- arsenal -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-5 md:p-6 space-y-3">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 class="font-black text-lg">arsenal <span class="opacity-60 font-bold text-sm">· medium · 18×13</span></h3>
+            <span class="badge badge-outline">3 bases + airport a side</span>
+            <span class="badge badge-outline">2 neutral bases</span>
+            <span class="badge badge-outline">10 neutral cities</span>
+            <span class="badge badge-outline">5,000/turn opening income</span>
+          </div>
+          <p class="text-sm max-w-3xl italic opacity-80">"Armies are built, not given: three bases and an airport a side, a neutral forge apiece by the river."</p>
+          <div class="map-frame"><div class="map-grid" data-rows='[".QB......F...M....",".BA...C.....C..F..",".B=======....C....","..F.=......M......","..C.=...N....C..M.","....=...F....F....","~~~~+~~~~~~~~+~~~~","....F....F...=....",".M..C....N...=.C..","......M......=.F..","....C....=======b.","..F..C.....C...ab.","....M...F......bq."]'></div></div>
+          <ul class="text-sm space-y-1 max-w-3xl list-disc pl-5">
+            <li>A full-width river crossed by exactly two bridges: land forces funnel, and the owned airport is the flanking answer that ignores the river entirely.</li>
+            <li>One neutral base sits just off the river on each half — the first expansion prize, and the fourth factory for whoever claims it.</li>
+            <li>Roads run base cluster → bridge on each side, so vehicles reach the front without detours.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- steelworks -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-5 md:p-6 space-y-3">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 class="font-black text-lg">steelworks <span class="opacity-60 font-bold text-sm">· big · 26×18 — largest board in the game</span></h3>
+            <span class="badge badge-outline">4 bases + airport a side</span>
+            <span class="badge badge-outline">2 neutral bases · 2 neutral airports</span>
+            <span class="badge badge-outline">18 neutral cities</span>
+            <span class="badge badge-outline">6,000/turn opening income</span>
+          </div>
+          <p class="text-sm max-w-3xl italic opacity-80">"The grand empty board: four bases and an airport a side, and a mountain wall with one gate."</p>
+          <div class="map-frame"><div class="map-grid" style="--cell: 12px" data-rows='["..QB........F.......M.....",".BB..C...F.....C......F...",".A============..C....M....",".B...........=.F....C.....","..C..F......N=....C...M...",".....C.......=...F........","..F.....C....=......C.....",".M...........=.....F......","MM...O..MMM.==...MMM....MM","MM....MMM...==.MMM..O...MM","......F.....=...........M.",".....C......=....C.....F..","........F...=.......C.....","...M...C....=N......F..C..",".....C....F.=...........b.","....M....C..============a.","...F......C.....F...C..bb.",".....M.......F........bq.."]'></div></div>
+          <ul class="text-sm space-y-1 max-w-3xl list-disc pl-5">
+            <li>A mountain wall crosses the middle with a single 2×2 road gate at dead center — armored columns meet there, and the neutral base pair sits right behind the clash.</li>
+            <li>A neutral airport on each flank rewards whoever wins the wings with air production the mountain wall can't stop.</li>
+            <li>The road ring runs HQ cluster → gate → enemy HQ cluster, so the biggest board still funnels to one readable front.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 4 · DECISIONS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">4</span> Decisions</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D1 · Zero units = an omitted <code>[units]</code> section</h3>
+          <p class="text-sm">Not an empty list, not a flag, no parser change — the section simply
+            isn't there. <span class="gc-file">MapData.parse</span> already treats it as optional.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D2 · Symmetric by construction</h3>
+          <p class="text-sm">All three are exact 180° mirrors — terrain <em>and</em> owners — generated by a
+            script that asserts the mirror before writing, and tagged <code># symmetric</code> so the
+            map lint enforces it forever. In a game decided purely by production, positional fairness
+            is the whole balance story.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D3 · No naval on these boards</h3>
+          <p class="text-sm"><span class="gc-file">the_straits</span> owns the naval domain, and the standing
+            R1 risk from the naval plan — the AI never builds transports — makes a big naval board its own
+            design problem. Airports deliver the "more production" promise without it.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-bold">D4 · Soak-driven city placement</h3>
+          <p class="text-sm">The per-map AI soak demands a capture (or a win) within 10 days. On a no-unit
+            board that clock starts from an empty field, so every side has a neutral city ≤2 tiles from a
+            base. This is a hard test gate, not a style preference.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow md:col-span-2"><div class="card-body p-5">
+          <h3 class="font-bold">D5 · Classic opening economy <span class="badge badge-success badge-sm align-middle">confirmed in review</span></h3>
+          <p class="text-sm">Only the HQ, bases and the airport start owned; every city is neutral —
+            matching the shipped roster, where income is earned by capture. Opening income is
+            3k / 5k / 6k per turn across the three boards.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 5 · VALIDATION ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">5</span> Validation — every gate green</h2>
+      <p class="max-w-3xl">Both suites auto-discover the roster via <span class="gc-file">MapCatalog.paths()</span>,
+        so all three maps were tested the moment the files landed. <span class="gc-file">make test</span>: 441/441.</p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-black">Map lint <span class="gc-file opacity-60">tests/unit/test_maps.gd</span></h3>
+          <ul class="gc-checks text-sm space-y-1 mt-2">
+            <li>Parses and builds a GameState</li>
+            <li>Exactly one owned HQ per team, no spares</li>
+            <li>Each team owns at least one base</li>
+            <li>HQs mutually reachable on foot</li>
+            <li><code># symmetric</code> tag verified — terrain and owners mirror</li>
+            <li>Menu description present; smallest-board-first ordering intact</li>
+          </ul>
+        </div></div>
+        <div class="card bg-base-100 shadow"><div class="card-body p-5">
+          <h3 class="font-black">AI soak <span class="gc-file opacity-60">tests/unit/test_map_soak.gd</span></h3>
+          <p class="text-sm mt-2">Ten AI-vs-AI days on every board, neutral commanders, seeded RNG.
+            The bar: someone wins or at least one property changes hands. On these maps that means the
+            AI proved the whole loop — <em>build from nothing → march → capture</em> — on all three
+            boards, inside the command cap even at 26×18.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · RISKS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">6</span> Risks</h2>
+      <div class="space-y-3">
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-4">
+          <h3 class="font-bold">R1 · Pacing is designed-in, not playtested</h3>
+          <p class="text-sm">Symmetry makes the boards fair by construction, but nobody has felt the
+            no-unit opening yet — <span class="gc-file">steelworks</span> especially may open slowly with
+            infantry crawling a 26-wide board. Mitigation: a few human games; if it drags, promote the
+            neutral properties closer or raise starting ownership (open question below).</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-medium"><div class="card-body p-4">
+          <h3 class="font-bold">R2 · AI turn time on the biggest board</h3>
+          <p class="text-sm">More factories means more candidate builds and eventually more units to plan
+            for. The soak passed within its command cap, but watch real turn length on
+            <span class="gc-file">steelworks</span> late-game — same watch item the More Maps plan held
+            for <span class="gc-file">ironworks</span>.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-4">
+          <h3 class="font-bold">R3 · No-unit starts spotlight AI build order</h3>
+          <p class="text-sm">With no gifted army, the AI's opening is pure
+            <span class="gc-file">AIProfile.build_priority</span>. That's by design — and it respects the
+            difficulty plan's locked rule (the AI never cheats; tiers only reweigh the planner). No tier
+            resource files were touched.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- ============================== 7 · REVIEW OUTCOME ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">7</span> Review outcome — all three questions resolved</h2>
+      <p class="max-w-3xl text-sm">Reviewed 2026-07-22. Every question closed in favor of the shipped design;
+        no map files changed as a result of review.</p>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-bold">Q1 → Classic economy stays</h3>
+          <p class="text-sm">Only HQ, bases and the airport start owned; every city is neutral and must be
+            earned. (Now locked as D5.)</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-bold">Q2 → forge stays lean</h3>
+          <p class="text-sm">No neutral bases on the small board — production complexity is the larger
+            boards' identity; forge stays the quick, readable duel.</p>
+        </div></div>
+        <div class="card bg-base-100 shadow gc-risk-good"><div class="card-body p-5">
+          <h3 class="font-bold">Q3 → No naval follow-up now</h3>
+          <p class="text-sm">The trio is the full scope of this work. A port-heavy production board remains
+            a possible future item, to be planned on its own terms against the naval plan's R1.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <footer class="pt-4 border-t text-sm opacity-70">
+      Shipped 2026-07-22 · <span class="gc-file">maps/forge.txt</span> ·
+      <span class="gc-file">maps/arsenal.txt</span> · <span class="gc-file">maps/steelworks.txt</span> ·
+      generated by a mirror-asserting script (regeneration on feedback is one command) ·
+      validated by <span class="gc-file">make test</span> — 441/441, including the per-map lint and 10-day AI soak.
+      Review resolved 2026-07-22 — ready to commit.
+    </footer>
+  </main>
+</div>
+
+<script>
+  const TERRAIN = {
+    'S': ['Sea', '#2779b9'],
+    '.': ['Plains', '#8fce64'],
+    'F': ['Woods', '#4c8a37'],
+    'M': ['Mountain', '#a38f70'],
+    '=': ['Road', '#d8c49a'],
+    '+': ['Bridge', '#b39b6e'],
+    '~': ['River', '#7fb7e0'],
+    'C': ['City (neutral)', '#cfc9bb'],
+    'B': ['Base (Red)', '#e08b7f'],
+    'b': ['Base (Blue)', '#7fa7dc'],
+    'N': ['Base (neutral)', '#cfc9bb'],
+    'A': ['Airport (Red)', '#e08b7f'],
+    'a': ['Airport (Blue)', '#7fa7dc'],
+    'O': ['Airport (neutral)', '#cfc9bb'],
+    'Q': ['HQ (Red)', '#d94d3f'],
+    'q': ['HQ (Blue)', '#3276c6'],
+  };
+  const GLYPH = { 'B':'B','b':'B','N':'B','A':'A','a':'A','O':'A','Q':'Q','q':'Q','C':'C' };
+  document.querySelectorAll('.map-grid[data-rows]').forEach(el => {
+    const rows = JSON.parse(el.dataset.rows);
+    el.style.gridTemplateColumns = `repeat(${rows[0].length}, var(--cell))`;
+    rows.forEach(row => [...row].forEach(ch => {
+      const cell = document.createElement('div');
+      const t = TERRAIN[ch] || ['?', '#f0f'];
+      cell.style.background = t[1];
+      cell.title = t[0];
+      if (GLYPH[ch]) {
+        cell.textContent = GLYPH[ch];
+        if ('CNO'.includes(ch)) cell.className = 'neutral';
+      }
+      el.appendChild(cell);
+    }));
+  });
+  const legend = document.getElementById('legend');
+  [['.','Plains'],['F','Woods'],['M','Mountain'],['=','Road'],['+','Bridge'],['~','River'],
+   ['C','Neutral city'],['N','Neutral base'],['O','Neutral airport'],
+   ['Q','Red HQ'],['B','Red base'],['A','Red airport'],
+   ['q','Blue HQ'],['b','Blue base'],['a','Blue airport']]
+    .forEach(([ch, label]) => {
+      const s = document.createElement('span');
+      const sw = document.createElement('i');
+      sw.style.background = TERRAIN[ch][1];
+      s.append(sw, label);
+      legend.appendChild(s);
+    });
+</script>
+</body>
+</html>

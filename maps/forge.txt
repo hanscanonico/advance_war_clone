@@ -1,0 +1,22 @@
+# A cramped foundry duel: no starting armies, two bases a side, one river between them.
+# symmetric
+# Symbols: . plains  F woods  M mountain  = road  ~ river  + bridge
+#          C city  B base  Q HQ  A airport
+[terrain]
+.QB...~..F..
+.B.C..~.C...
+..====+===C.
+.F....~.....
+..C...~..M..
+..M..~...C..
+.....~....F.
+.C===+====..
+...C.~..C.B.
+..F..~...BQ.
+[owners]
+1 1 0
+2 10 9
+1 2 0
+2 9 9
+1 1 1
+2 10 8
