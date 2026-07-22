@@ -32,7 +32,7 @@ func run() -> void:
 	var game := _battle.game
 	# Opens just after the day banner has cleared — however long the active tier
 	# holds that banner, which is why the wait is computed here and not fixed.
-	var start_delay := _speed().start_delay_seconds()
+	var start_delay := Settings.speed.start_delay_seconds()
 	await _battle.get_tree().create_timer(start_delay).timeout
 	for i in MAX_COMMANDS_PER_TURN:
 		if game.winner != 0:
@@ -65,22 +65,16 @@ func run() -> void:
 		_leave()
 
 
-## The tier this turn is paced at. The animator owns the answer, so a computer
-## turn and a player's move obey the same setting — and a capture, which pins its
-## own tier there, pins this too.
-func _speed() -> GameSpeed:
-	return _battle.animator.speed()
-
-
 ## The think-beat between two commands, so the turn reads as decisions rather
-## than a slideshow.
+## than a slideshow. Paced off Settings, the same tier the animations it sits
+## between run at — a computer turn and a player's move obey one setting.
 ##
 ## Instant drops the wait to a single frame rather than to nothing: the board
 ## still repaints once per command, so a forty-command turn is forty frames the
 ## eye can track as a fast flicker, the window keeps pumping events, and the
 ## per-turn safety cap above keeps meaning what it says.
 func _think() -> void:
-	var delay := _speed().command_delay_seconds()
+	var delay := Settings.speed.command_delay_seconds()
 	if delay <= 0.0:
 		await _battle.get_tree().process_frame
 		return

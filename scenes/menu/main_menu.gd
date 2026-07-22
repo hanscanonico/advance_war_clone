@@ -13,6 +13,7 @@ const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
 @onready var center: CenterContainer = $Center
 @onready var map_option: OptionButton = %MapOption
 @onready var difficulty_option: OptionButton = %DifficultyOption
+@onready var speed_option: OptionButton = %SpeedOption
 @onready var fog_check: CheckButton = %FogCheck
 @onready var one_player_button: Button = %OnePlayerButton
 @onready var two_player_button: Button = %TwoPlayerButton
@@ -31,8 +32,14 @@ var _pending_ai_teams: Array[int] = []
 
 
 func _ready() -> void:
+	var shot_path := ScreenshotUtil.requested()
+	if shot_path != "":
+		# The battle scene's rule, and for the same reason: a capture must not
+		# show — or depend on — the preference of the machine that took it.
+		Settings.pin(GameSpeed.CAPTURE_ID)
 	_populate_maps()
 	_populate_difficulties()
+	_populate_speeds()
 	_select_panel = CommanderSelectPanel.new()
 	add_child(_select_panel)
 	_select_panel.confirmed.connect(_on_selection_confirmed)
@@ -55,9 +62,8 @@ func _ready() -> void:
 		_open_select([2] as Array[int])
 		if select_mode == "blue":
 			_select_panel.debug_advance_to_blue()
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--screenshot="):
-			ScreenshotUtil.capture_and_quit(self, arg.get_slice("=", 1))
+	if shot_path != "":
+		ScreenshotUtil.capture_and_quit(self, shot_path)
 
 
 ## Smallest board first, so item 0 — the option the menu opens on — is the
@@ -116,6 +122,34 @@ func _populate_difficulties() -> void:
 		"How well the computer plays.\nSame rules, economy and dice at every tier — only its\n"
 		+ "judgement changes. Ignored in a 2-Player hot-seat."
 	)
+
+
+## Opens on whatever this device last chose, and writes back the moment the
+## choice changes.
+##
+## Deliberately the odd one out on this menu: speed is a device preference, so it
+## does not ride MatchConfig through `_start` like the rows above it. There is
+## nothing for a match to carry — the same setting applies to the next match, to
+## a resumed save, and to both sides of a hot-seat, and it stays changeable from
+## the in-battle map menu.
+func _populate_speeds() -> void:
+	var tiers := GameSpeed.ordered()
+	for tier in tiers:
+		speed_option.add_item(tier.display_name)
+	for i in tiers.size():
+		if tiers[i].id == Settings.speed.id:
+			speed_option.selected = i
+	speed_option.item_selected.connect(_on_speed_selected)
+	speed_option.tooltip_text = (
+		"How fast moves and battles play out on screen.\nNever changes an outcome — pacing only. "
+		+ "Changeable\nany time from the in-battle menu."
+	)
+
+
+func _on_speed_selected(index: int) -> void:
+	var tiers := GameSpeed.ordered()
+	if index >= 0 and index < tiers.size():
+		Settings.set_speed(tiers[index].id)
 
 
 func _selected_difficulty() -> StringName:

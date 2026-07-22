@@ -23,9 +23,13 @@ const SPEED_ARG := "--speed="
 ## effect on the very next animation.
 var speed: GameSpeed = GameSpeed.default_speed()
 
-## False once `--speed=` has spoken for this launch, so nothing written later
+## False once anything has spoken for this launch, so nothing written later
 ## reaches the file.
 var _persistent := true
+## True once `--speed=` has spoken. A capture pins the tier it needs, but an
+## explicit flag outranks even that: it is the most specific thing anyone said,
+## and asking for a capture *of* a tier is how you look at one you are tuning.
+var _flag_wins := false
 
 
 func _ready() -> void:
@@ -38,6 +42,18 @@ func set_speed(id: StringName) -> void:
 	speed = GameSpeed.by_id(id)
 	if _persistent:
 		_save()
+
+
+## Pins a tier for this launch and latches the file shut behind it. Captures and
+## scripted scenario runs pin, so a frame never depends on which machine took it
+## — and it is pinned *here* rather than inside the animator because the setting
+## has one owner: the in-battle menu row reads its label off this too, and a
+## capture whose animations were pinned but whose label was not would photograph
+## the preference it was meant to ignore.
+func pin(id: StringName) -> void:
+	_persistent = false
+	if not _flag_wins:
+		speed = GameSpeed.by_id(id)
 
 
 ## A missing or malformed file is not an error: the defaults simply stand, which
@@ -62,5 +78,7 @@ func _save() -> void:
 func _apply_cmdline() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with(SPEED_ARG):
-			speed = GameSpeed.by_id(StringName(arg.get_slice("=", 1).strip_edges()))
-			_persistent = false
+			pin(StringName(arg.get_slice("=", 1).strip_edges()))
+			# Latched after that pin, so the flag's own lands and every later
+			# one — a capture's — is declined.
+			_flag_wins = true

@@ -11,12 +11,14 @@ extends RefCounted
 ## on purpose: data/ is for numbers the *sim* reads, and the whole safety
 ## argument of this setting is that the sim cannot read the speed.
 ##
-## Who is playing at which tier is Settings' answer, and BattleAnimator is the
-## one place the presentation asks — at the moment each animation starts rather
-## than once at scene load, so a mid-match change lands on the very next move.
+## Which tier is active is Settings' answer and nobody else's. Callers ask it at
+## the moment they animate rather than caching it at scene load, so a speed
+## changed from the in-battle menu lands on the very next move.
 
-## The tier a fresh install plays at.
-const DEFAULT_ID := &"quick"
+## The tier a fresh install plays at: movement at twice the duration the game
+## shipped with, which is the complaint this setting exists to fix. Quick is that
+## original feel, one dropdown away.
+const DEFAULT_ID := &"normal"
 ## Captures and scripted scenario runs pin this tier instead of reading the
 ## device preference: a screenshot must not depend on which machine took it.
 const CAPTURE_ID := &"quick"

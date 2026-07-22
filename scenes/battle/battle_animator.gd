@@ -12,9 +12,10 @@ extends RefCounted
 ## Depends on BattleView to find sprites; never on Battle. Tweens need a Node
 ## to live on, so the scene root is passed in as a plain Node.
 ##
-## Every duration it waits belongs to a GameSpeed tier, and `speed()` is where
-## the presentation layer asks which one — the sprite it hands durations to
-## derives nothing, and BattleAiRunner paces its turn off the same answer. No
+## Every duration it waits is a GameSpeed tier's, asked of `Settings` at the
+## moment the animation starts rather than cached at scene load, so a speed
+## changed mid-match lands on the very next move. The sprite it hands durations
+## to derives nothing, and BattleAiRunner paces its turn off the same answer. No
 ## literal seconds below: a tween timed by a number written here would ignore the
 ## player's setting forever.
 
@@ -36,22 +37,9 @@ var power_banner: CommanderPowerBanner
 ## True for a run that exists to be photographed. Suppresses the two open-ended
 ## animations — see `shake_camera` and `start_cursor_pulse`.
 var capturing := false
-## Set only by a run that pins its own pace and ignores the device preference —
-## captures do, because a screenshot must not depend on which machine took it.
-var speed_override: GameSpeed
 
 var _banner_tween: Tween
 var _power_banner_tween: Tween
-
-# --- pacing ------------------------------------------------------------------
-
-
-## The tier every duration here is read from. Asked at each use rather than
-## cached at scene start, so a speed changed from the in-battle menu takes
-## effect on the very next animation.
-func speed() -> GameSpeed:
-	return speed_override if speed_override != null else Settings.speed
-
 
 # --- movement ----------------------------------------------------------------
 
@@ -64,7 +52,7 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 	if path.size() < 2:
 		return
 	Sfx.play(&"move", -6.0)
-	var tier := speed()
+	var tier := Settings.speed
 	if tier.instant:
 		sprite.position = BattleView.cell_center(path[path.size() - 1])
 		return
@@ -109,7 +97,7 @@ func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defende
 
 ## The white hit flash, at the active tier's pace. Awaitable.
 func flash_hit(sprite: UnitSprite) -> void:
-	var tier := speed()
+	var tier := Settings.speed
 	await sprite.flash_hit(tier.flash_in_seconds(), tier.flash_out_seconds())
 
 
@@ -117,7 +105,7 @@ func flash_hit(sprite: UnitSprite) -> void:
 ## the single place a death fade's length is decided — Battle's Join merge fades
 ## a sprite outside combat entirely and comes through here for that reason.
 func fade_out(sprite: UnitSprite) -> void:
-	await sprite.die(speed().death_fade_seconds())
+	await sprite.die(Settings.speed.death_fade_seconds())
 
 
 # --- banner ------------------------------------------------------------------
@@ -135,7 +123,7 @@ func _set_banner(text: String) -> void:
 func show_banner(text: String) -> void:
 	_set_banner(text)
 	_banner_tween = node.create_tween()
-	_banner_tween.tween_interval(speed().banner_seconds())
+	_banner_tween.tween_interval(Settings.speed.banner_seconds())
 	_banner_tween.tween_callback(turn_banner.hide)
 
 
@@ -160,7 +148,7 @@ func show_power_banner(commander: CommanderType) -> void:
 	if capturing:
 		return
 	_power_banner_tween = node.create_tween()
-	_power_banner_tween.tween_interval(speed().power_banner_seconds())
+	_power_banner_tween.tween_interval(Settings.speed.power_banner_seconds())
 	_power_banner_tween.tween_callback(power_banner.hide)
 
 
@@ -178,7 +166,7 @@ func show_power_banner(commander: CommanderType) -> void:
 ## Skipped under Instant too, which is the one tier where it is theatre rather
 ## than feedback: there is no hit animation left for it to punctuate.
 func shake_camera(strength: float = 3.0) -> void:
-	if capturing or speed().instant:
+	if capturing or Settings.speed.instant:
 		return
 	var tween := node.create_tween()
 	for i in 4:
