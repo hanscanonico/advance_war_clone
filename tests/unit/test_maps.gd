@@ -56,7 +56,7 @@ func test_every_map_parses_and_builds_a_game_state() -> void:
 func test_every_map_gives_each_team_exactly_one_hq_it_owns() -> void:
 	for map in _maps():
 		var hq_owners := []
-		for cell in _cells_of(map, HQ):
+		for cell in _cells_of_terrain(map, HQ):
 			hq_owners.append(map.owner_at(cell))
 		assert_eq(
 			hq_owners.size(),
@@ -76,7 +76,7 @@ func test_every_map_gives_each_team_a_base() -> void:
 	for map in _maps():
 		for team in GameState.TEAMS:
 			var bases := 0
-			for cell in _cells_of(map, BASE):
+			for cell in _cells_of_terrain(map, BASE):
 				if map.owner_at(cell) == team:
 					bases += 1
 			assert_gt(
@@ -156,7 +156,7 @@ func test_maps_tagged_symmetric_really_are() -> void:
 ## build menu offers hulls, they spawn, and they are stuck on the dock forever.
 func test_every_port_opens_onto_water_a_hull_can_use() -> void:
 	for map in _maps():
-		for cell in _cells_of(map, PORT):
+		for cell in _cells_of_terrain(map, PORT):
 			var sailable := false
 			for step in MovementResolver.DIRECTIONS:
 				var next: Vector2i = cell + step
@@ -181,7 +181,7 @@ func test_every_port_opens_onto_water_a_hull_can_use() -> void:
 ## "the AI is broken" rather than "this map is".
 func test_all_ports_on_a_map_share_one_body_of_water() -> void:
 	for map in _maps():
-		var ports := _cells_of(map, PORT)
+		var ports := _cells_of_terrain(map, PORT)
 		if ports.size() < 2:
 			continue
 		var reachable := _flood(map, ports[0], TerrainType.SHIP)
@@ -228,7 +228,7 @@ func test_every_shoal_can_be_reached_by_a_landing_craft() -> void:
 		if shoals.is_empty():
 			continue
 		var beachable := {}
-		for port in _cells_of(map, PORT):
+		for port in _cells_of_terrain(map, PORT):
 			beachable.merge(_flood(map, port, TerrainType.LANDER))
 		for shoal in shoals:
 			assert_true(
@@ -250,7 +250,7 @@ func test_the_shared_water_lint_can_tell_two_seas_apart() -> void:
 	# Two one-cell harbours with dry land between them.
 	var map := MapData.parse("[terrain]\nPSS.SSP\n", terrain_db)
 	assert_not_null(map)
-	var ports := _cells_of(map, PORT)
+	var ports := _cells_of_terrain(map, PORT)
 	assert_eq(ports.size(), 2, "the fixture should have a dock at each end")
 	assert_false(
 		_flood(map, ports[0], TerrainType.SHIP).has(ports[1]),
@@ -270,6 +270,24 @@ func test_the_shoal_lint_can_tell_a_beach_from_a_bridge() -> void:
 		1,
 		"the beach joins them into one landmass — exactly what the lint is for"
 	)
+
+
+## The bridge check works by counting components, so anything that adds a
+## component fails it. An offshore beach — a landing point out in open water,
+## touching no land at all — is one of those, and it is the one shape that would
+## make the lint accuse a map of the opposite of what it did.
+func test_the_shoal_lint_does_not_mistake_an_offshore_beach_for_a_bridge() -> void:
+	var offshore := MapData.parse("[terrain]\nSSSSS\nS.S.S\nSSSSS\nSS_SS\n", terrain_db)
+	assert_not_null(offshore)
+	assert_eq(
+		_cells_of_terrain(offshore, SHOAL).size(), 1, "the fixture should have one offshore beach"
+	)
+	assert_eq(
+		_land_components(offshore, true),
+		_land_components(offshore, false),
+		"a beach no land touches is a lander waypoint, not a bridge, and the lint has to say so"
+	)
+	assert_eq(_land_components(offshore, true), 2, "the two islands are still the only landmasses")
 
 
 func test_every_map_describes_itself_for_the_menu() -> void:
@@ -314,16 +332,9 @@ func _name(map: MapData) -> String:
 	return map.source_path.get_file()
 
 
-func _cells_of(map: MapData, terrain_id: StringName) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for cell in map.property_cells():
-		if map.terrain_at(cell).id == terrain_id:
-			cells.append(cell)
-	return cells
-
-
-## Same question as _cells_of, over the whole grid rather than the property
-## cache — shoals and reefs are terrain nobody captures.
+## Every cell of one terrain, row-major, over the whole grid rather than the
+## property cache — so it answers for shoals and reefs, which nobody captures,
+## as readily as for HQs and ports.
 func _cells_of_terrain(map: MapData, terrain_id: StringName) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	for y in map.height:
@@ -356,6 +367,11 @@ func _flood(map: MapData, start: Vector2i, move_class: StringName) -> Dictionary
 ## land terrain, so its components *are* the landmasses. With `with_shoals`
 ## false, beaches count as water, which is what makes the pair of counts
 ## comparable.
+##
+## A component of nothing but shoals is not a landmass, and is not counted in
+## either pass: an offshore beach — a lander waypoint no land touches — exists
+## only in the with-shoals graph, and counting it would read as a bridge that
+## appeared out of open water, which is the opposite of what it is.
 func _land_components(map: MapData, with_shoals: bool) -> int:
 	var seen := {}
 	var components := 0
@@ -364,8 +380,8 @@ func _land_components(map: MapData, with_shoals: bool) -> int:
 			var start := Vector2i(x, y)
 			if seen.has(start) or not _is_land(map, start, with_shoals):
 				continue
-			components += 1
 			seen[start] = true
+			var solid := map.terrain_at(start).id != SHOAL
 			var queue: Array[Vector2i] = [start]
 			while not queue.is_empty():
 				var cell: Vector2i = queue.pop_back()
@@ -376,7 +392,10 @@ func _land_components(map: MapData, with_shoals: bool) -> int:
 					if not _is_land(map, next, with_shoals):
 						continue
 					seen[next] = true
+					solid = solid or map.terrain_at(next).id != SHOAL
 					queue.append(next)
+			if solid:
+				components += 1
 	return components
 
 
@@ -392,7 +411,7 @@ func _is_land(map: MapData, cell: Vector2i, with_shoals: bool) -> bool:
 ## class that can cross every land terrain, so "unreachable on foot" means
 ## unreachable, full stop.
 func _hq_connection_error(map: MapData) -> String:
-	var hqs := _cells_of(map, HQ)
+	var hqs := _cells_of_terrain(map, HQ)
 	if hqs.size() < 2:
 		return ""  # the HQ-count assertion owns this case
 	var seen := _flood(map, hqs[0], TerrainType.FOOT)

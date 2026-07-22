@@ -120,6 +120,18 @@ planner and the rules disagree.
 > not as a current claim. Nothing here has been re-scored by estimate —
 > `make difficulty-check` is the only thing allowed to write these numbers.
 
+> **The board itself has also moved since: `ironworks` gained a mirrored pair of
+> airfields** (one per side, owned from day 1) in the map retrofit of
+> 2026-07-21 — see `.lavish/map-retrofit-plan.html`. That is +2 properties and
+> the income they carry, plus a 20k air domain on a board whose measurements
+> below were taken when nothing on it could fly and no tier profile had ever been
+> weighed against an aircraft. So the `ironworks` column and finding (a)
+> describe a **superseded board**, on top of describing a superseded planner.
+> Both halves of the gate need re-baselining on the current maps before the DF4
+> verdict is judged again; the retrofit is data-only and touched no `AIProfile`
+> weight and no tier `.tres` — as D2/D3 require, difficulty still changes nothing
+> but which profile the planner weighs moves with.
+
 **Standing result — 120 matches, 15 seeds, default 20-day cap:**
 
 | Pairing | Overall | scrimmage | ironworks | Gate |
