@@ -11,9 +11,6 @@ extends RefCounted
 ## does. Battle holds one of these for the whole scene and calls `run()` when a
 ## computer team's turn opens.
 
-## The AI opens its turn just after the day banner has cleared.
-const START_DELAY := BattleAnimator.BANNER_SECONDS + 0.1
-const COMMAND_DELAY := 0.2
 ## Safety net: a planner bug can never hang the match, only force a turn to end.
 ## Read from the harness rather than declared here, because the headless engine
 ## applies the identical cut (balance plan D7) — if the two drifted apart, a
@@ -33,7 +30,10 @@ func _init(battle: Battle) -> void:
 ## mirrors: it awaits its own animations and never blocks Battle's frame.
 func run() -> void:
 	var game := _battle.game
-	await _battle.get_tree().create_timer(START_DELAY).timeout
+	# Opens just after the day banner has cleared — however long the active tier
+	# holds that banner, which is why the wait is computed here and not fixed.
+	var start_delay := _speed().start_delay_seconds()
+	await _battle.get_tree().create_timer(start_delay).timeout
 	for i in MAX_COMMANDS_PER_TURN:
 		if game.winner != 0:
 			_leave()
@@ -56,13 +56,35 @@ func run() -> void:
 			return
 		if ended:
 			return
-		await _battle.get_tree().create_timer(COMMAND_DELAY).timeout
+		await _think()
 	push_error("AI hit the per-turn command cap; forcing end of turn")
 	var end_turn := EndTurnCommand.new()
 	if end_turn.validate(game) == "":
 		await _execute(end_turn)
 	else:
 		_leave()
+
+
+## The tier this turn is paced at. The animator owns the answer, so a computer
+## turn and a player's move obey the same setting — and a capture, which pins its
+## own tier there, pins this too.
+func _speed() -> GameSpeed:
+	return _battle.animator.speed()
+
+
+## The think-beat between two commands, so the turn reads as decisions rather
+## than a slideshow.
+##
+## Instant drops the wait to a single frame rather than to nothing: the board
+## still repaints once per command, so a forty-command turn is forty frames the
+## eye can track as a fast flicker, the window keeps pumping events, and the
+## per-turn safety cap above keeps meaning what it says.
+func _think() -> void:
+	var delay := _speed().command_delay_seconds()
+	if delay <= 0.0:
+		await _battle.get_tree().process_frame
+		return
+	await _battle.get_tree().create_timer(delay).timeout
 
 
 ## Every bail-out from the loop lands here, so a planner bug can never leave the

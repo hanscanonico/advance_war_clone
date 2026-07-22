@@ -79,16 +79,28 @@ func refresh() -> void:
 
 
 ## Quick white flash when taking a hit. Awaitable.
-func flash_hit() -> void:
+##
+## The durations arrive from BattleAnimator rather than being owned here: pacing
+## is the animator's job and the player's setting, and this sprite derives
+## nothing but sim state. A zero-length flash is skipped outright — that is the
+## Instant tier asking for the result rather than the theatre.
+func flash_hit(in_seconds: float, out_seconds: float) -> void:
+	if in_seconds <= 0.0 or out_seconds <= 0.0:
+		return
 	var tween := create_tween()
-	tween.tween_property(self, "self_modulate", Color(4.0, 4.0, 4.0), 0.08)
-	tween.tween_property(self, "self_modulate", Color.WHITE, 0.12)
+	tween.tween_property(self, "self_modulate", Color(4.0, 4.0, 4.0), in_seconds)
+	tween.tween_property(self, "self_modulate", Color.WHITE, out_seconds)
 	await tween.finished
 
 
 ## Fade out and free. Awaitable; the caller must drop its reference first.
-func die() -> void:
+## `fade_seconds` is handed in for the same reason as `flash_hit`'s, and a zero
+## fade frees on the spot.
+func die(fade_seconds: float) -> void:
+	if fade_seconds <= 0.0:
+		queue_free()
+		return
 	var tween := create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, 0.25)
+	tween.tween_property(self, "modulate:a", 0.0, fade_seconds)
 	await tween.finished
 	queue_free()
