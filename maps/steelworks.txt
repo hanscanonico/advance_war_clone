@@ -1,0 +1,36 @@
+# The grand empty board: four bases and an airport a side, and a mountain wall with one gate.
+# symmetric
+# Symbols: . plains  F woods  M mountain  = road  ~ river  + bridge
+#          C city  B base  Q HQ  A airport
+[terrain]
+..QB........F.......M.....
+.BB..C...F.....C......F...
+.A============..C....M....
+.B...........=.F....C.....
+..C..F......B=....C...M...
+.....C.......=...F........
+..F.....C....=......C.....
+.M...........=.....F......
+MM...A..MMM.==...MMM....MM
+MM....MMM...==.MMM..A...MM
+......F.....=...........M.
+.....C......=....C.....F..
+........F...=.......C.....
+...M...C....=B......F..C..
+.....C....F.=...........B.
+....M....C..============A.
+...F......C.....F...C..BB.
+.....M.......F........BQ..
+[owners]
+1 2 0
+2 23 17
+1 3 0
+2 22 17
+1 1 1
+2 24 16
+1 2 1
+2 23 16
+1 1 2
+2 24 15
+1 1 3
+2 24 14

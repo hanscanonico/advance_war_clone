@@ -1,11 +1,8 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. Four plans ship with it: `.lavish/advance-wars-clone-plan.html` for the base
-game (architecture, mechanics, milestones M0–M7), `.lavish/commanders-plan.html` for
-Commanders and Command Powers (milestones C1–C4), `.lavish/difficulty-modes-plan.html`
-for the Easy/Normal/Difficult tiers (milestones DF1–DF4), and
-`.lavish/naval-air-units-plan.html` for the air and naval domains (milestones N1–N4).
+typed GDScript. Six design plans ship with it under `.lavish/`; `CLAUDE.md` lists them and
+which decisions each one owns.
 
 ## Running
 
@@ -67,15 +64,25 @@ so two scenarios run both ways by default.
 
 Run a single scene directly: `bin/Godot.app/Contents/MacOS/Godot --path . scenes/battle/battle.tscn`.
 
-Nine maps ship. The main menu lists them smallest board first — `scrimmage`, `timberline`,
-`riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`, `the_straits`, `ironworks` — so it
-opens on `scrimmage`, the quick match, and shows each one's size, property count and a one-line
-pitch as a tooltip. `jet_stream` and `the_straits` are the boards air and naval units were added
-for: the first puts an airfield behind each front, the second a port on each coast of one shared
-channel. Three of the older boards have since been retrofitted with the domains that suit them —
-`isthmus` gained a port and a landing beach per side, `ironworks` and `crossfire` an airfield each —
-while `first_steps`, `scrimmage`, `timberline` and `riverline` deliberately stay land-only, because
-each is built on a barrier that wings or hulls would simply erase.
+Twelve maps ship. The main menu lists them smallest board first — `scrimmage`, `forge`,
+`timberline`, `arsenal`, `riverline`, `isthmus`, `jet_stream`, `crossfire`, `first_steps`,
+`the_straits`, `ironworks`, `steelworks` — so it opens on `scrimmage`, the quick match, and shows
+each one's size, property count and a one-line pitch as a tooltip. `jet_stream` and `the_straits`
+are the boards air and naval units were added for: the first puts an airfield behind each front, the
+second a port on each coast of one shared channel. Three of the older boards have since been
+retrofitted with the domains that suit them — `isthmus` gained a port and a landing beach per side,
+`ironworks` and `crossfire` an airfield each — while `first_steps`, `scrimmage`, `timberline` and
+`riverline` deliberately stay land-only, because each is built on a barrier that wings or hulls
+would simply erase.
+
+`forge`, `arsenal` and `steelworks` are the production boards, and the only ones that hand out **no
+starting units at all**: what you get instead is factories — two to four bases a side where the rest
+of the roster tops out at two, an owned airport a side on the larger two, and neutral bases and
+airports to expand production itself. The opening is a build order rather than a march, and
+`steelworks` at 26×18 is the largest board in the game. An empty day 1 is legal without any rules
+change: defeat is only ever checked when a unit dies, and the AI's planner already falls through to
+production when it has nothing to move.
+
 Command-line flags still override the menu so demos and tools can skip it: `--map=crossfire`,
 `--hotseat`, `--fog`, `--difficulty=hard`, and `--co=alina_ward,viktor_draeg` (red first, blue
 second; either side may be left blank for no commander) — e.g.
@@ -266,8 +273,8 @@ result, including one capability that measured *negative* and ships switched off
   with, so tuning its behaviour is a data edit rather than a code change — and the difficulty
   tiers in `data/difficulty/`, each of which is just a label plus one of those profiles).
 - `maps/` — plain-text maps: an ASCII terrain grid, a *starting* property-ownership section, and
-  a starting-units section. `MapData` (core) is authoritative for terrain and is never mutated by
-  play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
+  an optional starting-units section. `MapData` (core) is authoritative for terrain and is never
+  mutated by play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   and the sound-effect player.

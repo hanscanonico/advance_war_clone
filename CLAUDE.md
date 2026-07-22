@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** five designs of record, all worth reading before an architectural decision.
+- **Status:** six designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -26,6 +26,10 @@ three movement domains (land, air, sea), property capture and income, and a comp
   clause with the rule that replaced it: a map edit **converts** cells, never carves — land stays
   passable to every land class, no cell becomes sea and no coastline is redrawn — because a save
   stores its board by `map_path` and reloads the edited file from `res://`.
+  `.lavish/production-maps-plan.html` owns the three production boards — `forge`, `arsenal`,
+  `steelworks` — and its D1: **zero starting units is an omitted `[units]` section**, not a flag and
+  not a parser change, which is why the trio shipped with no engine change at all. Its D3 keeps them
+  land-only, deferring to the naval plan's standing R1.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 

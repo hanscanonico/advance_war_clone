@@ -16,6 +16,8 @@ extends RefCounted
 ##   <team> <symbol> <x> <y>   # starting units; symbols defined by UnitType
 ##
 ## [owners] and [units] must come after [terrain] (they need the bounds).
+## [units] is optional: a board that omits it starts both sides with nothing but
+## their properties, and the first move of the match is a build (maps/forge.txt).
 ## Unit symbols are validated later by GameState.create, which has the UnitDB.
 ## The playability invariants no parser can express — the ones about HQs, bases,
 ## reachability, the symmetry the tag above claims, and the water a port or a

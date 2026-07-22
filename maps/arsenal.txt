@@ -1,0 +1,29 @@
+# Armies are built, not given: three bases and an airport a side, a neutral forge apiece by the river.
+# symmetric
+# Symbols: . plains  F woods  M mountain  = road  ~ river  + bridge
+#          C city  B base  Q HQ  A airport
+[terrain]
+.QB......F...M....
+.BA...C.....C..F..
+.B=======....C....
+..F.=......M......
+..C.=...B....C..M.
+....=...F....F....
+~~~~+~~~~~~~~+~~~~
+....F....F...=....
+.M..C....B...=.C..
+......M......=.F..
+....C....=======B.
+..F..C.....C...AB.
+....M...F......BQ.
+[owners]
+1 1 0
+2 16 12
+1 2 0
+2 15 12
+1 1 1
+2 16 11
+1 2 1
+2 15 11
+1 1 2
+2 16 10
