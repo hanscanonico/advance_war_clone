@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scenes/battle/battle.gd" id="1"]
 [ext_resource type="Script" path="res://scenes/ui/terrain_panel.gd" id="2"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scenes/ui/commander_hud_chip.gd" id="5"]
 [ext_resource type="Script" path="res://scenes/ui/commander_power_banner.gd" id="6"]
 [ext_resource type="Script" path="res://scenes/ui/commander_info_sheet.gd" id="7"]
+[ext_resource type="PackedScene" path="res://scenes/battle/cutscene/combat_cutscene.tscn" id="8"]
 
 [node name="Battle" type="Node2D"]
 script = ExtResource("1")
@@ -399,3 +400,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("7")
+
+[node name="Cutscene" parent="." instance=ExtResource("8")]
+unique_name_in_owner = true

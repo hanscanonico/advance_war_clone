@@ -22,6 +22,11 @@ const DEMO_ARG := "--demo="
 
 ## Demos fix the seed so a capture of the same scenario is the same frame.
 const DEMO_SEED := 2026
+## Where on the cut-in's clock the `cutin` capture is posed: late in the
+## defender's impact, so the plates are up, the HP has ticked, and the damage
+## callout is at full. Any moment would be byte-stable — the cut-in is a pure
+## function of its clock — but this is the one that shows the most.
+const CUT_IN_POSE := 0.95
 
 var _battle: Battle
 var _shot_path := ""
@@ -155,6 +160,8 @@ func _run_demo(mode: String) -> void:
 			await _until_state(Battle.State.MENU)
 		"powermenu":
 			await _run_power_menu_demo()
+		"cutin":
+			_stage_cut_in()
 		"ambush", "vanish":
 			_run_vanish_demo(mode)
 		"power_ready":
@@ -283,6 +290,30 @@ func _run_vanish_demo(mode: String) -> void:
 	_battle.view.refresh_fog(game.current_team, false)
 	_battle.view._restage_identity()  # Sable Wren's Verdant recolours Blue after the fog pass
 	_battle.set_cursor_cell(Vector2i(5, 5))  # the panel names whatever is on the tile
+
+
+## The battle cut-in, held still for the shutter.
+##
+## The exchange is resolved directly rather than driven through the targeting
+## flow, because the flow deliberately suppresses the cut-in while capturing
+## (BattleAnimator._cut_in_applies) — a mid-tween frame is exactly what makes two
+## otherwise identical captures differ, which is the war this repo already fought
+## with the camera shake. So the still is posed instead: a real result off the
+## real resolver, frozen at one moment of the cut-in's own clock.
+##
+## The defender is softened first so the frame shows a mid-fight exchange with
+## both sides marked, rather than two units at full health.
+func _stage_cut_in() -> void:
+	var game := _battle.game
+	var attacker := game.unit_at(Vector2i(8, 8))  # red tank
+	var defender := game.unit_at(Vector2i(9, 8))  # blue tank
+	if attacker == null or defender == null:
+		push_error("cutin demo: the two frontline tanks are not where it expects them")
+		return
+	defender.hp = 74
+	var result := CombatResolver.resolve(game, attacker, defender)
+	_battle.view.sync_sprites()
+	_battle.animator.cutscene.pose_at(result, attacker, defender, CUT_IN_POSE)
 
 
 ## Sets Red's commander and, optionally, fills its meter, then refreshes the HUD

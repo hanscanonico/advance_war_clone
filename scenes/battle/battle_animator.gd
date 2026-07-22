@@ -34,8 +34,11 @@ var cursor: Sprite2D
 var turn_banner: PanelContainer
 var banner_label: Label
 var power_banner: CommanderPowerBanner
+## The full-screen battle cut-in. Every resolved attack goes through it when the
+## player has it on and both sides are visible; see `animate_combat`.
+var cutscene: CombatCutscene
 ## True for a run that exists to be photographed. Suppresses the two open-ended
-## animations — see `shake_camera` and `start_cursor_pulse`.
+## animations — see `shake_camera` and `start_cursor_pulse` — and the cut-in.
 var capturing := false
 
 var _banner_tween: Tween
@@ -69,12 +72,24 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 ## Plays out one already-resolved exchange: the hit, the shake, whichever side
 ## died, and the counter. Awaitable, so the flow resumes once the dust settles.
 ##
-## Under Instant the flash, fade and shake all fall away but the sounds stay: an
-## attack the player triggered has to register even when there is nothing to see.
+## Two bodies, one contract. With battle animations on, the exchange plays as the
+## full-screen cut-in and the map is brought back into step underneath; with them
+## off — or while capturing, when the viewer cannot see both combatants, or at the
+## Instant tier where there is nothing to watch — the on-map version below runs,
+## byte-for-byte as it always did. Either way this returns exactly once, which is
+## what both call sites hold their flow on.
+##
+## Under Instant that on-map flash, fade and shake all fall away but the sounds
+## stay: an attack the player triggered has to register even when there is
+## nothing to see.
 func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
 	var defender_sprite := view.sprite_for(defender)
 	var attacker_sprite := view.sprite_for(attacker)
 	view.refresh_sprite(attacker)  # snap to the committed destination
+	if _cut_in_applies(attacker, defender):
+		await cutscene.play(result, attacker, defender)
+		_sync_aftermath()
+		return
 	Sfx.play(&"shot")
 	await flash_hit(defender_sprite)
 	shake_camera()
@@ -106,6 +121,34 @@ func flash_hit(sprite: UnitSprite) -> void:
 ## a sprite outside combat entirely and comes through here for that reason.
 func fade_out(sprite: UnitSprite) -> void:
 	await sprite.die(Settings.speed.death_fade_seconds())
+
+
+## Whether this exchange gets the cut-in.
+##
+## The visibility half is the point of the gate: under fog an exchange the
+## viewer cannot see would otherwise parade two hidden units across the screen,
+## so it stays on the map path, which already draws fogged units correctly. The
+## question goes to the view, which asks `Vision` — no second opinion on who can
+## see what lives here (plan R6).
+##
+## Instant is out too: that tier exists to skip the theatre, so a full-screen
+## cut-in playing on its own clock would defeat it — the exchange stays on the
+## map path, which under Instant collapses to just the sounds.
+func _cut_in_applies(attacker: Unit, defender: Unit) -> bool:
+	if cutscene == null or capturing or not Settings.battle_animations:
+		return false
+	if Settings.speed.instant:
+		return false
+	return view.can_see_unit(attacker) and view.can_see_unit(defender)
+
+
+## The map beats the cut-in stands in for. Both sides have already been shown
+## dying on screen, so there is no fade left to play: this only brings the board
+## back into step with a sim that has moved on — dropping the sprites of units
+## the exchange removed (cargo that went down with a transport included) and
+## redrawing the survivors.
+func _sync_aftermath() -> void:
+	view.sync_sprites()
 
 
 # --- banner ------------------------------------------------------------------

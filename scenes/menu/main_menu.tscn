@@ -98,6 +98,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Fog of war"
 
+[node name="BattleAnimCheck" type="CheckButton" parent="Center/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Battle animations"
+
 [node name="Spacer2" type="Control" parent="Center/Rows"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 2)

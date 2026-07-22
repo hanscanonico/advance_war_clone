@@ -62,8 +62,16 @@ MIN_BYTES="${SMOKE_MIN_BYTES:-2000}"
 # commander_victory) are the G3 gate: the HUD chip's charging/ready/active
 # states, the activation card, the both-sides info sheet, and the victory lockup,
 # each proved to still render at native 640x360.
+#
+# `cutin` is the odd one out: every other mode drives the flow and photographs
+# what it produces, but the battle cut-in is deliberately suppressed while
+# capturing (a mid-tween frame is what made the camera shake undeterministic), so
+# that mode poses the overlay at a fixed moment of its own clock instead. It is
+# still a real check — the pose runs the real resolver and the real staging, so a
+# cut-in that stopped rendering, or a unit or terrain it could not draw, fails
+# here rather than in play.
 DEFAULT_MODES=(
-	attack resolve capture build buildmenu endturn
+	attack resolve cutin capture build buildmenu endturn
 	load cargo drop transport supply divemenu dive mapmenu powermenu victory aiturn
 	powermenu+fog victory+fog ambush vanish
 	power_ready power_active power_banner commander_info commander_victory

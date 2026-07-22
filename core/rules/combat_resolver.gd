@@ -47,6 +47,18 @@ class CombatResult:
 	var counter_damage := 0
 	var defender_died := false
 	var attacker_died := false
+	## Displayed HP (1-10) each side went into the exchange with, snapshotted by
+	## `resolve` before a point of it is spent.
+	##
+	## The only thing in this file that exists for the presentation layer. By the
+	## time the battle cut-in is handed a result the command has already applied,
+	## so both units hold their *post*-combat HP and the animation has nothing to
+	## count down from. Recorded here rather than re-derived there, because the
+	## cut-in must replay the exchange and never recompute it — a second opinion
+	## on combat is exactly the bug class this repo already paid for once with
+	## movement. Nothing in core/ or ai/ reads these.
+	var attacker_hp_before := 0
+	var defender_hp_before := 0
 
 
 ## Luck-free prediction for the damage preview. `attacker_cell` is the planned
@@ -123,6 +135,11 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 		defender.cell,
 		defender.displayed_hp()
 	)
+	# Taken off the Engagement, not the units: those are the effective values the
+	# formula below is about to be resolved with, so the snapshot can never drift
+	# from the exchange it describes.
+	result.attacker_hp_before = fight.attacker_hp
+	result.defender_hp_before = fight.defender_hp
 	var base := _damage_pct(state, fight)
 	if base < 0:
 		push_error("CombatResolver: %s cannot attack %s" % [attacker.type.id, defender.type.id])

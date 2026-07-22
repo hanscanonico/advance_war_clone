@@ -210,8 +210,8 @@ func _build_view() -> BattleView:
 	return built
 
 
-## Same assignment-not-constructor shape as _build_view, and for the same
-## reason: the animator never learns what a Battle is.
+## Same assignment-not-constructor shape as _build_view, and for the same reason:
+## neither the animator nor the cut-in it plays ever learns what a Battle is.
 func _build_animator() -> BattleAnimator:
 	var built := BattleAnimator.new()
 	built.node = self
@@ -221,6 +221,8 @@ func _build_animator() -> BattleAnimator:
 	built.turn_banner = %TurnBanner
 	built.banner_label = %BannerLabel
 	built.power_banner = %CommanderBanner
+	built.cutscene = %Cutscene
+	built.cutscene.view = view
 	return built
 
 

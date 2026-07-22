@@ -15,6 +15,7 @@ const BATTLE_SCENE := "res://scenes/battle/battle.tscn"
 @onready var difficulty_option: OptionButton = %DifficultyOption
 @onready var speed_option: OptionButton = %SpeedOption
 @onready var fog_check: CheckButton = %FogCheck
+@onready var battle_anim_check: CheckButton = %BattleAnimCheck
 @onready var one_player_button: Button = %OnePlayerButton
 @onready var two_player_button: Button = %TwoPlayerButton
 @onready var continue_button: Button = %ContinueButton
@@ -53,6 +54,15 @@ func _ready() -> void:
 	_select_panel.confirmed.connect(_on_selection_confirmed)
 	_select_panel.cancelled.connect(_on_selection_cancelled)
 	continue_button.visible = SaveGame.has_save()
+	# The one control on this page that is not a match option: it is a standing
+	# preference, so it opens on what was chosen last time and writes through the
+	# moment it is clicked rather than waiting for a match to start.
+	battle_anim_check.button_pressed = Settings.battle_animations
+	battle_anim_check.toggled.connect(Settings.set_battle_animations)
+	battle_anim_check.tooltip_text = (
+		"Play the full-screen battle cut-in when an attack resolves.\n"
+		+ "Off keeps the quick on-map hit. Any key skips a cut-in in progress."
+	)
 	one_player_button.pressed.connect(_open_select.bind([2] as Array[int]))
 	two_player_button.pressed.connect(_open_select.bind([] as Array[int]))
 	continue_button.pressed.connect(_continue)

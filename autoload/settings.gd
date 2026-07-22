@@ -1,11 +1,15 @@
 extends Node
-## Device preferences: what this machine likes, as opposed to what this match
-## is. Today that is exactly one thing — how fast the battle's theatre plays out.
+## Device preferences: what this machine likes, as opposed to what this match is.
+## Two of them today — how fast the battle's theatre plays out, and whether a
+## resolved attack cuts to the full-screen battle animation at all.
 ##
-## Deliberately not MatchConfig and deliberately not in the save file: resuming
-## a three-day-old save should play at the speed you like *today*, and a hot-seat
-## pair share one screen anyway. Nothing here is ever handed to core/ or ai/, so
-## the sim cannot observe a preference it never receives — see GameSpeed.
+## Deliberately not MatchConfig and deliberately not in the save file: resuming a
+## three-day-old save should play at the speed you like *today* and watch battles
+## the way you like *today*, and a hot-seat pair share one screen anyway. Both are
+## presentation only — nothing here may ever change a rule, a number, or what the
+## sim does, so two players' "same seed, same commands" keep meaning the same
+## result. Nothing here is ever handed to core/ or ai/, so the sim cannot observe
+## a preference it never receives — see GameSpeed.
 ##
 ## Persisted to user://settings.cfg with ConfigFile, beside SaveGame's
 ## user://save.json.
@@ -13,15 +17,25 @@ extends Node
 const SETTINGS_PATH := "user://settings.cfg"
 const SECTION := "game"
 const SPEED_KEY := "speed"
+const BATTLE_ANIMATIONS_KEY := "battle_animations"
 ## Overrides the stored tier for one launch, in the family of --map / --fog /
 ## --difficulty. Deliberately un-persisted: a scripted run must not edit what
 ## the player chose.
 const SPEED_ARG := "--speed="
+## Turns the battle cut-in off for one launch, same family as --speed= and just
+## as un-persisted: how a capture run keeps `make screenshot` byte-stable without
+## touching the stored preference.
+const NO_ANIM_ARG := "--no-battle-anim"
 
 ## How fast moves and battles play out on screen. Never null. Callers read it at
 ## the moment they animate rather than caching it, so a mid-match change takes
 ## effect on the very next animation.
 var speed: GameSpeed = GameSpeed.default_speed()
+
+## Whether a resolved attack plays the full-screen battle cut-in. Off falls back
+## to the on-map hit flash and shake, which is how combat looked before the
+## cut-in existed — see BattleAnimator.animate_combat.
+var battle_animations := true
 
 ## False once anything has spoken for this launch, so nothing written later
 ## reaches the file.
@@ -40,6 +54,16 @@ func _ready() -> void:
 ## Changes the tier and writes it back. The only way the speed ever moves.
 func set_speed(id: StringName) -> void:
 	speed = GameSpeed.by_id(id)
+	if _persistent:
+		_save()
+
+
+## The setter the menu's checkbox is wired to. Mirrors set_speed: writes through
+## immediately so a preference set in one session is honoured in the next even if
+## the game is closed the hard way, but a pinned or scripted launch (see pin and
+## _apply_cmdline) never touches the file.
+func set_battle_animations(enabled: bool) -> void:
+	battle_animations = enabled
 	if _persistent:
 		_save()
 
@@ -65,12 +89,14 @@ func _load() -> void:
 	var stored: Variant = config.get_value(SECTION, SPEED_KEY, "")
 	if stored is String:
 		speed = GameSpeed.by_id(StringName(stored))
+	battle_animations = config.get_value(SECTION, BATTLE_ANIMATIONS_KEY, battle_animations)
 
 
 func _save() -> void:
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)  # keep any key a later version of the game wrote
 	config.set_value(SECTION, SPEED_KEY, String(speed.id))
+	config.set_value(SECTION, BATTLE_ANIMATIONS_KEY, battle_animations)
 	if config.save(SETTINGS_PATH) != OK:
 		push_error("Settings: cannot write %s" % SETTINGS_PATH)
 
@@ -98,3 +124,9 @@ func _apply_cmdline() -> void:
 			# Latched after that pin, so the flag's own lands and every later
 			# one — a capture's — is declined.
 			_flag_wins = true
+		elif arg == NO_ANIM_ARG:
+			# Same family as --speed=: a per-launch override that never reaches
+			# the file. Latches it shut exactly as a pin does, so a scripted or
+			# capture run cannot rewrite what the player chose.
+			_persistent = false
+			battle_animations = false
