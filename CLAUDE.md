@@ -83,7 +83,7 @@ res://
 │              (NO Node references)
 ├─ maps/        # map scenes / map resources
 ├─ assets/      # sprites, audio, fonts  (+ LICENSES.md)
-└─ tests/       # GUT tests — target core/ and ai/ only
+└─ tests/       # GUT tests — target the Node-free layers only (see Testing)
 ```
 
 ## GDScript conventions

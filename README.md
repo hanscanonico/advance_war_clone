@@ -56,11 +56,11 @@ reference cycle (`AttackCommand.validate()` referring to its sibling `MoveComman
 script graph), reproducible in twelve lines with no GUT involved. No gameplay object leaks, so the
 gate reads exit status and ignores it.
 
-`make smoke` covers what unit tests deliberately do not: GUT is limited to the Node-free `core/`
-and `ai/`, so the battle scene is verified by driving it. Each demo scenario runs the same handlers
-a player's input reaches and must still produce a frame. It renders, so it needs a display — it is
-a local gate, not a headless-CI one. Narrow it with `make smoke MODES="attack capture"`, and keep
-the captures to look at with `SMOKE_KEEP=1 make smoke`.
+`make smoke` covers what unit tests deliberately do not: GUT is limited to the Node-free layers
+(see Architecture below), so the battle scene is verified by driving it. Each demo scenario runs
+the same handlers a player's input reaches and must still produce a frame. It renders, so it needs
+a display — it is a local gate, not a headless-CI one. Narrow it with
+`make smoke MODES="attack capture"`, and keep the captures to look at with `SMOKE_KEEP=1 make smoke`.
 
 A mode may carry a `+fog` suffix (`make smoke MODES="victory+fog"`) to rerun that scenario with fog
 of war on. Fog is the only setting under which the scene hides units rather than just drawing them,

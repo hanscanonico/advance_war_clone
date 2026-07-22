@@ -29,7 +29,7 @@ extends SceneTree
 ##     --no-commands             skip commands.jsonl (a big sweep's is large)
 ##     --out=reports/...         output directory (default reports/balance_sim/<run>)
 ##
-## Writes four files, all gitignored with the rest of reports/:
+## Writes five files (four with --no-commands), all gitignored with reports/:
 ##   matches.csv   — one row per match
 ##   timeline.csv  — one row per side per played turn, keyed by match_id
 ##   commands.jsonl— one line per applied command (plan Q3)
