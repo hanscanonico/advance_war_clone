@@ -40,4 +40,9 @@ max-returns: 12
 # battle.gd sits at exactly 918: adding to it means moving something else out
 # first, which is the point — and the number comes back down the moment the
 # scene sheds a responsibility.
-max-file-lines: 918
+#
+# 905 once BattleZoom — the camera zoom level, its clamp against the view and the
+# keyboard zoom steps — moved out, which is where the small-map camera work (a
+# new min_zoom that lets a small board zoom out until it fits) would otherwise
+# have landed.
+max-file-lines: 905

@@ -10,7 +10,6 @@ extends Node2D
 ## stands in for a player through exactly those.
 
 const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
-const MAX_ZOOM := 5.0
 
 enum State {
 	IDLE,
@@ -84,8 +83,8 @@ var animator: BattleAnimator
 ## whole scene; `run()` is fired when a computer team's turn opens.
 var _ai_runner: BattleAiRunner
 
-var _zoom := 2.0
-var _min_zoom := 1.0
+## Owns the camera zoom level, its clamp against the view, and the zoom keys.
+var _zoom: BattleZoom
 ## Set only when the command line asks for a scripted capture; see _ready.
 var _scenario_driver: BattleScenarioDriver
 ## True for a run that exists to be photographed. Suppresses the presentation's
@@ -129,7 +128,8 @@ func _ready() -> void:
 	menu_button.pressed.connect(_go_to_main_menu)
 	handoff_button.pressed.connect(leave_handoff)
 	commander_info_sheet.closed.connect(_close_commander_info)
-	_setup_camera()
+	_zoom = BattleZoom.new(view)
+	_zoom.setup()
 	set_cursor_cell(Vector2i.ZERO)
 	# Dev-only capture flows. The driver is held for the whole scene: `run`
 	# awaits, and a RefCounted nobody references is freed mid-scenario.
@@ -246,11 +246,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if state in [State.ANIMATING, State.MENU, State.VICTORY, State.AI_TURN, State.INFO]:
 		return  # the menu and info sheet handle their own input; the rest block it
-	if event.is_action_pressed(&"zoom_in"):
-		_set_zoom(_zoom + 1.0)
-	elif event.is_action_pressed(&"zoom_out"):
-		_set_zoom(_zoom - 1.0)
-	elif event is InputEventMouseMotion:
+	if _zoom.handle_input(event):
+		return
+	if event is InputEventMouseMotion:
 		var cell := _mouse_cell()
 		if map.in_bounds(cell) and cell != cursor_cell:
 			set_cursor_cell(cell)
@@ -883,19 +881,7 @@ func _update_damage_preview() -> void:
 	view.update_damage_preview(CombatResolver.forecast(game, selected, dest, target), cursor_cell)
 
 
-# --- camera / cursor ---------------------------------------------------------
-
-
-## How far the player may zoom out depends on the viewport, so the clamp is
-## worked out here; the view owns the camera itself.
-func _setup_camera() -> void:
-	_min_zoom = view.min_zoom()
-	_set_zoom(_zoom)
-
-
-func _set_zoom(zoom: float) -> void:
-	_zoom = clampf(zoom, ceilf(_min_zoom * 100.0) / 100.0, MAX_ZOOM)
-	view.set_zoom(_zoom)
+# --- cursor ------------------------------------------------------------------
 
 
 func _mouse_cell() -> Vector2i:
