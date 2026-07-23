@@ -95,7 +95,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_font_sizes/font_size = 10
-text = "Red Army"
+text = "First Army"
 horizontal_alignment = 2
 
 [node name="UnitHpLabel" type="Label" parent="UI/TerrainPanel/Margin/Rows/UnitRows"]
@@ -232,7 +232,7 @@ theme_override_constants/margin_bottom = 3
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
-text = "Day 1  -  Red Army  -  Funds 0"
+text = "Day 1  -  First Army  -  Funds 0"
 
 [node name="TurnBanner" type="PanelContainer" parent="UI"]
 unique_name_in_owner = true
@@ -256,7 +256,7 @@ theme_override_constants/margin_bottom = 10
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "Day 1 - Red Army"
+text = "Day 1 - First Army"
 
 [node name="CommanderBanner" type="PanelContainer" parent="UI"]
 unique_name_in_owner = true
@@ -315,7 +315,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
-text = "Red Army wins!"
+text = "First Army wins!"
 
 [node name="VictorySubLabel" type="Label" parent="UI/VictoryScreen/VictoryMargin/VictoryRows"]
 unique_name_in_owner = true
@@ -372,7 +372,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
-text = "Red Army — press confirm when ready"
+text = "First Army — press confirm when ready"
 
 [node name="HandoffHint" type="Label" parent="UI/HandoffScreen/HandoffCenter/HandoffRows"]
 layout_mode = 2
