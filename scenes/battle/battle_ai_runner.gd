@@ -85,7 +85,7 @@ func _think() -> void:
 ## scene stuck in AI_TURN with all input blocked and no banner.
 func _leave() -> void:
 	if _battle.game.winner != 0:
-		_battle._enter_victory()
+		_battle._outcome.enter_victory()
 	else:
 		_battle.state = Battle.State.IDLE
 
