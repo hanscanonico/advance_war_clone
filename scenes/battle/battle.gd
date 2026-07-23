@@ -288,7 +288,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func confirm_at(cell: Vector2i) -> void:
 	match state:
 		State.IDLE:
-			var unit := game.unit_at(cell)
+			var unit := view._visible_unit_at(cell)
 			if unit != null and unit.team == game.current_team and not unit.acted:
 				_select(unit)
 			elif _is_own_empty_factory(cell):
@@ -553,7 +553,7 @@ func _is_own_empty_factory(cell: Vector2i) -> bool:
 	return (
 		not map.terrain_at(cell).builds.is_empty()
 		and game.owner_at(cell) == game.current_team
-		and game.unit_at(cell) == null
+		and view._visible_unit_at(cell) == null
 	)
 
 

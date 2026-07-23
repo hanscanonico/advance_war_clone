@@ -364,6 +364,19 @@ func can_see_unit(unit: Unit) -> bool:
 	return Vision.can_see_unit(game, _viewing_team, unit, _visible_cells)
 
 
+## The unit on `cell` the viewing team can actually see, or null when the tile
+## reads empty to them — a fogged enemy included. The panel and the menu-opening
+## decisions ask this instead of `game.unit_at` so a hidden occupant can't change
+## what a click offers and turn an apparently-empty cell into a free fog probe.
+## The sim stays the authority on what lands there: a build onto a secretly
+## occupied cell is still refused by BuildCommand.validate.
+func _visible_unit_at(cell: Vector2i) -> Unit:
+	var unit := game.unit_at(cell)
+	if unit != null and not can_see_unit(unit):
+		return null
+	return unit
+
+
 ## Whether the viewing team may see activity on `cell` — the single authority in
 ## the view for cell-scoped visibility, as `can_see_unit` is for a unit. Ask it
 ## before disclosing anything a hidden unit could be doing on the tile, such as a
@@ -415,9 +428,7 @@ func refresh_hud() -> void:
 
 
 func refresh_panel(cell: Vector2i) -> void:
-	var hovered := game.unit_at(cell)
-	if hovered != null and not can_see_unit(hovered):
-		hovered = null  # hidden enemies stay hidden in the panel too
+	var hovered := _visible_unit_at(cell)  # hidden enemies stay hidden in the panel too
 	var carrying := ""
 	if hovered != null:
 		var cargo := game.cargo_of(hovered)
