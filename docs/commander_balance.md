@@ -155,5 +155,10 @@ the top of this document, a review trigger rather than an automatic nerf.
 
 ### Balance changelog
 
-_(none yet — the first tuning pass appends entries here: commander, the one value
-changed, from → to, and the evidence that prompted it.)_
+- **2026-07-23 — every commander, `power_cost`, +2 000 across the roster**
+  (8 000→10 000, 9 000→11 000, 10 000→12 000, 11 000→13 000, 12 000→14 000).
+  Evidence: human play — powers were firing too often to stay an event. This is
+  a global pacing shift, not a per-commander tune, so it moves one value per the
+  ladder above while preserving the roster's cost ordering; the top tier now
+  sits on the plan's 14 000 ceiling. The accrual split (100 % lost / 50 % dealt)
+  is the plan's locked D2 and was not touched.
