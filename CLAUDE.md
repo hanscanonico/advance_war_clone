@@ -48,6 +48,22 @@ three movement domains (land, air, sea), property capture and income, and a comp
   what keeps pacing unable to move an outcome, a save or a replay. Its GS3 subjective retune is
   **not done** — the tier numbers are still the plan's starting values, characterized but not yet
   adjusted against a full match played at each tier by a human.
+  `.lavish/faction-identity-plan.html` owns armies wearing their commander's faction — milestones
+  FI1–FI3, all shipped — and its D1: **identity is presentation-only.** Nothing under `core/` or
+  `ai/` learns a colour or a name; the sim keeps its team ints, and `scenes/common/side_identity.gd`
+  (`SideIdentity`) resolves `team → {theme, display name, atlas row}` **once per match** from the
+  commander picks, re-derived on load, never stored. It is the single authority every surface that
+  once said "Red"/"Blue" now reads — the board, the day banner, the terrain panel, the winner line,
+  the select chips, the info sheet — so ask it, never re-derive a side's colour or name. Its D3/D4
+  fallbacks are load-bearing and total: a mirror match keeps the faction name and the later slot
+  borrows the first hue-distinct classic (Aurora blue, else Meridian red); a commander-less side is
+  "First/Second Army" in the classic red and blue, so a no-CO match is board-identical to before
+  factions. The atlas-row order (`0 neutral, 1 meridian, 2 aurora, 3 iron, 4 verdant`) is a contract
+  between `SideIdentity._ROW_FOR_KEY` and the art pipeline (`build_pixvoxel_atlases.sh` ROW_PALETTE,
+  `generate_tiles.gd`); rows 0–2 are the shipped red/blue art byte-for-byte and must stay so. Its D5
+  is the standing boundary: **"Red"/"Blue" survive only as developer slot vocabulary** — the Balance
+  Lab's `--red`/`--blue` grammar and its byte-stable reports, code identifiers, comments — never on a
+  screen a player sees; if a player can see it, it speaks faction.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
