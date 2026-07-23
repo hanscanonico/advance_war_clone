@@ -179,8 +179,15 @@ func _paint_backdrop() -> void:
 			backdrop_layer.set_cell(Vector2i(x, y), ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, 0))
 
 
-## Recolors one property to its current owner, after a capture.
+## Recolors one property to its current owner, after a capture — but only for a
+## cell the viewer can currently see. A capture inside the viewer's fog must not
+## paint through the translucent fog layer (it would leak enemy expansion and
+## income), so a hidden cell keeps its last-seen colour and the repaint is
+## deferred to `refresh_fog`, which lands it the moment the viewer's vision
+## reaches the cell.
 func repaint_property(cell: Vector2i) -> void:
+	if not _can_see_cell(cell):
+		return
 	var terrain := map.terrain_at(cell)
 	if terrain.team_tinted:
 		terrain_layer.set_cell(
@@ -336,7 +343,13 @@ func refresh_fog(viewing_team: int, blacked_out: bool) -> void:
 		for y in map.height:
 			for x in map.width:
 				var cell := Vector2i(x, y)
-				if not _visible_cells.has(cell):
+				if _visible_cells.has(cell):
+					# In view: show the true owner. A capture the gate in
+					# repaint_property deferred while the cell was fogged reveals
+					# here, so the board never leaks an ownership change the viewer
+					# has not scouted, yet shows the truth the instant it is seen.
+					repaint_property(cell)
+				else:
 					fog_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i.ZERO)
 	for unit in game.units:
 		refresh_sprite(unit)
@@ -366,6 +379,19 @@ func _can_see_cell(cell: Vector2i) -> bool:
 	if _blacked_out:
 		return false
 	return _visible_cells.has(cell)
+
+
+## The owner the board tile at `cell` is currently painted for, recovered from its
+## atlas row. For a cell in view this equals the live owner (the fog pass just
+## repainted it); for a fogged cell it is the viewer's last-seen owner. The
+## terrain panel reads this instead of live truth on a hidden cell so its owner
+## label names the same side the tile shows — never outing a capture out of sight.
+func _last_seen_owner(cell: Vector2i) -> int:
+	var row: int = terrain_layer.get_cell_atlas_coords(cell).y
+	for team in GameState.TEAMS:
+		if identity.atlas_row(team) == row:
+			return team
+	return MapData.NEUTRAL
 
 
 # --- HUD and panels ----------------------------------------------------------
@@ -401,9 +427,13 @@ func refresh_panel(cell: Vector2i) -> void:
 	# stays hidden on a cell the viewer cannot see — otherwise the panel would out
 	# an enemy capturing inside your fog.
 	var capture_left: int = game.capture_progress.get(cell, -1) if _can_see_cell(cell) else -1
+	# The owner label follows the tile, not live truth: a property captured while
+	# this cell was fogged keeps its last-seen owner until the viewer sees it, so
+	# the panel never names a side change the board is still hiding.
+	var owner: int = game.owner_at(cell) if _can_see_cell(cell) else _last_seen_owner(cell)
 	terrain_panel.show_tile(
 		map.terrain_at(cell),
-		game.owner_at(cell),
+		owner,
 		game.current_team,
 		capture_left,
 		hovered,
