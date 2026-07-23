@@ -45,6 +45,11 @@ var commander_chip: CommanderHudChip
 var db: TerrainDB
 var map: MapData
 var game: GameState
+## Who each side is and what it wears — resolved once at match setup from the
+## commander picks (SideIdentity). Every team-to-paint and team-to-name answer
+## the board draws comes from here; the sim keeps its team ints. Battle builds it
+## and assigns it, like everything else the view draws with.
+var identity: SideIdentity
 ## Teams the computer plays. The view only needs them to know whose controls it
 ## must not offer; Battle owns the list and hands it over, as with everything.
 var ai_teams: Array[int] = []
@@ -63,6 +68,7 @@ var _blacked_out := false
 ## Builds the tile sets from data and paints the opening board. Call once, after
 ## the node fields and `db`/`map`/`game` are set.
 func setup() -> void:
+	terrain_panel.identity = identity  # the panel names and tints sides through the same resolver
 	terrain_layer.tile_set = _build_tile_set()
 	# The terrain atlas is drawn at 4x the world grid (see TERRAIN_PX), so the
 	# layer is scaled back down to keep one cell = TILE. Overlays and the cursor
@@ -98,8 +104,11 @@ func _build_tile_set() -> TileSet:
 	for terrain in db.all():
 		atlas.create_tile(Vector2i(terrain.atlas_col, 0))
 		if terrain.team_tinted:
-			atlas.create_tile(Vector2i(terrain.atlas_col, 1))
-			atlas.create_tile(Vector2i(terrain.atlas_col, 2))
+			# Rows 1-4, one per faction — a property can be owned by any side, and
+			# which faction row that side draws in is the resolver's call, not the
+			# owner int. The atlas carries all four (FI1); this registers them.
+			for row in range(1, SideIdentity.FACTION_ROWS + 1):
+				atlas.create_tile(Vector2i(terrain.atlas_col, row))
 	tile_set.add_source(atlas, ATLAS_SOURCE_ID)
 	return tile_set
 
@@ -120,7 +129,7 @@ func _paint_map() -> void:
 		for x in map.width:
 			var cell := Vector2i(x, y)
 			var terrain := map.terrain_at(cell)
-			var row := game.owner_at(cell) if terrain.team_tinted else 0
+			var row := identity.atlas_row(game.owner_at(cell)) if terrain.team_tinted else 0
 			terrain_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, row))
 
 
@@ -129,7 +138,9 @@ func repaint_property(cell: Vector2i) -> void:
 	var terrain := map.terrain_at(cell)
 	if terrain.team_tinted:
 		terrain_layer.set_cell(
-			cell, ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, game.owner_at(cell))
+			cell,
+			ATLAS_SOURCE_ID,
+			Vector2i(terrain.atlas_col, identity.atlas_row(game.owner_at(cell)))
 		)
 
 
@@ -145,7 +156,7 @@ func spawn_sprite_for(unit: Unit) -> void:
 	var sprite: UnitSprite = UNIT_SPRITE_SCENE.instantiate()
 	units_root.add_child(sprite)
 	sprite.fogged = _is_fogged(unit)
-	sprite.setup(unit, game.current_team)
+	sprite.setup(unit, game.current_team, identity.atlas_row(unit.team))
 	_sprites[unit] = sprite
 
 
@@ -209,6 +220,23 @@ func sync_sprites() -> void:
 		var sprite: UnitSprite = _sprites[unit]
 		_sprites.erase(unit)
 		sprite.queue_free()
+
+
+## Dev capture only, so underscored and reached into by the scenario driver like
+## the rest of the scene it drives: a scenario that swaps a side's commander after
+## the board is built re-resolves the identity and repaints to match — units, the
+## property tiles, the HUD name — so a staged commander recolours its army the way
+## it would in a real match (plan R3). Real play never calls this: commanders are
+## fixed before the board is ever drawn, so _build_view's resolve is the only one.
+func _restage_identity() -> void:
+	identity = SideIdentity.for_game(game)
+	terrain_panel.identity = identity
+	_paint_map()
+	for unit: Unit in _sprites:
+		var sprite: UnitSprite = _sprites[unit]
+		sprite.fogged = _is_fogged(unit)
+		sprite.setup(unit, game.current_team, identity.atlas_row(unit.team))
+	refresh_hud()
 
 
 # --- overlays ----------------------------------------------------------------
@@ -285,7 +313,7 @@ func refresh_hud() -> void:
 		"Day %d  -  %s  -  Funds %d"
 		% [
 			game.day,
-			TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team)),
+			identity.display_name(game.current_team),
 			game.funds[game.current_team],
 		]
 	)

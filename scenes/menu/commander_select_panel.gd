@@ -25,8 +25,6 @@ enum Side { RED, BLUE }
 const _TITLE_SIZE := 15
 const _MINI_H := 82
 const GOLD := Color(0.957, 0.745, 0.196)
-const RED_TEAM := Color(0.859, 0.290, 0.231)
-const BLUE_TEAM := Color(0.220, 0.396, 0.847)
 const _INACTIVE := Color(0.169, 0.192, 0.212)
 const _MUTED := Color(0.639, 0.667, 0.686)
 
@@ -338,6 +336,7 @@ func _preview(commander: CommanderType) -> void:
 	for i in _mini_buttons.size():
 		_mini_marks[i].visible = _members()[i].id == commander.id
 	_refresh_summary()
+	_refresh_chips()  # the active side's chip tracks the browse, mirror fallback and all
 
 
 func _preview_neutral() -> void:
@@ -405,29 +404,50 @@ func _focus_commander(id: StringName) -> void:
 # --- chrome refresh ----------------------------------------------------------
 
 
-## The two turn chips. Red is always relevant — it is either being edited or
-## already locked — so it stays filled and shows its pick once locked; Blue fills
-## only while it is the side in hand.
+## The two turn chips, live from the picks as they stand. Side 1 is always
+## relevant — being edited or already locked — so it stays filled and shows its
+## faction; side 2 fills only while it is the side in hand, and the moment both
+## land on one faction it shows the borrowed classic (D3), not a day-1 surprise.
 func _refresh_chips() -> void:
-	var editing_blue := _side == Side.BLUE
-	_red_chip.add_theme_stylebox_override("panel", _flat(RED_TEAM))
-	_red_chip_label.add_theme_color_override("font_color", Color.WHITE)
-	_red_chip_label.text = (
-		"1 · RED — %s" % _db.by_id(_red_id).display_name if editing_blue else "1 · RED"
+	var identity := _preview_identity()
+	_paint_chip(
+		_red_chip, _red_chip_label, "1 · %s — You" % identity.display_name(1), identity.theme(1)
 	)
-	_blue_chip.add_theme_stylebox_override("panel", _flat(BLUE_TEAM if editing_blue else _INACTIVE))
-	_blue_chip_label.add_theme_color_override("font_color", Color.WHITE if editing_blue else _MUTED)
-	_blue_chip_label.text = "2 · BLUE — %s" % ("CPU" if _one_player else "Player 2")
+	var opponent := "CPU" if _one_player else "Player 2"
+	if _side == Side.BLUE:
+		var label := "2 · %s — %s" % [identity.display_name(2), opponent]
+		_paint_chip(_blue_chip, _blue_chip_label, label, identity.theme(2))
+	else:
+		_paint_chip(_blue_chip, _blue_chip_label, "2 · %s" % opponent, null)
+
+
+## The identity the current picks would produce: the locked or previewed side 1,
+## and the previewed side 2 once it is being edited. Resolving the whole thing
+## rather than each chip alone is what lets the mirror fallback show live.
+func _preview_identity() -> SideIdentity:
+	var one: CommanderType = _current if _side == Side.RED else _db.by_id(_red_id)
+	var two: CommanderType = _current if _side == Side.BLUE else null
+	return SideIdentity.resolve({1: one, 2: two})
+
+
+## Fills a chip in a side's theme, or greys it (theme null) when the side is not
+## yet in hand.
+func _paint_chip(
+	chip: PanelContainer, label: Label, text: String, theme: CommanderVisuals.FactionTheme
+) -> void:
+	chip.add_theme_stylebox_override("panel", _flat(theme.color if theme != null else _INACTIVE))
+	label.add_theme_color_override("font_color", theme.ink if theme != null else _MUTED)
+	label.text = text
 
 
 func _refresh_summary() -> void:
-	var side_name := "RED" if _side == Side.RED else "BLUE"
-	var text := "%s ARMY — browse a faction, then Confirm." % side_name
+	var slot := "Side 1" if _side == Side.RED else "Side 2"
+	var text := "%s — browse a faction, then Confirm." % slot
 	if _current != null:
 		var theme := CommanderVisuals.theme_for(_current)
-		text = "%s ARMY · %s\nSelected: %s." % [side_name, theme.display, _current.display_name]
+		text = "%s · %s\nSelected: %s." % [slot, theme.display, _current.display_name]
 	if _side == Side.BLUE:
-		text += "  Red is locked in %s." % _db.by_id(_red_id).display_name
+		text += "  Side 1 is locked in %s." % _db.by_id(_red_id).display_name
 	_summary_label.text = text
 
 

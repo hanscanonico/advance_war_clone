@@ -29,9 +29,12 @@ const SPRITE_DIR := "res://assets/sprites/iso_air_sea"
 const TILE := 16
 ## Atlas cells are 4x the world grid, matching the PixVoxel columns beside them.
 const SCALE := 4
-## Row order is the team index the battle scene samples with: see
-## scenes/battle/unit_sprite.gd, which regions the atlas at `team * SPRITE_PX`.
-const TEAM_ROWS: Array[String] = ["neutral", "red", "blue"]
+## Atlas row order, matching the units the sprites step writes above these
+## columns (plan FI1): 0 neutral, 1 meridian(red), 2 aurora(blue), 3 iron,
+## 4 verdant. The iron and verdant source PNGs are produced from the red row by
+## tools/tint_iso_air_sea.sh and vendored beside it. The FI2 resolver maps a
+## team to one of these rows; before it lands the board samples only 1 and 2.
+const TEAM_ROWS: Array[String] = ["neutral", "red", "blue", "iron", "verdant"]
 ## The units this script supplies art for, by `UnitType.id`.
 const SPRITE_IDS: Array[StringName] = [
 	&"fighter",

@@ -105,7 +105,7 @@ custom_minimum_size = Vector2(0, 2)
 [node name="OnePlayerButton" type="Button" parent="Center/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "1 Player  (vs Blue AI)"
+text = "1 Player  (vs AI)"
 
 [node name="TwoPlayerButton" type="Button" parent="Center/Rows"]
 unique_name_in_owner = true

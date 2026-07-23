@@ -106,14 +106,16 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 ## Main menu
 
 The game boots to the menu: pick a map, a **Difficulty** and a **Speed**, toggle **Fog of war**,
-then start a **1 Player** match against the Blue AI or a **2 Player** hot-seat game. Either opens the
+then start a **1 Player** match against the AI or a **2 Player** hot-seat game. Either opens the
 **commander selection page**; **Continue** appears only when a save exists and skips selection,
 resuming the save with its own map, fog setting, difficulty, commanders, and AI sides. **Quit**
 exits.
 
-On the selection page you edit **Red**, confirm, then edit **Blue**, confirm. Four faction tabs and
-three peer portraits let you browse; one focused card shows the highlighted general's doctrine and
-Command Power in full (no hover tooltips), and a deliberate **No Commander** plays the plain rules.
+On the selection page you pick **side 1**'s commander, confirm, then **side 2**'s, confirm — the
+turn chips preview each side's faction name and colour as you browse, mirror rule included. Four
+faction tabs and three peer portraits let you browse; one focused card shows the highlighted
+general's doctrine and Command Power in full (no hover tooltips), and a deliberate **No Commander**
+plays the plain rules.
 Mouse, keyboard, and controller all navigate it, and **Back** returns to the menu without discarding
 the map or fog choice. Nothing is committed until both sides are locked.
 
@@ -123,9 +125,9 @@ map menu, and a portrait on the victory screen.
 
 ## Controls
 
-You play Red; Blue is the computer. Blue's turn plays itself — input is blocked while the AI
-moves, attacks, captures, and builds, and the cursor follows each of its actions so you can
-watch. `make hotseat` drops the AI and lets two players share the keyboard instead.
+You play the first side; the computer plays the second. Its turn plays itself — input is blocked
+while the AI moves, attacks, captures, and builds, and the cursor follows each of its actions so
+you can watch. `make hotseat` drops the AI and lets two players share the keyboard instead.
 
 Either way, only the team whose day it is can act; a banner announces each turn and the cursor
 jumps to that team's first property.
@@ -172,7 +174,7 @@ jumps to that team's first property.
   team's colours beside its name and cost; rows you can't afford are greyed out. A bought unit
   spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
-  team (the day counter advances when the rotation wraps back to Red), and **Save**, which writes
+  team (the day counter advances when the rotation wraps back to the first side), and **Save**, which writes
   the whole match — map, day, funds, ownership, every unit, both commanders, and the RNG stream —
   over the single save slot. Resume it later with **Continue** on the main menu. When your Command
   Power is charged the menu lists it first, so it is reachable from the keyboard as well as from
@@ -198,6 +200,15 @@ Twelve ship, three to each of four factions (Meridian Coalition, Iron Dominion, 
 Verdant League). `data/commanders/` is the roster: one `.tres` per general, carrying their
 doctrine line, power name and description, and every balance number. Read it — or the selection
 page's card, which binds the same fields — rather than a list here, so the numbers have one home.
+
+**Colours and names.** A side wears its commander's faction: pick Verdant League and your army is
+green and called *Verdant League* everywhere — the board, the day banner, the terrain panel, the
+victory screen. When both sides pick the same faction, the first keeps the faction colour and the
+second borrows a distinct one (Aurora blue, else Meridian red) while both keep the faction name;
+the side number and commander tell them apart. A side with **No Commander** is *First*/*Second
+Army* in the classic red and blue, so a commander-less match looks exactly as it always did.
+("Red"/"Blue" survive only as developer slot names — the Balance Lab's `--red`/`--blue` flags and
+its reports — never on a screen a player sees.)
 
 Picking **No Commander** on either side gives that side no doctrine, no meter and no power: a
 match with neither plays exactly as the game did before commanders existed.

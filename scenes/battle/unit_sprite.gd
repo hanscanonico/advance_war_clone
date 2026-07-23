@@ -33,10 +33,13 @@ var fogged: bool = false
 @onready var fuel_label: Label = $FuelLabel
 
 
-func setup(p_unit: Unit, p_active_team: int) -> void:
+func setup(p_unit: Unit, p_active_team: int, p_atlas_row: int) -> void:
 	unit = p_unit
 	active_team = p_active_team
-	texture = texture_for(p_unit.type, p_unit.team)
+	# The row is the side's resolved faction row, not p_unit.team: the sim keeps
+	# team ints, but which paint a team wears is the SideIdentity resolver's call.
+	# The sprite still reads unit.team for everything else — acted grey-out, fog.
+	texture = texture_for(p_unit.type, p_atlas_row)
 	scale = Vector2.ONE * SPRITE_SCALE
 	# The badges are authored against the world grid, so undo the sprite's scale
 	# rather than letting them shrink with the art. Their offsets are authored in
@@ -48,14 +51,16 @@ func setup(p_unit: Unit, p_active_team: int) -> void:
 	refresh()
 
 
-## Atlas region for one unit kind in one team's colours, at the atlas's own
-## SPRITE_PX resolution. Static so menus can show the same artwork the board
-## does without instancing a sprite; callers that draw it outside the world
-## grid size it themselves.
-static func texture_for(type: UnitType, team: int) -> AtlasTexture:
+## Atlas region for one unit kind in a resolved faction's colours, at the atlas's
+## own SPRITE_PX resolution. `row` is a SideIdentity atlas row, not a team int —
+## the two coincided before factions, when team N drew in row N, and this is the
+## one line where that stopped being true. Static so menus can show the same
+## artwork the board does without instancing a sprite; callers that draw it
+## outside the world grid size it themselves.
+static func texture_for(type: UnitType, row: int) -> AtlasTexture:
 	var atlas := AtlasTexture.new()
 	atlas.atlas = load(UNITS_ATLAS_PATH)
-	atlas.region = Rect2(type.atlas_col * SPRITE_PX, team * SPRITE_PX, SPRITE_PX, SPRITE_PX)
+	atlas.region = Rect2(type.atlas_col * SPRITE_PX, row * SPRITE_PX, SPRITE_PX, SPRITE_PX)
 	return atlas
 
 

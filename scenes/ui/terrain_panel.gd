@@ -4,8 +4,6 @@ extends PanelContainer
 ## headline card; terrain drops to a compact card below it.
 ## Flips to the other bottom corner when the cursor gets close (set_side).
 
-const TEAM_NAMES := {0: "Neutral", 1: "Red Army", 2: "Blue Army"}
-const TEAM_COLORS := {1: Color(1.0, 0.61, 0.55), 2: Color(0.61, 0.78, 1.0)}
 const ACTED_TINT := Color(0.62, 0.62, 0.62)
 const MAX_DEFENSE_STARS := 4
 const TERRAIN_ATLAS_PATH := "res://assets/tiles/terrain_atlas.png"
@@ -21,6 +19,11 @@ const CLASS_LABELS: Array = [
 	[TerrainType.SHIP, "Ship"],
 	[TerrainType.LANDER, "Lander"],
 ]
+
+## How each side is named and tinted. Battle resolves it once and BattleView
+## hands it over (see BattleView.setup); the panel names the hovered unit's side
+## and the tile's owner through it instead of a private Red/Blue table.
+var identity: SideIdentity
 
 @onready var unit_rows: VBoxContainer = %UnitRows
 @onready var unit_icon: TextureRect = %UnitIcon
@@ -62,11 +65,12 @@ func _show_unit(unit: Unit, carrying: String, active_team: int) -> void:
 	separator.visible = unit != null
 	if unit == null:
 		return
-	unit_icon.texture = UnitSprite.texture_for(unit.type, unit.team)
+	unit_icon.texture = UnitSprite.texture_for(unit.type, identity.atlas_row(unit.team))
 	unit_name_label.text = unit.type.display_name
-	unit_team_label.text = TEAM_NAMES.get(unit.team, "Team %d" % unit.team)
-	var team_color: Color = TEAM_COLORS.get(unit.team, Color.WHITE)
-	unit_team_label.add_theme_color_override("font_color", team_color)
+	unit_team_label.text = identity.display_name(unit.team)
+	# The lighter shade of the side's theme, so a dark faction (Iron slate) still
+	# reads against the panel the way the old pastel team tints did.
+	unit_team_label.add_theme_color_override("font_color", identity.theme(unit.team).color_light)
 	unit_hp_label.text = "HP %d/10" % unit.displayed_hp()
 	var supply := "Fuel %d/%d" % [unit.fuel, unit.type.max_fuel]
 	if unit.type.max_ammo > 0:
@@ -95,7 +99,7 @@ func _show_terrain(terrain: TerrainType, owner_team: int, capture_left: int, uni
 	def_label.text = "DEF %s" % _stars(terrain.defense_stars)
 	move_label.text = _move_costs(terrain, unit)
 	owner_label.visible = terrain.is_property
-	var owner_text: String = TEAM_NAMES.get(owner_team, "Team %d" % owner_team)
+	var owner_text: String = identity.display_name(owner_team)
 	if capture_left >= 0:
 		owner_text += "  (capture: %d left)" % capture_left
 	owner_label.text = owner_text
@@ -136,7 +140,10 @@ func _stars(count: int) -> String:
 func _terrain_texture(terrain: TerrainType, owner_team: int) -> AtlasTexture:
 	var atlas := AtlasTexture.new()
 	atlas.atlas = load(TERRAIN_ATLAS_PATH)
-	var row: int = owner_team if terrain.team_tinted and owner_team > 0 else 0
+	# The owner's resolved faction row, so the panel draws a captured property in
+	# the same colour the board does — a neutral owner and a plain tile both fall
+	# to row 0 through the resolver.
+	var row: int = identity.atlas_row(owner_team) if terrain.team_tinted else 0
 	atlas.region = Rect2(terrain.atlas_col * TERRAIN_PX, row * TERRAIN_PX, TERRAIN_PX, TERRAIN_PX)
 	return atlas
 
