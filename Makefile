@@ -115,11 +115,12 @@ format:
 format-check:
 	gdformat --check $(SOURCES)
 
-# generate_tiles.gd draws only the ground; it leaves city/base/hq as bare lots
-# and no longer writes units_atlas.png, so the PixVoxel step must follow it.
+# generate_tiles.gd draws only the ground; it leaves every property column —
+# city/base/hq, airport, port — as bare grounds and no longer writes
+# units_atlas.png, so the buildings step (`sprites`) must follow it.
 # The two `*-check` preflights run first because `ground` is destructive: it
-# replaces the committed building art with bare lots that only `sprites` can
-# finish painting, so a missing ImageMagick, source sprite, or iso air/sea PNG
+# replaces the committed building art with bare grounds that only `sprites` can
+# finish painting, so a missing ImageMagick, source sprite, or iso PNG
 # has to fail while the tree is clean.
 # `import` runs last because Godot caches image imports by size: without it a
 # rebuild that changes the atlas dimensions renders a blank map.

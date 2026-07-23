@@ -1,7 +1,7 @@
 # Grid Commander (working title)
 
 A turn-based tactics game in the style of Advance Wars, built with Godot 4.7 and
-typed GDScript. Eight designs of record ship with it under `.lavish/`; `CLAUDE.md` lists them and
+typed GDScript. Nine designs of record ship with it under `.lavish/`; `CLAUDE.md` lists them and
 which decisions each one owns.
 
 ## Running
@@ -369,11 +369,10 @@ Nintendo assets or names may ever be used.
 `make tiles` rebuilds the art in seven ordered steps: `sprites-check` and `unit-sprites-check`
 verify the build inputs, `ground` draws the terrain headless, `sprites` composites the PixVoxel art
 and the airport/port buildings over it, `unit-sprites` re-pastes the hand-authored air and naval
-sprites, `unit-placeholders`
-draws the units still lacking real art, and `import` reimports the result — Godot caches image
-imports by size, so skipping the last step after a rebuild that changes atlas dimensions renders a
-blank map. The checks run first because `ground` is destructive: it replaces the committed building
-art with bare lots that only `sprites` can finish painting, so a failure has to happen while the
+sprites, `unit-placeholders` draws the units still lacking real art, and `import` reimports the
+result — Godot caches image imports by size, so skipping the last step after a rebuild that changes
+atlas dimensions renders a blank map. The checks run first because `ground` is destructive: it replaces the committed building
+art with bare grounds that only `sprites` can finish painting, so a failure has to happen while the
 tree is still clean.
 
 The pack has no aircraft and no ships. Those columns of the units atlas hold the original isometric
