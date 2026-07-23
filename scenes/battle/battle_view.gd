@@ -351,6 +351,23 @@ func can_see_unit(unit: Unit) -> bool:
 	return Vision.can_see_unit(game, _viewing_team, unit, _visible_cells)
 
 
+## Whether the viewing team may see activity on `cell` — the single authority in
+## the view for cell-scoped visibility, as `can_see_unit` is for a unit. Ask it
+## before disclosing anything a hidden unit could be doing on the tile, such as a
+## capture in progress or (later) a fresh owner. With fog off every cell is
+## visible; during a hot-seat blackout none is; otherwise it is whatever the last
+## fog pass computed. Kept distinct from `can_see_unit` because a cell can be
+## visible while a doctrine hides the unit standing on it, and vice versa.
+## Underscored because every caller is inside the view; it is still the one place
+## the answer is computed — re-derive it nowhere else.
+func _can_see_cell(cell: Vector2i) -> bool:
+	if not game.fog_enabled:
+		return true
+	if _blacked_out:
+		return false
+	return _visible_cells.has(cell)
+
+
 # --- HUD and panels ----------------------------------------------------------
 
 
@@ -380,11 +397,15 @@ func refresh_panel(cell: Vector2i) -> void:
 		var cargo := game.cargo_of(hovered)
 		if not cargo.is_empty():
 			carrying = cargo[0].type.display_name
+	# A capture in progress belongs to whoever is standing on the property, so it
+	# stays hidden on a cell the viewer cannot see — otherwise the panel would out
+	# an enemy capturing inside your fog.
+	var capture_left: int = game.capture_progress.get(cell, -1) if _can_see_cell(cell) else -1
 	terrain_panel.show_tile(
 		map.terrain_at(cell),
 		game.owner_at(cell),
 		game.current_team,
-		game.capture_progress.get(cell, -1),
+		capture_left,
 		hovered,
 		carrying
 	)
