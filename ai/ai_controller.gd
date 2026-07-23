@@ -478,9 +478,9 @@ static func _position_rank(state: GameState, unit: Unit, cell: Vector2i, goal: A
 
 
 ## Units low on fuel head for somewhere that refits them, damaged units for a
-## friendly property (repairs), capture units for the nearest non-owned property,
-## everyone else toward the nearest enemy — which indirect units approach only as
-## far as their firing ring.
+## friendly property that repairs their domain, capture units for the nearest
+## non-owned property, everyone else toward the nearest enemy — which indirect
+## units approach only as far as their firing ring.
 ##
 ## Fuel comes first because it is the only one of these that is fatal: a plane
 ## that ignores it dies of it, where a damaged tank merely stays damaged. Note
@@ -490,14 +490,14 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	var goal := AdvanceGoal.new()
 	goal.cell = unit.cell
 	if unit.running_dry(profile.refuel_margin_turns):
-		var refits := _refitting_properties(state, unit)
+		var refits := _servicing_properties(state, unit)
 		if not refits.is_empty():
 			goal.cell = _nearest(unit.cell, refits)
 			return goal
 	if unit.hp <= profile.retreat_hp:
-		var owned := state.properties_of(unit.team)
-		if not owned.is_empty():
-			goal.cell = _nearest(unit.cell, owned)
+		var repairs := _servicing_properties(state, unit)
+		if not repairs.is_empty():
+			goal.cell = _nearest(unit.cell, repairs)
 			return goal
 	if unit.type.can_capture:
 		var capturable: Array[Vector2i] = []
@@ -516,10 +516,12 @@ func _advance_goal(state: GameState, unit: Unit) -> AdvanceGoal:
 	return goal
 
 
-## Our properties that would refit this unit. A city is no use to a bomber, so
-## the domain gate is asked here exactly as TurnRules asks it — heading somewhere
-## that will not refuel you is worse than not breaking off at all.
-func _refitting_properties(state: GameState, unit: Unit) -> Array[Vector2i]:
+## Our properties that would service this unit — the ones that both refuel and
+## repair it. A city is no use to a bomber and an airport none to a tank, so the
+## domain gate is asked here exactly as TurnRules asks it — heading somewhere
+## that will neither refuel nor mend you is worse than not breaking off at all,
+## which is why the fuel retreat and the damage retreat both read this one list.
+func _servicing_properties(state: GameState, unit: Unit) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	for cell in state.properties_of(unit.team):
 		if state.map.terrain_at(cell).services_domain(unit.type.domain):
