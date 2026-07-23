@@ -79,13 +79,14 @@ class Outcome:
 ## decision, which is what keeps the measured game the shipped one (plan D2).
 static func play(setup: Setup, recorder: BalanceMatchRecorder = null) -> Outcome:
 	var outcome := Outcome.new()
-	var state := GameState.create(setup.map, setup.unit_db, setup.chart)
+	# Commanders are handed to create so the opening side's day-1 begin_turn runs
+	# against its real doctrine, not neutral — the same asymmetry the battle scene
+	# had to fix.
+	var state := GameState.create(setup.map, setup.unit_db, setup.chart, setup.commanders)
 	if state == null:
 		outcome.termination = "invalid_map"
 		return outcome
 	state.rng.seed = setup.seed_val
-	for team: int in setup.commanders:
-		state.set_commander(team, setup.commanders[team])
 	outcome.state = state
 	for team in GameState.TEAMS:
 		outcome.powers[team] = 0

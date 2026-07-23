@@ -46,8 +46,17 @@ var map_path := ""
 ## Builds the starting state from a parsed map. Returns null (with a pushed
 ## error) if any starting unit is invalid. The damage chart is optional for
 ## states that never resolve combat (e.g. movement-only tests).
+##
+## `p_commanders` (team -> CommanderType) is assigned *before* the opening
+## begin_turn, so the first player's day-1 start-of-turn doctrine — a supply
+## radius, a repair discount — is resolved against its real commander rather
+## than the neutral one. Callers that name commanders must pass them here, not
+## set_commander after: begin_turn only runs once, and it runs inside create.
 static func create(
-	p_map: MapData, unit_db: UnitDB, p_damage_chart: DamageChart = null
+	p_map: MapData,
+	unit_db: UnitDB,
+	p_damage_chart: DamageChart = null,
+	p_commanders: Dictionary = {}
 ) -> GameState:
 	var state := GameState.new()
 	state.map = p_map
@@ -73,6 +82,8 @@ static func create(
 			)
 			return null
 		state.units.append(Unit.create(type, entry.team, cell))
+	for team: int in p_commanders:
+		state.set_commander(team, p_commanders[team])
 	TurnRules.begin_turn(state)  # day-1 income and upkeep for the first player
 	return state
 
