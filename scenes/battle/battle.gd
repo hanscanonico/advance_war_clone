@@ -188,6 +188,7 @@ func hide_banner() -> void:
 func _build_view() -> BattleView:
 	var built := BattleView.new()
 	built.terrain_layer = $TerrainLayer
+	built.backdrop_layer = $Backdrop
 	built.move_overlay = $MoveOverlay
 	built.attack_overlay = $AttackOverlay
 	built.fog_layer = $FogLayer

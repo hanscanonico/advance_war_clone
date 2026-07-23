@@ -26,6 +26,9 @@ const ATLAS_SOURCE_ID := 0
 const UNIT_SPRITE_SCENE := preload("res://scenes/battle/unit_sprite.tscn")
 
 var terrain_layer: TileMapLayer
+## Painted beyond the map edges — a darkened continuation of the board that
+## fills the screen when the camera is far enough out to show the whole map.
+var backdrop_layer: TileMapLayer
 var move_overlay: TileMapLayer
 var attack_overlay: TileMapLayer
 var fog_layer: TileMapLayer
@@ -74,16 +77,15 @@ func setup() -> void:
 	# layer is scaled back down to keep one cell = TILE. Overlays and the cursor
 	# stay at 1x and are unaffected.
 	terrain_layer.scale = Vector2.ONE * (float(TILE) / float(TERRAIN_PX))
+	backdrop_layer.tile_set = terrain_layer.tile_set
+	backdrop_layer.scale = terrain_layer.scale
 	move_overlay.tile_set = _build_overlay_tile_set()
 	attack_overlay.tile_set = move_overlay.tile_set
 	fog_layer.tile_set = move_overlay.tile_set
 	_paint_map()
+	_paint_backdrop()
 	_spawn_unit_sprites()
-	var map_px := Vector2(map.size() * TILE)
-	camera.limit_left = 0
-	camera.limit_top = 0
-	camera.limit_right = int(map_px.x)
-	camera.limit_bottom = int(map_px.y)
+	_apply_camera_limits()
 
 
 static func cell_center(cell: Vector2i) -> Vector2:
@@ -131,6 +133,31 @@ func _paint_map() -> void:
 			var terrain := map.terrain_at(cell)
 			var row := identity.atlas_row(game.owner_at(cell)) if terrain.team_tinted else 0
 			terrain_layer.set_cell(cell, ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, row))
+
+
+## Fills a ring of cells beyond the map edges so that when the whole map is in
+## view (see min_zoom) the rest of the screen reads as darkened out-of-bounds
+## ground, not engine-clear void. Each cell extends its nearest edge terrain;
+## properties fall back to plains so no building appears to stand off the board.
+## The ring is sized to the most min_zoom can expose, and the darkening is the
+## layer's modulate in the scene — the tiles themselves are the terrain atlas.
+func _paint_backdrop() -> void:
+	var plains := db.by_id(&"plains")
+	var map_px := Vector2(map.size() * TILE)
+	var exposed := _viewport_size() / min_zoom()
+	var margin := Vector2i(
+		ceili(maxf(0.0, (exposed.x - map_px.x) / 2.0) / TILE) + 1,
+		ceili(maxf(0.0, (exposed.y - map_px.y) / 2.0) / TILE) + 1
+	)
+	for y in range(-margin.y, map.height + margin.y):
+		for x in range(-margin.x, map.width + margin.x):
+			if x >= 0 and x < map.width and y >= 0 and y < map.height:
+				continue
+			var src := Vector2i(clampi(x, 0, map.width - 1), clampi(y, 0, map.height - 1))
+			var terrain := map.terrain_at(src)
+			if terrain.team_tinted:
+				terrain = plains
+			backdrop_layer.set_cell(Vector2i(x, y), ATLAS_SOURCE_ID, Vector2i(terrain.atlas_col, 0))
 
 
 ## Recolors one property to its current owner, after a capture.
@@ -380,14 +407,30 @@ func move_cursor_to(cell: Vector2i) -> void:
 
 func set_zoom(zoom: float) -> void:
 	camera.zoom = Vector2(zoom, zoom)
+	_apply_camera_limits()
 
 
-## The furthest out the player may zoom before the map stops filling the view.
-## Battle owns the zoom level itself and clamps against this.
+## The furthest out the player may zoom: just far enough that the whole map is
+## in view, with the backdrop filling whatever the map's aspect leaves over. On
+## a map smaller than the viewport this sits above the default zoom, so a small
+## map starts at its floor. Battle owns the zoom level and clamps against this.
 func min_zoom() -> float:
 	var map_px := Vector2(map.size() * TILE)
 	var view := _viewport_size()
-	return maxf(view.x / map_px.x, view.y / map_px.y)
+	return minf(view.x / map_px.x, view.y / map_px.y)
+
+
+## Camera limits pin the view inside the map. On an axis where the view shows
+## more than the whole map they expand just enough to centre it instead,
+## splitting the exposed backdrop evenly. Floor/ceil keeps the limit span at
+## least the visible extent, so the camera is never pushed against one edge.
+func _apply_camera_limits() -> void:
+	var map_px := Vector2(map.size() * TILE)
+	var extra := ((_viewport_size() / camera.zoom.x - map_px) / 2.0).max(Vector2.ZERO)
+	camera.limit_left = floori(-extra.x)
+	camera.limit_top = floori(-extra.y)
+	camera.limit_right = ceili(map_px.x + extra.x)
+	camera.limit_bottom = ceili(map_px.y + extra.y)
 
 
 func _viewport_size() -> Vector2:
@@ -414,12 +457,12 @@ func _screen_center() -> Vector2:
 	return Vector2(
 		clampf(
 			camera.position.x,
-			view_size.x / (2.0 * camera.zoom.x),
+			camera.limit_left + view_size.x / (2.0 * camera.zoom.x),
 			camera.limit_right - view_size.x / (2.0 * camera.zoom.x)
 		),
 		clampf(
 			camera.position.y,
-			view_size.y / (2.0 * camera.zoom.y),
+			camera.limit_top + view_size.y / (2.0 * camera.zoom.y),
 			camera.limit_bottom - view_size.y / (2.0 * camera.zoom.y)
 		)
 	)
