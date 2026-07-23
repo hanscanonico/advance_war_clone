@@ -1,5 +1,5 @@
 extends SceneTree
-## Generates the ground terrain atlas (9 terrain columns x 3 team rows), the
+## Generates the ground terrain atlas (9 terrain columns x 5 team rows), the
 ## range overlay, the grid cursor sprite, and the project icon.
 ##
 ## Unit art and the city/base/hq buildings are deliberately NOT drawn here: they

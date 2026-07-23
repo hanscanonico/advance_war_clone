@@ -125,9 +125,9 @@ map menu, and a portrait on the victory screen.
 
 ## Controls
 
-You play Red; Blue is the computer. Blue's turn plays itself — input is blocked while the AI
-moves, attacks, captures, and builds, and the cursor follows each of its actions so you can
-watch. `make hotseat` drops the AI and lets two players share the keyboard instead.
+You play the first side; the computer plays the second. Its turn plays itself — input is blocked
+while the AI moves, attacks, captures, and builds, and the cursor follows each of its actions so
+you can watch. `make hotseat` drops the AI and lets two players share the keyboard instead.
 
 Either way, only the team whose day it is can act; a banner announces each turn and the cursor
 jumps to that team's first property.
@@ -174,7 +174,7 @@ jumps to that team's first property.
   team's colours beside its name and cost; rows you can't afford are greyed out. A bought unit
   spawns exhausted and acts next turn
 - Confirm on an empty tile: the map menu opens with **End Turn**, which hands play to the other
-  team (the day counter advances when the rotation wraps back to Red), and **Save**, which writes
+  team (the day counter advances when the rotation wraps back to the first side), and **Save**, which writes
   the whole match — map, day, funds, ownership, every unit, both commanders, and the RNG stream —
   over the single save slot. Resume it later with **Continue** on the main menu. When your Command
   Power is charged the menu lists it first, so it is reachable from the keyboard as well as from
