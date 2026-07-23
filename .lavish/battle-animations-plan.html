@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Battle Animations: The Combat Cut-In</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    pre code { font-size: .8rem; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+
+    /* --- cut-in mock ------------------------------------------------------- */
+    .cutin-frame { overflow-x: auto; padding: .35rem; }
+    .cutin {
+      width: min(680px, 100%);
+      margin: 0 auto;
+      border: 4px solid var(--gc-ink);
+      border-radius: 6px;
+      background: linear-gradient(#aee0f5 0 52%, #cfe9b6 52% 100%);
+      font-family: ui-monospace, monospace;
+      position: relative;
+      box-shadow: 6px 6px 0 rgba(7,34,55,.25);
+    }
+    .cutin-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: .8rem .9rem 1rem; }
+    .cutin-side { display: grid; gap: .45rem; align-content: end; }
+    .cutin-plate {
+      display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+      background: rgba(23,40,56,.88); color: #fff; border-radius: .3rem;
+      padding: .25rem .5rem; font-size: .72rem; font-weight: 800;
+    }
+    .cutin-stars { color: #ffd25e; letter-spacing: .1em; }
+    .cutin-hp { display: flex; gap: 2px; }
+    .cutin-hp i {
+      width: 9px; height: 12px; border-radius: 1px; border: 1px solid rgba(0,0,0,.35);
+      background: #45d05f; display: inline-block;
+    }
+    .cutin-hp i.lost { background: rgba(255,255,255,.25); }
+    .cutin-squad { display: flex; gap: .4rem; align-items: end; min-height: 64px; }
+    .cutin-side.right .cutin-squad { justify-content: flex-end; }
+    .cutin-fig {
+      width: 34px; height: 34px; border-radius: 4px; border: 2px solid rgba(0,0,0,.4);
+      display: grid; place-items: center; font-size: 1rem;
+    }
+    .cutin-fig.red { background: color-mix(in srgb, var(--gc-red) 78%, white); }
+    .cutin-fig.blue { background: color-mix(in srgb, var(--gc-blue) 72%, white); }
+    .cutin-fig.falling { opacity: .35; transform: rotate(12deg) translateY(4px); }
+    .cutin-tracer {
+      position: absolute; left: 38%; right: 42%; top: 46%;
+      border-top: 3px dashed #ff9a3d; filter: drop-shadow(0 0 3px #ffce7a);
+    }
+    .cutin-ground { display: flex; gap: 2px; padding: 0 .9rem .55rem; justify-content: space-between; font-size: .62rem; opacity: .75; }
+    .beat-table td:first-child { white-space: nowrap; }
+  </style>
+</head>
+<body class="py-6">
+<div class="gc-shell rounded-box overflow-hidden">
+
+  <!-- ============================== HERO ============================== -->
+  <header class="gc-hero px-6 py-8 md:px-10">
+    <p class="gc-kicker opacity-80">Grid Commander · Battle presentation · Design of record</p>
+    <h1 class="text-3xl md:text-4xl font-black mt-2">Battle animations — the combat cut-in</h1>
+    <p class="mt-3 max-w-3xl opacity-90">
+      When an attack resolves, the board gives way to a <strong>full-screen battle cut-in</strong>:
+      the two units face each other over their own terrain, squads of figures sized to their HP,
+      the attacker's volley lands, figures fall, the counter comes back — then the map returns,
+      exactly as Advance Wars staged it. The whole feature hangs off <strong>one method the game
+      already awaits</strong> — <span class="gc-file">BattleAnimator.animate_combat</span> — and
+      replays numbers the sim has already committed. It chooses nothing.
+    </p>
+    <div class="mt-5 flex flex-wrap gap-2">
+      <span class="badge badge-warning badge-lg font-bold">DRAFT — awaiting review</span>
+      <span class="badge badge-outline badge-lg text-white">4 milestones · BA1–BA4</span>
+      <span class="badge badge-outline badge-lg text-white">presentation-only + 2 core snapshot fields</span>
+      <span class="badge badge-outline badge-lg text-white">no new unit art</span>
+    </div>
+  </header>
+
+  <main class="px-6 md:px-10 py-8 space-y-12">
+
+    <!-- ============================== 1 · SEAMS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">1</span> The seams already exist</h2>
+      <p class="max-w-3xl">
+        Combat presentation is already funneled through a single awaitable:
+        <span class="gc-file">battle_animator.gd</span>'s <code>animate_combat(result, attacker, defender)</code>,
+        which today plays the on-map version — hit flash, camera shake, death fade. It has exactly
+        <strong>two call sites</strong>, and both already <code>await</code> it, holding the
+        interaction flow until the dust settles. The cut-in is a body swap of that one method:
+        neither caller changes, and the AI's attacks get the animation for free because the AI
+        issues the same commands the player does.
+      </p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full">
+          <thead><tr><th>Piece</th><th>Where</th><th>What it gives the cut-in</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="gc-file">battle.gd:763</td><td>player attack path</td>
+              <td>already <code>await</code>s <code>animate_combat</code> after <code>AttackCommand.apply</code></td>
+            </tr>
+            <tr>
+              <td class="gc-file">battle_ai_runner.gd:84</td><td>AI attack path</td>
+              <td>same await, same argument shapes — AI battles animate identically, no extra wiring</td>
+            </tr>
+            <tr>
+              <td class="gc-file">CombatResolver.CombatResult</td><td class="gc-file">core/rules/combat_resolver.gd</td>
+              <td><code>attack_damage</code>, <code>countered</code>, <code>counter_damage</code>, <code>defender_died</code>, <code>attacker_died</code> — the full script of the exchange, luck already rolled</td>
+            </tr>
+            <tr>
+              <td class="gc-file">UnitSprite.texture_for(type, team)</td><td class="gc-file">scenes/battle/unit_sprite.gd</td>
+              <td>static atlas access to every unit's 64&nbsp;px art in every team's colours — the menus already reuse it off-board; the cut-in does too</td>
+            </tr>
+            <tr>
+              <td class="gc-file">TerrainType</td><td class="gc-file">core/terrain_type.gd</td>
+              <td><code>defense_stars</code>, <code>display_name</code>, <code>atlas_col</code> — each side's backdrop and star count, straight from the cells the shot was fought over</td>
+            </tr>
+            <tr>
+              <td class="gc-file">Sfx</td><td class="gc-file">autoload/sfx.gd</td>
+              <td>pooled fire-and-forget playback; missing streams silently skipped, so new effect names degrade gracefully</td>
+            </tr>
+            <tr>
+              <td class="gc-file">animator.capturing</td><td class="gc-file">scenes/battle/battle_animator.gd</td>
+              <td>the existing "this run is being photographed" flag — the cut-in obeys it like the shake and pulse already do</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="alert border-2" role="note">
+        <span><strong>The one thing missing:</strong> when <code>animate_combat</code> runs, the units'
+        HP is already <em>post-combat</em> — the command applied first. The cut-in needs to show HP
+        falling, so <code>CombatResult</code> grows two snapshot fields (pre-combat displayed HP for
+        each side), filled by the resolver at the moment it resolves. That is the entire core change,
+        and it gets a unit test. Everything else in this plan lives in the presentation layer.</span>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · THE CUT-IN ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">2</span> What plays — anatomy of the cut-in</h2>
+      <p class="max-w-3xl">
+        A full-width overlay wipes in over the board. Attacker on the left, defender on the right,
+        each posed over a strip of its <em>own</em> terrain with the terrain's name and defence stars
+        on its plate. Each side shows a <strong>squad of figures sized to its HP</strong> —
+        Advance Wars' rule: <code>ceil(displayed_hp / 2)</code>, so 10&nbsp;HP is five figures and a
+        battered 1&nbsp;HP straggler fights alone. The volley crosses, the defender's HP pips tick
+        down to the snapshot value, surplus figures fall. If the defender survives and the result
+        says <code>countered</code>, the answer comes back the other way. Deaths end in the
+        explosion and an empty side. Then the wipe reverses and the map is back.
+      </p>
+
+      <div class="cutin-frame">
+        <div class="cutin">
+          <div class="cutin-inner">
+            <div class="cutin-side">
+              <div class="cutin-plate"><span>TANK</span><span class="cutin-hp"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+              <div class="cutin-squad">
+                <div class="cutin-fig red">▲</div><div class="cutin-fig red">▲</div><div class="cutin-fig red">▲</div><div class="cutin-fig red">▲</div><div class="cutin-fig red">▲</div>
+              </div>
+              <div class="cutin-plate"><span>PLAINS</span><span class="cutin-stars">★☆☆☆</span></div>
+            </div>
+            <div class="cutin-side right">
+              <div class="cutin-plate"><span class="cutin-hp"><i></i><i></i><i></i><i></i><i></i><i class="lost"></i><i class="lost"></i><i class="lost"></i><i class="lost"></i><i class="lost"></i></span><span>MECH</span></div>
+              <div class="cutin-squad">
+                <div class="cutin-fig blue">●</div><div class="cutin-fig blue">●</div><div class="cutin-fig blue falling">●</div>
+              </div>
+              <div class="cutin-plate"><span class="cutin-stars">★★★☆</span><span>MOUNTAIN</span></div>
+            </div>
+          </div>
+          <div class="cutin-tracer"></div>
+          <div class="cutin-ground"><span>attacker fires from its committed cell</span><span>defender holds its terrain</span></div>
+        </div>
+      </div>
+      <p class="text-sm opacity-70 text-center">Layout mock — a 10&nbsp;HP tank's volley catching a mech mid-tick at 5&nbsp;HP on a mountain. Team colours, not factions, pick the figure tint.</p>
+
+      <h3 class="text-lg font-bold mt-6">The beat sheet</h3>
+      <p class="max-w-3xl">
+        Every beat is driven by a field of the result — the cut-in never decides an outcome, only
+        paces it. Unskipped it runs <strong>≈ 1.7&nbsp;s</strong> for a clean kill and
+        <strong>≈ 2.4&nbsp;s</strong> for a full exchange with counter, which is Advance Wars' tempo.
+        Accept or cancel at any point <strong>fast-forwards</strong> every remaining beat to its end
+        state — it never aborts, so the await always resolves exactly once (see R2).
+      </p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full beat-table">
+          <thead><tr><th>Beat</th><th>Budget</th><th>Driven by</th><th>What shows</th></tr></thead>
+          <tbody>
+            <tr><td>1 · Wipe in</td><td>0.20&nbsp;s</td><td>—</td><td>overlay slides over the board; both squads posed at <strong>pre-combat</strong> HP from the snapshot fields</td></tr>
+            <tr><td>2 · Volley</td><td>0.45&nbsp;s</td><td>attacker's <code>battle_style</code></td><td>muzzle flashes per figure, tracers / shell / rocket / bomb / torpedo crossing per style; <code>Sfx</code> per style</td></tr>
+            <tr><td>3 · Impact</td><td>0.40&nbsp;s</td><td><code>defender_hp_before → after</code></td><td>defender flashes white, HP pips tick down, surplus figures drop; a zero-damage volley ticks nothing and both sides live with that</td></tr>
+            <tr><td>4 · Death or counter</td><td>0.35–0.45&nbsp;s</td><td><code>defender_died</code>, <code>countered</code></td><td>death: explosion, side empties, beat 5 skipped. Counter: beats 2–3 mirrored right-to-left with the defender's style</td></tr>
+            <tr><td>5 · Attacker fate</td><td>0.35&nbsp;s</td><td><code>attacker_died</code></td><td>a fatal counter plays the explosion on the left side</td></tr>
+            <tr><td>6 · Hold + wipe out</td><td>0.45&nbsp;s</td><td>—</td><td>final tableau holds a beat; wipe reverses; the existing map aftermath (death fade, <code>sync_sprites</code>) runs abbreviated underneath</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="text-lg font-bold mt-6">The call-site surgery — all of it</h3>
+      <pre class="bg-base-300 rounded-box p-4 overflow-x-auto"><code>func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -&gt; void:
+	view.refresh_sprite(attacker)
+	if Settings.battle_animations and not capturing and _both_sides_visible(attacker, defender):
+		await cutscene.play(result, attacker, defender)   # the cut-in; BA1
+		_sync_aftermath(result, attacker, defender)       # abbreviated map beats
+		return
+	# animations off / capturing / fogged side: today's on-map path, unchanged
+	...</code></pre>
+      <p class="max-w-3xl text-sm opacity-80">
+        <code>_both_sides_visible</code> asks <span class="gc-file">core/rules/vision.gd</span> —
+        the single authority — whether the viewing team may see both combatants. Under fog an
+        AI-versus-AI exchange the player can't see stays on the map path rather than parading a
+        hidden unit across the screen (R6). Everything the cut-in shows, the viewer could already see.
+      </p>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">3</span> Decisions</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D1 — The cut-in replays a snapshot; it computes nothing</h3>
+          <p class="text-sm"><code>CombatResult</code> grows <code>attacker_hp_before</code> and
+          <code>defender_hp_before</code> (displayed HP, 1–10), filled inside
+          <code>CombatResolver.resolve</code> and covered by a core unit test. The cut-in reads the
+          result and the two units — it never touches the damage chart, the RNG, or re-derives a
+          number. This repo has already paid for a "fourth independent opinion" bug once (movement);
+          the animation layer will not open that door for combat.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D2 — Board art, blown up; zero new unit sprites</h3>
+          <p class="text-sm">Squad figures are the existing 64&nbsp;px PixVoxel atlas art via
+          <code>UnitSprite.texture_for</code>, nearest-neighbour scaled — framed as a diorama over a
+          terrain strip, not a fake side-view. Muzzle flashes, tracers, shells, and explosions are
+          original procedural effects (tweened polygons / <code>CPUParticles2D</code>). Authoring
+          per-unit animation sheets is the named scope-creep trap and is explicitly out (R5). Original
+          presentation throughout — nothing lifted from Advance Wars' battle screens, per the repo's
+          legal note.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D3 — Squad size is Advance Wars' rule</h3>
+          <p class="text-sm"><code>figures = ceil(displayed_hp / 2)</code>, capped at 5: full health
+          is five figures, 1–2&nbsp;HP is a lone survivor, zero only ever means dead. Figures exist
+          for legibility — the pip bar carries the exact number, the squad carries the feel.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D4 — One persistent toggle, one skip, both presentation-only</h3>
+          <p class="text-sm">A new tiny <span class="gc-file">autoload/settings.gd</span> persists
+          <code>battle_animations</code> (default <strong>on</strong>) to
+          <code>user://settings.cfg</code> — a user preference, not a match option, so it doesn't
+          belong on <code>MatchConfig</code> and survives across matches. The menu gets the checkbox
+          next to the fog toggle. In battle, accept/cancel during a cut-in fast-forwards it. Toggle
+          off = today's on-map path, byte-identical behaviour.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D5 — Weapon styles are data, six styles cover eighteen units</h3>
+          <p class="text-sm">How a volley looks is a <code>BattleStyle</code> resource under
+          <span class="gc-file">data/battle_anim/</span> (projectile kind, shots per figure, sfx
+          name, timing nudges). <code>UnitType</code> gains <code>battle_style: StringName</code> —
+          the same precedent as <code>atlas_col</code>, a presentation key on the data resource, no
+          gameplay number anywhere in the style. The <code>BattleStyle</code> class itself lives in
+          <span class="gc-file">scenes/battle/cutscene/</span>, keeping <span class="gc-file">core/</span>
+          free of presentation types.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D6 — An overlay in battle.tscn, not a scene switch; captures opt out</h3>
+          <p class="text-sm">The cut-in is a <code>CanvasLayer</code> inside
+          <span class="gc-file">battle.tscn</span> — no <code>change_scene</code>, the board and all
+          state stay live underneath, and the awaitable contract is a plain child node's method.
+          While <code>capturing</code>, the cut-in is suppressed exactly like the shake and pulse
+          already are, so <code>make screenshot</code> stays deterministic; the scenario driver can
+          pose the overlay directly when a screenshot <em>of the cut-in</em> is wanted.</p>
+        </div></div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">4</span> Milestones — each one shippable</h2>
+
+      <div class="space-y-4">
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">BA1</span>
+            <h3 class="card-title text-base">The cut-in shell — every attack cuts in, readable, skippable, optional</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li><strong>Core:</strong> <code>attacker_hp_before</code> / <code>defender_hp_before</code> on <code>CombatResult</code>, set in <code>resolve</code>; test in <span class="gc-file">tests/unit/</span> proves the snapshots match displayed HP going in.</li>
+            <li><strong>Scene:</strong> <span class="gc-file">scenes/battle/cutscene/combat_cutscene.tscn/.gd</span> + <span class="gc-file">cutscene_side.gd</span> — wipe, two posed sides (single unit portrait for now, no squads yet), name/HP-pip/terrain-star plates, white-flash impact, HP tick, counter beat, death fade, wipe out. Fast-forward on accept/cancel.</li>
+            <li><strong>Wiring:</strong> the <code>animate_combat</code> body swap (section 2), the <code>Settings</code> autoload, the menu checkbox, the <code>Vision</code> visibility guard, <code>capturing</code> suppression.</li>
+            <li><strong>Ships:</strong> the full loop with placeholder staging — the game feels different on day one, and turning it off restores today exactly.</li>
+          </ul>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">BA2</span>
+            <h3 class="card-title text-base">Squads and volleys — fights look like fights</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li>HP-sized squads (D3) in loose formation; surplus figures drop on the tick, staggered.</li>
+            <li>First two <code>BattleStyle</code> resources — <code>small_arms</code> and <code>cannon</code> — with muzzle flash, tracer/shell, per-style <code>Sfx</code>; every unit temporarily maps to one of the two.</li>
+            <li>Death explosion effect replaces the plain fade inside the cut-in; <code>explosion.wav</code> stays the sound.</li>
+            <li><strong>Ships:</strong> infantry firefights and tank duels read at a glance; other units borrow the closest style without looking broken.</li>
+          </ul>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">BA3</span>
+            <h3 class="card-title text-base">The full roster — all six styles, all eighteen units, all three domains</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li>Remaining styles: <code>autocannon</code> (flak bursts), <code>rocket</code>, <code>bomb</code>, <code>torpedo</code>. Air figures hover-bob; sea figures sit on a water strip; indirect attacks (result never counters) frame the lone volley without an awkward pause.</li>
+            <li>Terrain strip drawn from each side's actual cell via the terrain atlas; property strips team-tinted like the board.</li>
+            <li><strong>Ships:</strong> every matchup in the game stages correctly — checked against the mapping below.</li>
+          </ul>
+          <div class="overflow-x-auto mt-3">
+            <table class="table table-xs table-zebra w-full">
+              <thead><tr><th>Style</th><th>Units</th><th>Volley reads as</th></tr></thead>
+              <tbody>
+                <tr><td class="gc-file">small_arms</td><td>infantry, recon</td><td>rapid tracer bursts</td></tr>
+                <tr><td class="gc-file">autocannon</td><td>anti_air, cruiser, fighter, b_copter</td><td>heavy flak / missile streaks</td></tr>
+                <tr><td class="gc-file">cannon</td><td>tank, md_tank, battleship, artillery</td><td>single heavy shell (artillery's arcs high)</td></tr>
+                <tr><td class="gc-file">rocket</td><td>mech, rockets, missiles</td><td>smoke-trailed rockets</td></tr>
+                <tr><td class="gc-file">bomb</td><td>bomber</td><td>falling bombs, ground burst</td></tr>
+                <tr><td class="gc-file">torpedo</td><td>sub</td><td>wake line under the water strip</td></tr>
+                <tr><td class="gc-file">— (defender only)</td><td>apc, t_copter, lander</td><td>unarmed — they only ever take the hit</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">BA4</span>
+            <h3 class="card-title text-base">Pace and polish — the feature survives a whole match</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li>AI-turn pacing: consecutive AI attacks tighten the hold/wipe budgets so a five-attack turn doesn't cost twelve seconds of ceremony; skip stays instant.</li>
+            <li>Entrance polish — camera punch-in on the struck cell before the wipe, faction accent on the wipe itself.</li>
+            <li>New <code>Sfx</code> entries generated for the styles that want their own voice (flak, rocket, torpedo splash), added to the <code>make sfx</code> pipeline; missing files stay silent by design.</li>
+            <li><strong>Verification soak:</strong> a full AI-vs-AI match with animations on — no softlock, no drift between cut-in pips and map HP badges, then the same match with the toggle off (see risks R1/R2). Screenshot of a posed cut-in via the scenario driver.</li>
+          </ul>
+        </div></div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">5</span> Risks</h2>
+      <div class="space-y-3">
+
+        <div class="card bg-base-100 gc-risk-high shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R1 · Pacing fatigue — the animation everyone turns off</h3>
+          <p class="text-sm">Two seconds a battle is charming for ten battles and a chore for two
+          hundred; it's why Advance Wars shipped the off switch. Mitigation is layered: fast-forward
+          on any press, the persistent toggle, and BA4's tightened AI pacing. The BA4 soak is the
+          gate — if watching a full AI turn grates <em>with</em> the mitigations, the budgets
+          shrink before it ships.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-high shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R2 · The await contract — a cut-in that never finishes is a softlock</h3>
+          <p class="text-sm">Both call sites hold the entire interaction flow on
+          <code>animate_combat</code>. A skip racing a tween kill, or an early <code>return</code>
+          path that forgets to resolve, freezes input for the rest of the session. Design answer:
+          the cut-in owns <em>one</em> completion signal, skip fast-forwards state rather than
+          aborting tweens mid-flight, and every branch funnels to the same exit. Verified by the
+          BA4 soak plus deliberate skip-spamming at every beat.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-medium shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R3 · Art readability — isometric board sprites in a close-up frame</h3>
+          <p class="text-sm">The PixVoxel art was drawn to sit on a tile, not to fill a stage;
+          blown up it may read as "big board piece" rather than "battle scene". BA1 exists partly
+          to answer this cheaply: the shell ships with single portraits, and the diorama framing
+          (terrain strip, plates, wipe) carries the drama. If a blown-up figure still reads poorly,
+          the fallback is smaller figures and stronger effects — not new art (R5).</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-medium shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R4 · Capture determinism — screenshots must stay byte-stable</h3>
+          <p class="text-sm">The repo already fought this war with the camera shake: mid-tween
+          frames make identical captures differ everywhere. The cut-in follows the same law —
+          suppressed while <code>capturing</code>, all randomness presentation-side (never
+          <code>game.rng</code>), and any posed cut-in screenshot goes through the scenario driver
+          at a settled tableau.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-medium shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R5 · Scope creep toward authored animation sheets</h3>
+          <p class="text-sm">Scope creep is this project's named top risk, and battle animation is
+          its natural habitat — there is always one more frame to draw. D2 is the fence: board art
+          plus procedural effects, six styles total, and any "just one bespoke sprite" proposal is
+          a plan amendment, not a commit.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-good shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R6 · Fog and hidden units — the cut-in must not out-see the viewer</h3>
+          <p class="text-sm">Handled at the gate: the cut-in only plays when
+          <span class="gc-file">core/rules/vision.gd</span> says the viewing team may see both
+          combatants; otherwise the exchange stays on the map path, which already renders fogged
+          units correctly. No new visibility logic anywhere — the single authority stays single.</p>
+        </div></div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">6</span> Explicitly out of scope</h2>
+      <ul class="list-disc list-inside space-y-1 max-w-3xl text-sm">
+        <li><strong>Authored side-view animation sheets</strong> — the whole of R5. Revisit only as its own plan with an art budget.</li>
+        <li><strong>Per-team animation toggles</strong> (Advance Wars' "own / enemy / off" matrix) — one switch plus skip covers the need; add granularity only if playtesting demands it.</li>
+        <li><strong>Commander cut-in portraits during battle</strong> — the power banner already owns commander presentation; mixing it into combat beats is a separate design.</li>
+        <li><strong>Capture / build / resupply cutscenes</strong> — this plan is combat only; the on-map language for everything else stays.</li>
+        <li><strong>A replay theater</strong> — the command log makes one possible someday; it is not this.</li>
+      </ul>
+    </section>
+
+    <!-- ============================== 7 · ACCEPTANCE ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">7</span> Acceptance checks</h2>
+      <ul class="gc-checks space-y-2 max-w-3xl text-sm">
+        <li>Every resolved attack — player or AI — plays the cut-in when animations are on and both sides are visible to the viewer; the toggle off reproduces today's behaviour exactly.</li>
+        <li>Cut-in HP pips, falling figures, and survivor counts always equal the sim's snapshot numbers; the map's HP badges agree the moment the wipe clears. No number is computed in the presentation layer.</li>
+        <li>Accept/cancel at any beat lands on the correct final tableau and returns control immediately; skip-spamming through a full AI turn never softlocks.</li>
+        <li><span class="gc-file">make test</span> stays green, including the new <code>CombatResult</code> snapshot test; <span class="gc-file">make screenshot</span> output is unchanged with the feature merged.</li>
+        <li>All eighteen units stage with the correct style, terrain strip, and stars, across land, air, and sea matchups — including indirect fire and an attack on a visible submarine.</li>
+        <li>No file under <span class="gc-file">core/</span> or <span class="gc-file">ai/</span> references a Node, the cut-in scene, or a style resource; <code>battle_style</code> on <code>UnitType</code> is a plain <code>StringName</code>.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer class="px-6 md:px-10 py-6 border-t-2 text-sm opacity-70">
+    Grid Commander · battle-animations plan · drafted 2026-07-22 · companion to
+    <span class="gc-file">.lavish/advance-wars-clone-plan.html</span> (base game, M0–M7 done) —
+    this work touches presentation plus two snapshot fields, and changes no rule, no balance number,
+    and no map byte.
+  </footer>
+
+</div>
+</body>
+</html>

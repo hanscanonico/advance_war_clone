@@ -15,8 +15,48 @@ func _init() -> void:
 	_save("fanfare", _tone([[523.25, 0.11], [659.26, 0.11], [783.99, 0.16]], 0.45, false))
 	_save("shot", _noise(0.12, 0.5, 6.0))
 	_save("explosion", _noise(0.4, 0.6, 3.0))
-	print("generate_sfx: wrote 6 sfx wavs")
+	# The battle cut-in's weapon voices. Each is the same random-walk noise bed
+	# the two above use, shaped differently: flak is a hard rattle of several
+	# short cracks, a rocket is a swell that arrives rather than a hit, and a
+	# torpedo is a swell with a low bubble under it.
+	_save("flak", _burst(3, 0.055, 0.055, 0.5, 9.0))
+	_save("rocket", _swell(0.34, 0.4, 0.0))
+	_save("torpedo", _swell(0.42, 0.38, 90.0))
+	print("generate_sfx: wrote %d sfx wavs" % 9)
 	quit()
+
+
+## Several short noise cracks in a row — one gun firing fast, or a few going off
+## at once, which is what flak sounds like either way.
+func _burst(
+	count: int, length: float, gap: float, volume: float, decay: float
+) -> PackedFloat32Array:
+	var samples := PackedFloat32Array()
+	for i in count:
+		samples.append_array(_noise(length, volume * (1.0 - i * 0.15), decay))
+		for j in int(gap * RATE):
+			samples.append(0.0)
+	return samples
+
+
+## Noise that rises into the frame and falls away, for something that travels
+## instead of landing. `hum` above zero lays a sine under it — the low bubble a
+## torpedo leaves and a rocket does not.
+func _swell(length: float, volume: float, hum: float) -> PackedFloat32Array:
+	var samples := PackedFloat32Array()
+	var count := int(length * RATE)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2  # reproducible art, like _noise
+	var last := 0.0
+	for i in count:
+		var t := float(i) / count
+		var envelope := sin(t * PI)  # in and out, peaking in the middle
+		last = last * 0.82 + rng.randf_range(-1.0, 1.0) * 0.18
+		var value := last
+		if hum > 0.0:
+			value = value * 0.6 + sin(TAU * float(i) / RATE * hum) * 0.4
+		samples.append(value * volume * envelope)
+	return samples
 
 
 func _tone(notes: Array, volume: float, square: bool) -> PackedFloat32Array:

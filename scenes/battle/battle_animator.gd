@@ -25,6 +25,23 @@ extends RefCounted
 ## "no bare seconds in a battle tween" stays a grep anyone can run.
 const SHAKE_STEP_SECONDS := 0.04
 const CURSOR_PULSE_SECONDS := 0.4
+## Two cut-ins closer together than this are treated as one run of fighting, and
+## each one after the first is tightened (plan BA4, risk R1). Comfortably longer
+## than BattleAiRunner.COMMAND_DELAY, which is what makes a computer's turn
+## qualify; a human picks a unit, moves it and opens a menu between attacks, so
+## an ordinary player's turn never does.
+const CUT_IN_STREAK_GAP_MS := 1600
+## How far the tightening goes: full ceremony at the start of a run, and by the
+## fourth attack in a row a cut-in that plays a third faster with most of its
+## closing hold gone. The volley and the impact keep their length throughout.
+const CUT_IN_MAX_STREAK := 4
+const CUT_IN_STREAK_SPEED := 0.11
+const CUT_IN_STREAK_TAIL := 0.22
+## The board's flinch as the frame is taken over: a short zoom toward the cell
+## that is about to be struck. The cursor is already parked there by both call
+## sites, and the camera follows the cursor, so there is nothing to pan.
+const PUNCH_ZOOM := 1.14
+const PUNCH_SECONDS := 0.11
 
 ## Assigned by Battle before first use, like BattleView's nodes.
 var node: Node
@@ -34,12 +51,21 @@ var cursor: Sprite2D
 var turn_banner: PanelContainer
 var banner_label: Label
 var power_banner: CommanderPowerBanner
+## The full-screen battle cut-in. Every resolved attack goes through it when the
+## player has it on and both sides are visible; see `animate_combat`.
+var cutscene: CombatCutscene
 ## True for a run that exists to be photographed. Suppresses the two open-ended
-## animations — see `shake_camera` and `start_cursor_pulse`.
+## animations — see `shake_camera` and `start_cursor_pulse` — and the cut-in.
 var capturing := false
 
 var _banner_tween: Tween
 var _power_banner_tween: Tween
+## When the last cut-in ended, and how many have run back to back since the
+## fighting started. Held as elapsed time rather than as a per-turn counter
+## somebody has to remember to reset: there is no lifecycle to get wrong, and a
+## fast pace cannot leak out of a computer's turn into the player's next one.
+var _last_cut_in_ms := -CUT_IN_STREAK_GAP_MS
+var _cut_in_streak := 0
 
 # --- movement ----------------------------------------------------------------
 
@@ -69,12 +95,29 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 ## Plays out one already-resolved exchange: the hit, the shake, whichever side
 ## died, and the counter. Awaitable, so the flow resumes once the dust settles.
 ##
-## Under Instant the flash, fade and shake all fall away but the sounds stay: an
-## attack the player triggered has to register even when there is nothing to see.
+## Two bodies, one contract. With battle animations on, the exchange plays as the
+## full-screen cut-in and the map is brought back into step underneath; with them
+## off — or while capturing, when the viewer cannot see both combatants, or at the
+## Instant tier where there is nothing to watch — the on-map version below runs,
+## byte-for-byte as it always did. Either way this returns exactly once, which is
+## what both call sites hold their flow on.
+##
+## Under Instant that on-map flash, fade and shake all fall away but the sounds
+## stay: an attack the player triggered has to register even when there is
+## nothing to see.
 func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
 	var defender_sprite := view.sprite_for(defender)
 	var attacker_sprite := view.sprite_for(attacker)
 	view.refresh_sprite(attacker)  # snap to the committed destination
+	if _cut_in_applies(attacker, defender):
+		_pace_cut_in()
+		var resting := camera.zoom
+		await _punch_camera()
+		await cutscene.play(result, attacker, defender, camera, resting)
+		camera.zoom = resting  # safety net: the cut-in already eased it home on the wipe
+		_last_cut_in_ms = Time.get_ticks_msec()
+		_sync_aftermath()
+		return
 	Sfx.play(&"shot")
 	await flash_hit(defender_sprite)
 	shake_camera()
@@ -106,6 +149,68 @@ func flash_hit(sprite: UnitSprite) -> void:
 ## a sprite outside combat entirely and comes through here for that reason.
 func fade_out(sprite: UnitSprite) -> void:
 	await sprite.die(Settings.speed.death_fade_seconds())
+
+
+## Whether this exchange gets the cut-in.
+##
+## The visibility half is the point of the gate: under fog an exchange the
+## viewer cannot see would otherwise parade two hidden units across the screen,
+## so it stays on the map path, which already draws fogged units correctly. The
+## question goes to the view, which asks `Vision` — no second opinion on who can
+## see what lives here (plan R6).
+##
+## Instant is out too: that tier exists to skip the theatre, so a full-screen
+## cut-in playing on its own clock would defeat it — the exchange stays on the
+## map path, which under Instant collapses to just the sounds.
+func _cut_in_applies(attacker: Unit, defender: Unit) -> bool:
+	if cutscene == null or capturing or not Settings.battle_animations:
+		return false
+	if Settings.speed.instant:
+		return false
+	return view.can_see_unit(attacker) and view.can_see_unit(defender)
+
+
+## Sets how much ceremony this cut-in gets, from how long it has been since the
+## last one (plan BA4). Two seconds a battle is charming for ten battles and a
+## chore for two hundred — R1, the plan's own named risk — and a computer turn
+## that opens fire five times is exactly where that bites. So a run of attacks
+## tightens as it goes: faster overall, and most of the closing hold cut away.
+##
+## What is *not* touched is the volley, the impact and the HP tick. Those carry
+## the information; trimming them would make the cut-in shorter and worse, which
+## is the wrong trade at any speed.
+func _pace_cut_in() -> void:
+	var gap := Time.get_ticks_msec() - _last_cut_in_ms
+	_cut_in_streak = (
+		mini(_cut_in_streak + 1, CUT_IN_MAX_STREAK) if gap < CUT_IN_STREAK_GAP_MS else 0
+	)
+	cutscene.speed = 1.0 + _cut_in_streak * CUT_IN_STREAK_SPEED
+	cutscene.tail_scale = maxf(0.0, 1.0 - _cut_in_streak * CUT_IN_STREAK_TAIL)
+
+
+## A short zoom onto the cell about to be struck, so the board flinches before
+## the frame is taken away from it. Awaited, then left punched in: the cut-in
+## covers the map for its whole run and, handed the camera and this resting zoom,
+## eases it home over the closing wipe so the board is already at rest the moment
+## it is uncovered — see CombatCutscene._restore_zoom.
+func _punch_camera() -> void:
+	var tween := node.create_tween()
+	(
+		tween
+		. tween_property(camera, "zoom", camera.zoom * PUNCH_ZOOM, PUNCH_SECONDS)
+		. set_trans(Tween.TRANS_CUBIC)
+		. set_ease(Tween.EASE_OUT)
+	)
+	await tween.finished
+
+
+## The map beats the cut-in stands in for. Both sides have already been shown
+## dying on screen, so there is no fade left to play: this only brings the board
+## back into step with a sim that has moved on — dropping the sprites of units
+## the exchange removed (cargo that went down with a transport included) and
+## redrawing the survivors.
+func _sync_aftermath() -> void:
+	view.sync_sprites()
 
 
 # --- banner ------------------------------------------------------------------

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/battle/cutscene/combat_cutscene.gd" id="1"]
+
+[node name="Cutscene" type="CanvasLayer"]
+layer = 2
+script = ExtResource("1")
