@@ -205,6 +205,7 @@ func _build_view() -> BattleView:
 	built.map = map
 	built.game = game
 	built.ai_teams = ai_teams
+	built.identity = SideIdentity.for_game(game)  # the side resolver; Battle reads view.identity
 	return built
 
 
@@ -550,7 +551,9 @@ func _open_build_menu(cell: Vector2i) -> void:
 	_menu_context = &"base"
 	_build_cell = cell
 	state = State.MENU
-	var actions := BattleMenus.build_actions(game, unit_db, map.terrain_at(cell), game.current_team)
+	var actions := BattleMenus.build_actions(
+		game, unit_db, map.terrain_at(cell), game.current_team, view.identity
+	)
 	action_menu.open(actions, view.screen_pos_for_cell(cell))
 
 
@@ -598,8 +601,7 @@ func _begin_turn() -> void:
 	if _end_watch_on_day_cap():
 		return
 	Sfx.play(&"fanfare", -8.0)
-	var team_name: String = TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team))
-	animator.show_banner("Day %d - %s" % [game.day, team_name])
+	animator.show_banner("Day %d - %s" % [game.day, view.identity.display_name(game.current_team)])
 	var homes := game.properties_of(game.current_team)
 	if not homes.is_empty():
 		set_cursor_cell(homes[0])
@@ -631,8 +633,7 @@ func _enter_handoff() -> void:
 	animator.hide_banner()
 	_refresh_fog()  # blanks the outgoing team's vision before the panel goes up
 	handoff_label.text = (
-		"%s — press confirm when ready"
-		% TerrainPanel.TEAM_NAMES.get(game.current_team, str(game.current_team))
+		"%s — press confirm when ready" % view.identity.display_name(game.current_team)
 	)
 	handoff_screen.show()
 	handoff_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -704,13 +705,12 @@ func _enter_victory() -> void:
 		_report_watched_result()
 
 
-## "Blue wins!", or "Draw" for the one case that has no winner: a watched match
-## that reached the day cap with every tiebreak measure level. A match the board
-## decided always names a side.
+## The winner lockup — "Verdant League wins!" — or "Draw" for the one case with
+## no winner: a watched match that hit the day cap with every tiebreak level.
 func _result_text() -> String:
 	if _result_winner == 0:
 		return "Draw"
-	return "%s wins!" % TerrainPanel.TEAM_NAMES.get(_result_winner, str(_result_winner))
+	return "%s wins!" % view.identity.display_name(_result_winner)
 
 
 ## The one line BS3's replay-fidelity check reads: a watched match must end with

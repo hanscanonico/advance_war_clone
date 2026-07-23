@@ -82,9 +82,10 @@ static func destination_actions(
 ## Filtered by the terrain's own build list, so a hangar never offers a tank and
 ## a base never offers a bomber — the same list BuildCommand rejects them with.
 static func build_actions(
-	game: GameState, unit_db: UnitDB, terrain: TerrainType, team: int
+	game: GameState, unit_db: UnitDB, terrain: TerrainType, team: int, identity: SideIdentity
 ) -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
+	var row := identity.atlas_row(team)  # the building side's faction art, not a team int
 	for unit_type in unit_db.all():
 		if not terrain.can_build(unit_type.move_class):
 			continue
@@ -95,7 +96,7 @@ static func build_actions(
 					"id": unit_type.id,
 					"label": "%s  %d" % [unit_type.display_name, unit_type.cost],
 					"disabled": game.funds[team] < unit_type.cost,
-					"icon": UnitSprite.texture_for(unit_type, team),
+					"icon": UnitSprite.texture_for(unit_type, row),
 				}
 			)
 		)
