@@ -125,7 +125,8 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 
 ## Main menu
 
-The game boots to the menu: pick a map, a **Difficulty** and a **Speed**, toggle **Fog of war**,
+The game boots to the menu: pick a map, a **Difficulty** and a **Speed**, toggle **Fog of war**
+and **Battle animations** (the full-screen combat cut-in — a saved preference, on by default),
 then start a **1 Player** match against the AI or a **2 Player** hot-seat game. Either opens the
 **commander selection page**; **Continue** appears only when a save exists and skips selection,
 resuming the save with its own map, fog setting, difficulty, commanders, and AI sides. **Quit**
@@ -340,8 +341,8 @@ result, including one capability that measured *negative* and ships switched off
   mutated by play; runtime ownership, funds, and turn state live in `GameState`. The TileMapLayer is just paint.
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
-  the device preferences this machine keeps between launches (`Settings` — today just the game
-  speed above), and the sound-effect player.
+  the device preferences this machine keeps between launches (`Settings` — the game speed above
+  and whether battles play the full-screen cut-in), and the sound-effect player.
 - `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
   and portrait generators, the air/naval sprite paste step, plus the PixVoxel atlas builder (see
   Assets below); and the offline balance

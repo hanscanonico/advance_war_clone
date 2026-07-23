@@ -245,7 +245,9 @@ func _pose(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) 
 	_atk_style = _styles.for_unit(attacker.type)
 	_def_style = _styles.for_unit(defender.type)
 	_accent = _accent_of(attacker.team)
-	_atk.bind(attacker, _terrain_at(attacker.cell), view.game.owner_at(attacker.cell), false, _accent)
+	_atk.bind(
+		attacker, _terrain_at(attacker.cell), view.game.owner_at(attacker.cell), false, _accent
+	)
 	_def.bind(
 		defender,
 		_terrain_at(defender.cell),
