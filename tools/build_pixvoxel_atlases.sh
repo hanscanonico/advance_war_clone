@@ -48,11 +48,27 @@ FRAME="Large_face0_0"  # one standing frame, one facing, for every sprite
 # out. -strip touches metadata only, not the pixels or the colour type.
 NO_TIME=(-strip -define png:exclude-chunk=time)
 
-# Team rows: 0 neutral, 1 red, 2 blue — matching GameState.TEAMS / MapData.NEUTRAL.
-# PixVoxel colour1 is white and gets desaturated to grey, so a neutral property
-# never reads as a team. colour0 (dark) is unusable here: its red trim looks red-team.
-ROW_PALETTE=(color1 color2 color6)
-ROW_TWEAK=("-modulate 100,0,100" "" "")
+# Team rows: 0 neutral, 1 meridian(red), 2 aurora(blue), 3 iron, 4 verdant —
+# the faction-identity plan's atlas order (FI1). Rows 0-2 are byte-for-byte what
+# shipped before factions; the board still samples only 1 and 2 until the FI2
+# resolver reroutes it, so rows 3-4 are inert new art.
+#
+# meridian/aurora are the pack's authored red/blue palettes; neutral desaturates
+# the white colour1 master so a neutral property never reads as a team. iron and
+# verdant have no authored palette, so they tint that same white master with a
+# duotone level map — the same class of ImageMagick trick as the desaturate, one
+# hue-and-value ramp per faction. colour0 (dark) is unusable here: its red trim
+# looks red-team. Endpoints are eyeballed against CommanderVisuals' iron #4a5258
+# and verdant #2c8636 on the board (FI2), the paired tint of the air/naval rows
+# in tools/tint_iso_air_sea.sh, and the neutral row beside them.
+ROW_PALETTE=(color1 color2 color6 color1 color1)
+ROW_TWEAK=(
+	"-modulate 100,0,100"
+	""
+	""
+	"-modulate 100,0,100 +level-colors #23282d,#5f6b76"
+	"-modulate 100,0,100 +level-colors #114018,#46b552"
+)
 
 # One crop box shared by every unit and one by every building. A single uniform
 # scale then preserves both relative size (infantry stays smaller than a tank)

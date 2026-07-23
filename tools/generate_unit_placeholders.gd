@@ -30,8 +30,12 @@ const PLACEHOLDER_IDS: Array[StringName] = [&"missiles"]
 const TILE := 16
 ## Atlas cells are 4x the world grid, matching the PixVoxel columns beside them.
 const SCALE := 4
-const ROWS := 3  # 0 = neutral, 1 = red, 2 = blue
-const TEAM_COLORS: Array[Color] = [Color("8a9099"), Color("d84a3c"), Color("3c64d8")]
+## 0 neutral, 1 meridian(red), 2 aurora(blue), 3 iron, 4 verdant — the atlas row
+## order the sprites step writes (plan FI1). Matches tools/generate_tiles.gd.
+const ROWS := 5
+const TEAM_COLORS: Array[Color] = [
+	Color("8a9099"), Color("d84a3c"), Color("3c64d8"), Color("4a5258"), Color("2c8636")
+]
 const OUTLINE := Color("14171c")
 const GLASS := Color("cfe4f5")
 const WAKE := Color("9fd0f2")

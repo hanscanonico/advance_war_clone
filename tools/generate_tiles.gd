@@ -19,7 +19,12 @@ const SCALE := 4
 ## Keep TERRAIN_COLS in tools/build_pixvoxel_atlases.sh in step: that script
 ## checks the atlas it paints buildings into is exactly this wide.
 const COLS := 14
-const ROWS := 3  # 0 = neutral, 1 = red, 2 = blue
+## 0 neutral, 1 meridian(red), 2 aurora(blue), 3 iron, 4 verdant — the
+## faction-identity atlas order (plan FI1). Rows 0-2 render byte-for-byte as
+## before; the two faction rows are inert until the FI2 resolver samples them.
+## Keep TERRAIN_ROWS in tools/build_pixvoxel_atlases.sh in step: it checks the
+## atlas it paints buildings into is exactly this many rows tall.
+const ROWS := 5
 
 const GRASS := Color("78c850")
 const GRASS_DARK := Color("5aa63c")
@@ -40,7 +45,13 @@ const ASPHALT_DARK := Color("585d64")
 const MARKING := Color("e4e7eb")
 const SAND := Color("e0d3a4")
 const SAND_DARK := Color("c4b585")
-const TEAM_COLORS: Array[Color] = [Color("8a9099"), Color("d84a3c"), Color("3c64d8")]
+# Neutral, then one hue per faction row. Rows 0-2 are the shipped values and must
+# not change (byte-identical proof). The iron and verdant entries are
+# CommanderVisuals' own faction colours, so the airport tower and port warehouse
+# a faction owns match the colour that faction wears everywhere else in the UI.
+const TEAM_COLORS: Array[Color] = [
+	Color("8a9099"), Color("d84a3c"), Color("3c64d8"), Color("4a5258"), Color("2c8636")
+]
 
 var img: Image
 
