@@ -274,6 +274,11 @@ func _focus_bonus(
 ## (move budget plus firing range), so no extra flood fill is spent and the worst
 ## case is crediting a follow-up that terrain would have denied — the failure to
 ## avoid is missing a real one. Draws no RNG: forecast is luck-free.
+##
+## Who-may-shoot is asked of AttackRange.can_engage, not the damage chart raw, so
+## a dived target is credited only to a friendly that can reach under the water —
+## a battleship that cannot hit a submerged sub is the shot AttackCommand.validate
+## would refuse, and pricing its follow-up in would over-rank the whole attack.
 func _follow_up_damage(state: GameState, attacker: Unit, enemy: Unit) -> int:
 	var total := 0
 	for friendly in state.units_of(attacker.team):
@@ -281,8 +286,8 @@ func _follow_up_damage(state: GameState, attacker: Unit, enemy: Unit) -> int:
 			continue
 		if friendly.type.max_range <= 0 or not friendly.has_ammo():
 			continue
-		if not state.damage_chart.can_attack(friendly.type.id, enemy.type.id):
-			continue
+		if not AttackRange.can_engage(state, friendly, enemy):
+			continue  # no chart entry, or the target is dived beyond this friendly
 		var reach := AttackRange.maximum(state, friendly)
 		if not AttackRange.is_indirect(friendly):
 			reach += MovementResolver.move_budget(state, friendly)

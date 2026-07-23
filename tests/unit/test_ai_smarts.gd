@@ -343,6 +343,49 @@ func test_focus_fire_adds_nothing_to_a_shot_that_already_kills() -> void:
 	)
 
 
+## The follow-up total credits only friendlies that could actually land a shot,
+## so it routes who-may-shoot through AttackRange.can_engage — not the damage
+## chart raw. A battleship has a chart entry against subs but cannot hit a
+## submerged one, exactly the shot AttackCommand.validate would refuse; crediting
+## its follow-up would over-rank a cruiser's attack on a dived sub. The gate is
+## the dive and only the dive: a cruiser hits submerged and a surfaced sub is an
+## ordinary target, so both of those still count in full.
+##
+## One function rather than three because test_ai_smarts.gd is at the lint's
+## public-method ceiling; the three scenarios read as one claim about the gate.
+func test_follow_up_gates_a_dived_sub_on_can_engage() -> void:
+	var ai := AIController.new(unit_db, _profile())
+	var battleship_board := "[terrain]\nSSSSSSSS\n[units]\n1 c 0 0\n1 B 4 0\n2 s 7 0"
+
+	# A battleship cannot hit a submerged sub, so it adds no follow-up.
+	var dived := _state(battleship_board)
+	var dived_sub := dived.units_of(2)[0]
+	dived_sub.dived = true
+	assert_eq(
+		ai._follow_up_damage(dived, dived.units_of(1)[0], dived_sub),
+		0,
+		"a battleship threatens a dived sub with nothing it could legally land",
+	)
+
+	# The same battleship against a surfaced sub is unchanged: an ordinary target.
+	var surfaced := _state(battleship_board)
+	assert_gt(
+		ai._follow_up_damage(surfaced, surfaced.units_of(1)[0], surfaced.units_of(2)[0]),
+		0,
+		"a surfaced sub is a legal battleship target, so its follow-up still counts",
+	)
+
+	# A cruiser can hit submerged, so a dive does not hide the sub from its follow-up.
+	var hunted := _state("[terrain]\nSSSSSSSS\n[units]\n1 B 0 0\n1 c 6 0\n2 s 7 0")
+	var hunted_sub := hunted.units_of(2)[0]
+	hunted_sub.dived = true
+	assert_gt(
+		ai._follow_up_damage(hunted, hunted.units_of(1)[0], hunted_sub),
+		0,
+		"a cruiser hits submerged, so its follow-up still counts against a dive",
+	)
+
+
 # --- S3 · counter-building ----------------------------------------------------
 
 
