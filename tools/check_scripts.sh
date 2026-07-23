@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 #
-# Parse- and type-checks every GDScript file in the project.
+# Parse- and type-checks GDScript files.
 #
 # `godot --check-only -s <file>` runs the full GDScript analyser — it catches
 # type mismatches and unknown identifiers, not just syntax — but always exits 0,
 # so this wrapper scans its output for diagnostics and sets the status itself.
 #
-# Usage:  tools/check_scripts.sh   (see the `check` target in the Makefile)
+# Usage:  tools/check_scripts.sh [file.gd ...]
+#
+# With no arguments it checks every project script (the `check` target in the
+# Makefile); with arguments, just those files — project-relative paths — which
+# is what the post-edit hook (tools/check_gd_hook.sh) uses.
 #
 # Much faster than `make test` for "does what I just wrote compile?": it skips
 # booting the scene tree and GUT.
@@ -65,15 +69,19 @@ while IFS= read -r file; do
 		failed=$((failed + 1))
 	fi
 done < <(
-	# .claude/worktrees holds whole nested checkouts of this same repo; without
-	# excluding it every project file gets checked twice, once at a path Godot
-	# cannot resolve res:// imports for.
-	find . -name '*.gd' \
-		-not -path './.godot/*' \
-		-not -path './addons/*' \
-		-not -path './bin/*' \
-		-not -path './.claude/*' |
-		sort
+	if (($#)); then
+		printf '%s\n' "$@"
+	else
+		# .claude/worktrees holds whole nested checkouts of this same repo;
+		# without excluding it every project file gets checked twice, once at a
+		# path Godot cannot resolve res:// imports for.
+		find . -name '*.gd' \
+			-not -path './.godot/*' \
+			-not -path './addons/*' \
+			-not -path './bin/*' \
+			-not -path './.claude/*' |
+			sort
+	fi
 )
 
 if ((failed > 0)); then
