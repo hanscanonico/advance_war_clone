@@ -35,6 +35,12 @@ static func validate_path_steps(
 		return "unit has already acted"
 	if unit_path.is_empty() or unit_path[0] != unit_moving.cell:
 		return "path must start at the unit's cell"
+	# Only enemies the mover can see block the path here. A hidden one is left to
+	# spring the ambush on apply; refusing the command would betray its position,
+	# turning validation into a free fog probe (see GameState.advance_unit).
+	var visible: Dictionary = (
+		Vision.visible_cells(state, unit_moving.team) if state.fog_enabled else {}
+	)
 	var cost := 0
 	for i in range(1, unit_path.size()):
 		if (unit_path[i] - unit_path[i - 1]).length_squared() != 1:
@@ -46,7 +52,11 @@ static func validate_path_steps(
 		if step == TerrainType.IMPASSABLE:
 			return "path crosses impassable terrain"
 		var occupant := state.unit_at(unit_path[i])
-		if occupant != null and occupant.team != unit_moving.team:
+		if (
+			occupant != null
+			and occupant.team != unit_moving.team
+			and Vision.can_see_unit(state, unit_moving.team, occupant, visible)
+		):
 			return "path is blocked by an enemy"
 		cost += step
 	# Fuel first, because the budget below is already capped by it — asking the
@@ -65,9 +75,17 @@ func validate(state: GameState) -> String:
 	var dest: Vector2i = path[path.size() - 1]
 	var dest_occupant := state.unit_at(dest)
 	if dest_occupant != null and dest_occupant != unit:
-		return "destination is occupied"
+		# A friendly (always seen) blocks; a hidden enemy is left to spring the
+		# ambush on apply rather than refused, which would reveal it. A visible
+		# enemy never reaches here — validate_path_steps already caught it.
+		var visible: Dictionary = Vision.visible_cells(state, unit.team) if state.fog_enabled else {}
+		if (
+			dest_occupant.team == unit.team
+			or Vision.can_see_unit(state, unit.team, dest_occupant, visible)
+		):
+			return "destination is occupied"
 	return ""
 
 
 func apply(state: GameState) -> void:
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)

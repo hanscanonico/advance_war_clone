@@ -29,7 +29,9 @@ func validate(state: GameState) -> String:
 
 
 func apply(state: GameState) -> void:
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	if ambushed:
+		return  # stopped short by a hidden enemy; no top-up this turn
 	for friendly in friendlies_in_reach(state, unit.cell):
 		friendly.resupply()
 

@@ -98,6 +98,9 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 ## Plays out one already-resolved exchange: the hit, the shake, whichever side
 ## died, and the counter. Awaitable, so the flow resumes once the dust settles.
 ##
+## A null result means the move was ambushed short of the firing cell — the shot
+## never happened — so there is nothing to play but the trap cue.
+##
 ## Two bodies, one contract. With battle animations on, the exchange plays as the
 ## full-screen cut-in and the map is brought back into step underneath; with them
 ## off — or while capturing, when the viewer cannot see both combatants, or at the
@@ -109,6 +112,9 @@ func animate_path(sprite: UnitSprite, path: Array[Vector2i]) -> void:
 ## stay: an attack the player triggered has to register even when there is
 ## nothing to see.
 func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
+	if result == null:
+		show_ambush(attacker)
+		return
 	var defender_sprite := view.sprite_for(defender)
 	var attacker_sprite := view.sprite_for(attacker)
 	view.refresh_sprite(attacker)  # snap to the committed destination
@@ -261,6 +267,40 @@ func _capture_cut_in_applies(unit: Unit) -> bool:
 	if Settings.speed.instant:
 		return false
 	return view.can_see_unit(unit)
+
+
+# --- ambush ------------------------------------------------------------------
+
+
+## The cue when a committed move runs into a hidden enemy and stops short: put the
+## mover's sprite back where the sim actually left it — the preview walked it
+## further — and name the trap. Shared by every move-family action, combat too,
+## where the shot simply never fires.
+func show_ambush(unit: Unit) -> void:
+	view.refresh_sprite(unit)
+	show_banner("Ambush!")
+
+
+## Brings a moved unit's sprite back in step with the sim after an ordinary
+## (non-combat) action, springing the ambush cue in place of a plain refresh when
+## the move was cut short. Every such action funnels its sprite update here so the
+## trap reads the same however the move was going to end.
+func settle_move(command: Command, unit: Unit) -> void:
+	if command.ambushed:
+		show_ambush(unit)
+	else:
+		view.refresh_sprite(unit)
+
+
+## The sprite side of a Join: the moving unit's twin fades away and the survivor
+## redraws where they merged — unless a hidden enemy stopped the move short, in
+## which case nobody merged and the mover is simply back on its own cell.
+func animate_join(command: Command, mover: Unit, survivor: Unit) -> void:
+	if command.ambushed:
+		show_ambush(mover)
+		return
+	fade_out(view.release_sprite(mover))  # merged-away twin; fire and forget
+	view.refresh_sprite(survivor)
 
 
 # --- banner ------------------------------------------------------------------

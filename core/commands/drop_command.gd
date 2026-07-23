@@ -38,13 +38,26 @@ func validate(state: GameState) -> String:
 		return "cargo cannot stand there"
 	var occupant := state.unit_at(drop_cell)
 	if occupant != null and occupant != unit:
-		return "drop cell is occupied"  # the transport's own vacated cell is fine
+		# The transport's own vacated cell is fine, and a hidden enemy is left to
+		# foil the drop on apply rather than refused, which would reveal it; a
+		# friendly or a visible enemy still blocks.
+		var visible: Dictionary = Vision.visible_cells(state, unit.team) if state.fog_enabled else {}
+		if (
+			occupant.team == unit.team
+			or Vision.can_see_unit(state, unit.team, occupant, visible)
+		):
+			return "drop cell is occupied"
 	return ""
 
 
 func apply(state: GameState) -> void:
 	var passenger: Unit = state.cargo_of(unit)[0]
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	# The move can stop short of where the drop was planned, or the drop cell can
+	# turn out to hold a hidden enemy: either way the passenger stays aboard.
+	if ambushed or state.unit_at(drop_cell) != null:
+		ambushed = true
+		return
 	passenger.carrier = null
 	passenger.cell = drop_cell
 	passenger.acted = true

@@ -35,5 +35,7 @@ func validate(state: GameState) -> String:
 
 
 func apply(state: GameState) -> void:
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	if ambushed:
+		return  # cut short by a hidden enemy; the boat just stops, hatch as it was
 	unit.dived = submerge

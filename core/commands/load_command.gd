@@ -34,5 +34,7 @@ func validate(state: GameState) -> String:
 
 func apply(state: GameState) -> void:
 	var transport := state.unit_at(path[path.size() - 1])
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	if ambushed:
+		return  # stopped short of the transport; it does not board
 	unit.carrier = transport

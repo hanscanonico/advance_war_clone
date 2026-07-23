@@ -417,10 +417,8 @@ func _handle_unit_action(action: StringName) -> void:
 				_undo_move_preview()
 				return
 			var dest: Vector2i = planned_path[planned_path.size() - 1]
-			var mover_sprite := view.release_sprite(selected)
 			command.apply(game)
-			animator.fade_out(mover_sprite)  # merged-away sprite; fire and forget
-			view.refresh_sprite(game.unit_at(dest))
+			animator.animate_join(command, selected, game.unit_at(dest))
 			_clear_selection()
 			_refresh_panel()
 		&"capture":
@@ -439,7 +437,7 @@ func _handle_unit_action(action: StringName) -> void:
 			if game.owner_at(dest) == selected.team:
 				EventBus.property_captured.emit(dest, selected.team)
 				view.repaint_property(dest)
-			view.refresh_sprite(selected)
+			animator.settle_move(command, selected)
 			_clear_selection()
 			_refresh_panel()
 			_refresh_hud()
@@ -464,7 +462,7 @@ func _commit(action: StringName, command: Command) -> void:
 		return
 	command.apply(game)
 	EventBus.unit_moved.emit(selected)
-	view.refresh_sprite(selected)
+	animator.settle_move(command, selected)
 	_clear_selection()
 	_refresh_panel()
 
@@ -746,8 +744,8 @@ func _drop_cells(dest: Vector2i) -> Array[Vector2i]:
 		if terrain == null or not terrain.is_passable(cargo[0].type.move_class):
 			continue
 		var occupant := game.unit_at(cell)
-		if occupant != null and occupant != selected:
-			continue
+		if occupant != null and occupant != selected and view.can_see_unit(occupant):
+			continue  # a hidden enemy foils the drop on apply, not in the overlay
 		cells.append(cell)
 	return cells
 
@@ -771,8 +769,8 @@ func _execute_drop(drop_cell: Vector2i) -> void:
 	var transport := selected
 	command.apply(game)
 	EventBus.unit_moved.emit(transport)
-	view.refresh_sprite(transport)
-	view.refresh_sprite(passenger)  # reappears, exhausted, at the drop cell
+	animator.settle_move(command, transport)
+	view.refresh_sprite(passenger)  # reappears, exhausted, at the drop cell (or stays aboard)
 	_drop_targets = []
 	_clear_selection()
 	_refresh_panel()

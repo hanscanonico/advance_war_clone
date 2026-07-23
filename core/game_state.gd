@@ -184,21 +184,41 @@ func properties_of(team: int) -> Array[Vector2i]:
 ## resets to the full point count, fuel is spent per terrain cost, cargo rides
 ## along, and the unit is exhausted. Sole move-commit entry point, shared by
 ## every movement-type command's apply.
-func advance_unit(unit: Unit, path: Array[Vector2i]) -> void:
-	var dest: Vector2i = path[path.size() - 1]
-	if dest != path[0]:
-		capture_progress.erase(path[0])
-	var fuel_spent := 0
+##
+## The path was planned with the mover's knowledge, so it may run onto or through
+## an enemy the mover could not see (fogged, or a dived sub it was not next to).
+## When it does, the move is cut short at the last free cell before that enemy —
+## the Advance Wars trap — and the return says so, telling the caller to drop any
+## follow-on it had bound to the move. Fuel is charged only for the steps taken.
+func advance_unit(unit: Unit, path: Array[Vector2i]) -> bool:
+	var stop := path.size() - 1
+	var ambushed := false
 	for i in range(1, path.size()):
+		var blocker := unit_at(path[i])
+		if blocker != null and blocker.team != unit.team:
+			ambushed = true
+			# Never end on a cell a friendly is passing-through, nor past the
+			# origin: back up to the last cell that is actually free to stand on.
+			stop = i - 1
+			while stop > 0 and unit_at(path[stop]) != null:
+				stop -= 1
+			break
+	var walked: Array[Vector2i] = path.slice(0, stop + 1)
+	var dest: Vector2i = walked[walked.size() - 1]
+	if dest != walked[0]:
+		capture_progress.erase(walked[0])
+	var fuel_spent := 0
+	for i in range(1, walked.size()):
 		# Through MovementResolver, not the terrain directly, so a doctrine that
 		# discounts terrain charges the discounted fuel too — the player is never
 		# billed for a step the range overlay showed them as cheaper.
-		fuel_spent += MovementResolver.step_cost(self, unit, map.terrain_at(path[i]))
+		fuel_spent += MovementResolver.step_cost(self, unit, map.terrain_at(walked[i]))
 	unit.fuel = maxi(0, unit.fuel - fuel_spent)
 	unit.cell = dest
 	unit.acted = true
 	for passenger in cargo_of(unit):
 		passenger.cell = dest
+	return ambushed
 
 
 func next_team() -> int:

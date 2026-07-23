@@ -51,7 +51,9 @@ func validate(state: GameState) -> String:
 
 
 func apply(state: GameState) -> void:
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	if ambushed:
+		return  # stopped short of the property; nothing is captured
 	var dest: Vector2i = path[path.size() - 1]
 	var before: int = state.capture_progress.get(dest, GameState.CAPTURE_POINTS)
 	var remaining := before - capture_strength(state, unit)

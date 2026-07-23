@@ -33,7 +33,9 @@ func validate(state: GameState) -> String:
 
 func apply(state: GameState) -> void:
 	var target := state.unit_at(path[path.size() - 1])
-	state.advance_unit(unit, path)  # spends fuel, resets any abandoned capture
+	ambushed = state.advance_unit(unit, path)  # spends fuel, resets any abandoned capture
+	if ambushed:
+		return  # stopped short of the friendly; the two do not merge
 	target.hp = mini(100, target.hp + unit.hp)
 	target.fuel = mini(target.type.max_fuel, target.fuel + unit.fuel)
 	target.ammo = mini(target.type.max_ammo, target.ammo + unit.ammo)
