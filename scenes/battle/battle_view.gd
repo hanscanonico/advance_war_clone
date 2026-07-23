@@ -384,8 +384,10 @@ func _visible_unit_at(cell: Vector2i) -> Unit:
 ## visible; during a hot-seat blackout none is; otherwise it is whatever the last
 ## fog pass computed. Kept distinct from `can_see_unit` because a cell can be
 ## visible while a doctrine hides the unit standing on it, and vice versa.
-## Underscored because every caller is inside the view; it is still the one place
-## the answer is computed — re-derive it nowhere else.
+## Underscored because it is the view's own; BattleAiRunner reaches in for it the
+## same way it reaches into Battle's private flow, so as not to add a 21st public
+## method here. It is still the one place the answer is computed — re-derive it
+## nowhere else.
 func _can_see_cell(cell: Vector2i) -> bool:
 	if not game.fog_enabled:
 		return true

@@ -92,7 +92,12 @@ func _leave() -> void:
 
 ## Applies one AI command with the same animations the player flow uses.
 ## Attack/Capture are checked before Move because each is its own Command
-## subclass; the cursor follows so the player can watch.
+## subclass. The cursor and camera follow so the player can watch — but only for an
+## action the viewer can actually see (`_can_watch`). A computer move made entirely
+## inside the viewer's fog is applied without moving the cursor, panning the camera
+## or sounding its footsteps, so a fogged turn no longer broadcasts every hidden
+## step; the mover's sprite stays hidden and the post-apply `refresh_sprite` (or
+## `spawn_sprite_for`) lands it on its committed cell without a tween.
 func _execute(command: Command) -> void:
 	var game := _battle.game
 	var view := _battle.view
@@ -100,17 +105,21 @@ func _execute(command: Command) -> void:
 	if command is AttackCommand:
 		var attack := command as AttackCommand
 		var target := game.unit_at(attack.target_cell)
-		_battle.set_cursor_cell(attack.path[attack.path.size() - 1])
-		await animator.animate_path(view.sprite_for(attack.unit), attack.path)
-		_battle.set_cursor_cell(attack.target_cell)
+		var cells: Array[Vector2i] = attack.path.duplicate()
+		cells.append(attack.target_cell)
+		if _can_watch(attack.unit, cells):
+			_battle.set_cursor_cell(attack.path[attack.path.size() - 1])
+			await animator.animate_path(view.sprite_for(attack.unit), attack.path)
+			_battle.set_cursor_cell(attack.target_cell)
 		command.apply(game)
 		EventBus.unit_moved.emit(attack.unit)
 		await animator.animate_combat(attack.result, attack.unit, target)
 	elif command is CaptureCommand:
 		var capture := command as CaptureCommand
 		var dest: Vector2i = capture.path[capture.path.size() - 1]
-		_battle.set_cursor_cell(dest)
-		await animator.animate_path(view.sprite_for(capture.unit), capture.path)
+		if _can_watch(capture.unit, capture.path):
+			_battle.set_cursor_cell(dest)
+			await animator.animate_path(view.sprite_for(capture.unit), capture.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(capture.unit)
 		await animator.animate_capture(capture.result, capture.unit, dest)
@@ -120,15 +129,17 @@ func _execute(command: Command) -> void:
 		view.refresh_sprite(capture.unit)
 	elif command is DiveCommand:
 		var dive := command as DiveCommand
-		_battle.set_cursor_cell(dive.path[dive.path.size() - 1])
-		await animator.animate_path(view.sprite_for(dive.unit), dive.path)
+		if _can_watch(dive.unit, dive.path):
+			_battle.set_cursor_cell(dive.path[dive.path.size() - 1])
+			await animator.animate_path(view.sprite_for(dive.unit), dive.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(dive.unit)
 		view.refresh_sprite(dive.unit)
 	elif command is MoveCommand:
 		var move := command as MoveCommand
-		_battle.set_cursor_cell(move.path[move.path.size() - 1])
-		await animator.animate_path(view.sprite_for(move.unit), move.path)
+		if _can_watch(move.unit, move.path):
+			_battle.set_cursor_cell(move.path[move.path.size() - 1])
+			await animator.animate_path(view.sprite_for(move.unit), move.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(move.unit)
 		view.refresh_sprite(move.unit)
@@ -138,7 +149,9 @@ func _execute(command: Command) -> void:
 		view.sync_sprites()  # the one-shot half may have healed or refuelled
 	elif command is BuildCommand:
 		var build := command as BuildCommand
-		_battle.set_cursor_cell(build.cell)
+		var build_cells: Array[Vector2i] = [build.cell]
+		if _can_watch(null, build_cells):
+			_battle.set_cursor_cell(build.cell)
 		command.apply(game)
 		view.spawn_sprite_for(build.built_unit)
 		EventBus.unit_built.emit(build.built_unit)
@@ -148,3 +161,23 @@ func _execute(command: Command) -> void:
 	_battle._refresh_fog()
 	_battle._refresh_panel()
 	_battle._refresh_hud()
+
+
+## Whether the viewing player can watch this command play out — the gate on the
+## cursor, the camera and the move cue during a computer turn. A move made
+## entirely inside the viewer's fog must not pan the camera to its destination or
+## sound its footsteps: that would broadcast a hidden enemy's every step. An action
+## whose unit the viewer can see, or that starts, passes, or ends on a cell the
+## viewer can see, is shown exactly as before. `unit` is null for a build, whose
+## visibility is the factory cell's alone. Cell visibility is BattleView's own
+## `_can_see_cell`, reached into the same way this runner reaches into Battle's
+## private flow. With fog off every cell and unit is visible, so this is always
+## true and a watched (fog-off) match is unchanged.
+func _can_watch(unit: Unit, cells: Array[Vector2i]) -> bool:
+	var view := _battle.view
+	if unit != null and view.can_see_unit(unit):
+		return true
+	for cell in cells:
+		if view._can_see_cell(cell):
+			return true
+	return false
