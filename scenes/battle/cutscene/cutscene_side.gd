@@ -85,6 +85,10 @@ var unit: Unit
 var terrain: TerrainType
 ## Owner of the cell this side is fought over, for the team-tinted atlas row.
 var owner_team := 0
+## This side's faction accent, the tint on its name-plate bar. Resolved by the
+## director off SideIdentity and written here — the side never re-derives a team
+## colour, in keeping with "draws, and does nothing else" above.
+var accent := Color.WHITE
 ## True for the defender's half: art, plates and squad all face the other way.
 var mirror := false
 
@@ -130,10 +134,13 @@ func _ready() -> void:
 
 ## Poses this half for one exchange. Called once per cut-in, before the clock
 ## starts; everything after that is the pose fields above.
-func bind(p_unit: Unit, p_terrain: TerrainType, p_owner_team: int, p_mirror: bool) -> void:
+func bind(
+	p_unit: Unit, p_terrain: TerrainType, p_owner_team: int, p_mirror: bool, p_accent: Color
+) -> void:
 	unit = p_unit
 	terrain = p_terrain
 	owner_team = p_owner_team
+	accent = p_accent
 	mirror = p_mirror
 	_art = UnitSprite.texture_for(p_unit.type, p_unit.team)
 	_ridge_tint = _ground_tint(p_terrain.atlas_col, _atlas_row())
@@ -432,7 +439,6 @@ func _draw_plates() -> void:
 
 func _draw_name_row(plate: Rect2) -> void:
 	var font := get_theme_font(&"font", &"Label")
-	var accent: Color = TerrainPanel.TEAM_COLORS.get(unit.team, Color.WHITE)
 	var title := unit.type.display_name.to_upper()
 	var text_width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 	var bar_x := _outward_px(PLATE_MARGIN - 10.0) - (4.0 if mirror else 0.0)

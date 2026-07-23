@@ -106,6 +106,16 @@ var _fx: CutsceneFx
 var _view := Vector2(640.0, 360.0)
 var _bar_h := 46.0
 
+## The board camera and the two zoom levels the entry flinch left it between.
+## The cut-in eases it from `_punched_zoom` back to `_resting_zoom` over the
+## closing wipe, so the board is already at rest on the frame it is uncovered —
+## no snap when `play` returns, and a skip lands the zoom home exactly as it
+## lands every other value, because it too is a pure function of `_t`. Bound per
+## play by the animator; null for a posed still, which never punched the camera.
+var _camera: Camera2D
+var _resting_zoom := Vector2.ONE
+var _punched_zoom := Vector2.ONE
+
 var _playing := false
 var _skipping := false
 var _t := 0.0
@@ -137,8 +147,21 @@ func _ready() -> void:
 
 ## Plays one already-resolved exchange and returns when the map is back.
 ## Awaitable: both call sites hold the interaction flow on it.
-func play(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
+##
+## The animator hands over the punched-in camera and the zoom to return it to;
+## the cut-in eases it home over the closing wipe (see `_restore_zoom`). Left
+## null — as the scenario driver leaves it — the camera is untouched.
+func play(
+	result: CombatResolver.CombatResult,
+	attacker: Unit,
+	defender: Unit,
+	camera: Camera2D = null,
+	resting_zoom := Vector2.ONE
+) -> void:
 	_pose(result, attacker, defender)
+	_camera = camera
+	_resting_zoom = resting_zoom
+	_punched_zoom = camera.zoom if camera != null else resting_zoom
 	_t = 0.0
 	_playing = true
 	_skipping = false
@@ -161,6 +184,7 @@ func pose_at(
 	result: CombatResolver.CombatResult, attacker: Unit, defender: Unit, at: float
 ) -> void:
 	_pose(result, attacker, defender)
+	_camera = null  # a still never punched the camera; keep `_apply` off it
 	_t = clampf(at, 0.0, _beats.total)
 	_layout()
 	_apply()
@@ -221,8 +245,14 @@ func _pose(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) 
 	_atk_style = _styles.for_unit(attacker.type)
 	_def_style = _styles.for_unit(defender.type)
 	_accent = _accent_of(attacker.team)
-	_atk.bind(attacker, _terrain_at(attacker.cell), view.game.owner_at(attacker.cell), false)
-	_def.bind(defender, _terrain_at(defender.cell), view.game.owner_at(defender.cell), true)
+	_atk.bind(attacker, _terrain_at(attacker.cell), view.game.owner_at(attacker.cell), false, _accent)
+	_def.bind(
+		defender,
+		_terrain_at(defender.cell),
+		view.game.owner_at(defender.cell),
+		true,
+		_accent_of(defender.team)
+	)
 	_atk.hp_shown = result.attacker_hp_before
 	_def.hp_shown = result.defender_hp_before
 	_squads(_atk, result.attacker_hp_before, _atk_hp_after, result.attacker_died)
@@ -243,15 +273,16 @@ static func _squads(side: CutsceneSide, before: int, after: int, died: bool) -> 
 	side.squad_now = side.squad_was if died else CutsceneSide.figures_for(after)
 
 
-## The colour the wipe carries: the attacking commander's faction, or that
-## side's plain team colour when it is fighting without one. CommanderVisuals is
-## the single authority on what a faction looks like — the card, the HUD chip and
-## the power banner all ask it, and so does this.
+## A side's accent colour: the attacking commander's faction, or — fighting
+## without one — the classic its slot falls back to. CommanderVisuals is the
+## single authority on what a faction looks like (the card, the HUD chip and the
+## power banner all ask it, and so does this); a commander-less side's colour is
+## SideIdentity's, the same red/blue the board and panels already resolve it to.
 func _accent_of(team: int) -> Color:
 	var commander := view.game.commander_of(team)
 	if commander != null and commander.id != CommanderType.NEUTRAL_ID:
 		return CommanderVisuals.theme_for(commander).color_light
-	return TerrainPanel.TEAM_COLORS.get(team, Color.WHITE)
+	return view.identity.theme(team).color_light
 
 
 ## The cell's terrain. An attacker fires from the cell it has already been moved
@@ -303,6 +334,7 @@ func _apply() -> void:
 	var present := clampf(_window(Vector2(0.0, WIPE_IN)) - _window(_beats.wipe_out), 0.0, 1.0)
 	var plates := _window(Vector2(WIPE_IN * 0.5, WIPE_IN * 0.5 + PLATES)) * present
 	_dim.color.a = DIM_ALPHA * present
+	_restore_zoom()
 	_frame_bars(present)
 	_frame_band(present)
 
@@ -333,6 +365,18 @@ func _apply() -> void:
 
 	_frame_fx(present)
 	_sound()
+
+
+## Eases the board camera from its entry punch back to rest over the closing
+## wipe, in lockstep with `present` falling to zero — so the map is already at
+## its resting zoom on the frame the wipe uncovers it, and a skip (which pins the
+## reveal at 1) lands the zoom exactly at rest with everything else. No-op when no
+## camera was handed over, which is how a posed still leaves the board untouched.
+func _restore_zoom() -> void:
+	if _camera == null:
+		return
+	var reveal := _window(_beats.wipe_out)
+	_camera.zoom = _resting_zoom if reveal >= 1.0 else _punched_zoom.lerp(_resting_zoom, reveal)
 
 
 ## The letterbox, and the faction line on its inner edge. The accent is brightest

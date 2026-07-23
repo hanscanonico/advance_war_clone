@@ -355,13 +355,18 @@ func _stage_cut_in(spec: String) -> void:
 ## rest of the session. Here the same exchange is played and skipped again and
 ## again, one frame later each time, which walks the skip across every beat the
 ## cut-in has — the wipe, the volley, the impact, the counter, the death and the
-## hold. Each run has to emit `finished` exactly once.
+## hold. Each run has to emit `finished` exactly once and land the punched-in
+## camera back at its resting zoom, since the cut-in now eases that off its own
+## clock too (plan R2/R4).
 ##
 ## A run that never finishes hangs the scenario and the smoke sweep reports the
-## timeout; one that finishes twice, or not at all, quits non-zero here.
+## timeout; one that finishes twice, or not at all, or leaves the camera zoomed,
+## quits non-zero here.
 func _spam_skip(result: CombatResolver.CombatResult, attacker: Unit, defender: Unit) -> void:
 	var cutscene := _battle.animator.cutscene
+	var camera := _battle.camera
 	var tree := _battle.get_tree()
+	var resting := camera.zoom
 	for delay in SKIP_FRAMES:
 		var finishes := [0]
 		# Deliberately not CONNECT_ONE_SHOT: a one-shot connection drops itself
@@ -369,7 +374,11 @@ func _spam_skip(result: CombatResolver.CombatResult, attacker: Unit, defender: U
 		# exit that fires twice — would be the one it could not see.
 		var tally := func() -> void: finishes[0] += 1
 		cutscene.finished.connect(tally)
-		cutscene.play(result, attacker, defender)  # deliberately not awaited
+		# Hand it the punched-in camera the animator would, so the skip has a zoom
+		# to land: the cut-in now owns easing it back to `resting` off its own
+		# clock, and a skip must pin it there like every other value it drives.
+		camera.zoom = resting * BattleAnimator.PUNCH_ZOOM
+		cutscene.play(result, attacker, defender, camera, resting)  # deliberately not awaited
 		for frame in delay:
 			await tree.process_frame
 		# Spammed, not pressed once: a second skip after the exit has run must be
@@ -383,7 +392,17 @@ func _spam_skip(result: CombatResolver.CombatResult, attacker: Unit, defender: U
 			push_error("cut-in skipped after %d frame(s) finished %d times" % [delay, finishes[0]])
 			tree.quit(1)
 			return
-	print("cutin_skip: %d skips, each resolved exactly once" % SKIP_FRAMES.size())
+		if not camera.zoom.is_equal_approx(resting):
+			push_error(
+				(
+					"cut-in skipped after %d frame(s) left camera zoom at %s, not resting %s"
+					% [delay, camera.zoom, resting]
+				)
+			)
+			tree.quit(1)
+			return
+	camera.zoom = resting
+	print("cutin_skip: %d skips, each resolved exactly once and camera home" % SKIP_FRAMES.size())
 
 
 ## Puts one unit of each named type onto the first pair of cells the board has

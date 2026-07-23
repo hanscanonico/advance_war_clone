@@ -89,7 +89,9 @@ func _load() -> void:
 	var stored: Variant = config.get_value(SECTION, SPEED_KEY, "")
 	if stored is String:
 		speed = GameSpeed.by_id(StringName(stored))
-	battle_animations = config.get_value(SECTION, BATTLE_ANIMATIONS_KEY, battle_animations)
+	var stored_anim: Variant = config.get_value(SECTION, BATTLE_ANIMATIONS_KEY, battle_animations)
+	if stored_anim is bool:
+		battle_animations = stored_anim
 
 
 func _save() -> void:

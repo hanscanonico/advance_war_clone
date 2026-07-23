@@ -113,8 +113,8 @@ func animate_combat(result: CombatResolver.CombatResult, attacker: Unit, defende
 		_pace_cut_in()
 		var resting := camera.zoom
 		await _punch_camera()
-		await cutscene.play(result, attacker, defender)
-		camera.zoom = resting  # restored under the cut-in, so nothing sees it snap
+		await cutscene.play(result, attacker, defender, camera, resting)
+		camera.zoom = resting  # safety net: the cut-in already eased it home on the wipe
 		_last_cut_in_ms = Time.get_ticks_msec()
 		_sync_aftermath()
 		return
@@ -190,8 +190,9 @@ func _pace_cut_in() -> void:
 
 ## A short zoom onto the cell about to be struck, so the board flinches before
 ## the frame is taken away from it. Awaited, then left punched in: the cut-in
-## covers the map for its whole run, and `animate_combat` puts the zoom back
-## while nothing can see it.
+## covers the map for its whole run and, handed the camera and this resting zoom,
+## eases it home over the closing wipe so the board is already at rest the moment
+## it is uncovered — see CombatCutscene._restore_zoom.
 func _punch_camera() -> void:
 	var tween := node.create_tween()
 	(
