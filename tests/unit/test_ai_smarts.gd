@@ -224,6 +224,50 @@ func test_measuring_a_cell_never_moves_the_unit() -> void:
 	assert_eq(state.unit_at(origin), tank, "and the board still finds it where it was")
 
 
+## A battleship on the surface threatens a sea cell, and the map routes its
+## who-may-shoot question through AttackRange.can_engage — so a dived friendly sub
+## sitting in that cell is charged nothing. The battleship has a chart entry
+## against subs but cannot hit a submerged one, exactly the shot AttackCommand
+## would refuse; pricing it in would make the boat flee threats that do not exist.
+func test_a_battleship_does_not_threaten_a_dived_sub() -> void:
+	var state := _state("[terrain]\nSSSSSSS\n[units]\n1 s 0 0\n2 B 3 0")
+	var sub := state.units_of(1)[0]
+	sub.dived = true
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_eq(
+		map.incoming_damage(state, sub, Vector2i(0, 0)),
+		0,
+		"a battleship cannot hit a submerged sub, so it threatens it with nothing",
+	)
+
+
+## The gate is the dive and only the dive: a cruiser can hit submerged, so going
+## under does not hide the boat from it and the map still prices its forecast.
+func test_a_cruiser_still_threatens_a_dived_sub() -> void:
+	var state := _state("[terrain]\nSSSSSSS\n[units]\n1 s 0 0\n2 c 3 0")
+	var sub := state.units_of(1)[0]
+	sub.dived = true
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_gt(
+		map.incoming_damage(state, sub, Vector2i(0, 0)),
+		0,
+		"a cruiser can hit submerged, so a dive does not hide the sub from it",
+	)
+
+
+## And an undived sub is an ordinary battleship target, so the gate leaves the
+## surfaced number untouched: routing through can_engage changed nothing here.
+func test_an_undived_sub_still_takes_the_battleships_forecast() -> void:
+	var state := _state("[terrain]\nSSSSSSS\n[units]\n1 s 0 0\n2 B 3 0")
+	var sub := state.units_of(1)[0]
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_gt(
+		map.incoming_damage(state, sub, Vector2i(0, 0)),
+		0,
+		"a surfaced sub is a legal battleship target and takes its forecast",
+	)
+
+
 ## The same guarantee across a whole Difficult turn on a real board: the sim
 ## changes when a command is *applied*, never while one is being planned. Guards
 ## the pure read above from anything a future capability adds beside it.

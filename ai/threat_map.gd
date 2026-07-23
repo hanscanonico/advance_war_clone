@@ -9,9 +9,11 @@ extends RefCounted
 ##
 ## Node-free like the rest of ai/. Reuses the single authorities and re-derives
 ## no rules: MovementResolver for each enemy's reach, AttackRange for its firing
-## ring, CombatResolver.forecast_at for the damage. Forecast is luck-free and draws
-## no RNG, so a Difficult match stays as deterministic and replayable as any
-## other tier.
+## ring and for whether an enemy may engage the defender at all (can_engage, so a
+## dived sub is charged nothing by a hunter that cannot reach under the water),
+## CombatResolver.forecast_at for the damage. Forecast is luck-free and draws no
+## RNG, so a Difficult match stays as deterministic and replayable as any other
+## tier.
 ##
 ## The expensive half — one flood fill per enemy — depends only on where the
 ## enemies are, which does not change during the side's own turn (a unit only
@@ -98,8 +100,8 @@ func incoming_damage(state: GameState, defender: Unit, cell: Vector2i) -> int:
 		return 0
 	var total := 0
 	for enemy: Unit in enemies:
-		if not state.damage_chart.can_attack(enemy.type.id, defender.type.id):
-			continue
+		if not AttackRange.can_engage(state, enemy, defender):
+			continue  # no chart entry, or the defender is dived beyond this hunter
 		var forecast := CombatResolver.forecast_at(state, enemy, enemy.cell, defender, cell)
 		if forecast.can_attack:
 			total += forecast.attack_damage
