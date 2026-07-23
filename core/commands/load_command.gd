@@ -29,6 +29,11 @@ func validate(state: GameState) -> String:
 		return "unit cannot be transported"
 	if state.cargo_of(transport).size() >= transport.type.transport_capacity:
 		return "transport is full"
+	# The sim nests transports one level deep only: a loaded carrier's cargo would
+	# freeze at this boarding cell and its capture-progress erase the wrong cell on
+	# a sinking. Refuse the second level outright.
+	if not state.cargo_of(unit).is_empty():
+		return "unit is carrying cargo"
 	return ""
 
 

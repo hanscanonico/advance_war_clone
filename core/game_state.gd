@@ -158,8 +158,11 @@ func remove_unit(unit: Unit) -> void:
 	for passenger in cargo_of(unit):
 		remove_unit(passenger)
 	units.erase(unit)
-	# A dying unit abandons any capture in progress.
-	capture_progress.erase(unit.cell)
+	# A dying unit abandons any capture in progress. A passenger owns no cell of
+	# its own — its stored cell is stale from wherever it last boarded — so it can
+	# hold no capture, and erasing by that cell would wipe an unrelated one.
+	if unit.carrier == null:
+		capture_progress.erase(unit.cell)
 	_check_rout(unit.team)
 
 
