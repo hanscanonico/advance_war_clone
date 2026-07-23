@@ -19,12 +19,13 @@ static func begin_turn(state: GameState) -> void:
 	for unit in state.units_of(team):
 		unit.acted = false
 		if unit.carrier != null:
-			continue  # passengers sit tight until dropped, and burn nothing
+			continue  # cargo burns no upkeep; its transport refills it below
 		_burn_upkeep(unit)
 		if _serviced_here(state, unit) or _in_reach_of_supplier(state, unit):
 			unit.resupply()
 		if _lost_to_empty_tank(state, unit):
-			continue  # nothing left to repair
+			continue  # nothing left to repair, and its cargo went down with it
+		_resupply_cargo(state, unit)
 		_repair(state, unit)
 
 
@@ -34,6 +35,16 @@ static func begin_turn(state: GameState) -> void:
 ## is played against.
 static func _burn_upkeep(unit: Unit) -> void:
 	unit.fuel = maxi(0, unit.fuel - unit.upkeep())
+
+
+## A transport refuels and re-ammoes every unit it carries, in full and wherever
+## it stands — cargo is refilled by its transport, not beside it, so a rider that
+## boarded on empty rides out full. Called only for a transport that survived its
+## own upkeep, so cargo lost with a dry carrier is never touched; and cargo burns
+## no upkeep of its own, so there is nothing to spend before this refill.
+static func _resupply_cargo(state: GameState, transport: Unit) -> void:
+	for passenger in state.cargo_of(transport):
+		passenger.resupply()
 
 
 ## An air or sea unit whose tank reached zero is destroyed here, and its cargo
