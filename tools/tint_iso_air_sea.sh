@@ -3,6 +3,10 @@
 # Derives the Iron and Verdant team rows of the hand-authored air/naval sprites
 # from the committed red row, and vendors them beside it under
 # assets/sprites/iso_air_sea/ as build inputs for tools/paste_unit_sprites.gd.
+# The airport and port building sprites under assets/sprites/iso_buildings/ are
+# the same class of art (three hand-authored rows, no palette master), so they
+# get their faction rows here too — one recipe, one pair of tint constants, for
+# every hand-authored sprite family.
 #
 # The PixVoxel land units get their extra faction rows from a palette tweak of
 # the white masters (see tools/build_pixvoxel_atlases.sh ROW_PALETTE); the eight
@@ -27,7 +31,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIR="$ROOT/assets/sprites/iso_air_sea"
+UNIT_DIR="$ROOT/assets/sprites/iso_air_sea"
+BLDG_DIR="$ROOT/assets/sprites/iso_buildings"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -47,11 +52,12 @@ IRON_MOD=(-modulate 66,17,20)
 VERDANT_MOD=(-modulate 84,96,167)
 
 UNITS=(fighter bomber b_copter t_copter battleship cruiser sub lander)
+BUILDINGS=(airport port)
 
 tint_one() {
-	local id="$1" row="$2"; shift 2
+	local dir="$1" id="$2" row="$3"; shift 3
 	local mod=("$@")
-	local red="$DIR/${id}_red.png" neutral="$DIR/${id}_neutral.png"
+	local red="$dir/${id}_red.png" neutral="$dir/${id}_neutral.png"
 	[ -f "$red" ] || { echo "error: missing $red" >&2; exit 1; }
 	[ -f "$neutral" ] || { echo "error: missing $neutral" >&2; exit 1; }
 	# White wherever the red row diverges from neutral: exactly the team paint.
@@ -66,12 +72,19 @@ tint_one() {
 		\( "$red" "${mod[@]}" \) \
 		"$WORK/mask.png" \
 		-compose over -composite \
-		"${NO_TIME[@]}" "$DIR/${id}_${row}.png"
+		"${NO_TIME[@]}" "$dir/${id}_${row}.png"
 }
 
 echo "tinting ${#UNITS[@]} air/naval units -> iron, verdant"
 for id in "${UNITS[@]}"; do
-	tint_one "$id" iron "${IRON_MOD[@]}"
-	tint_one "$id" verdant "${VERDANT_MOD[@]}"
+	tint_one "$UNIT_DIR" "$id" iron "${IRON_MOD[@]}"
+	tint_one "$UNIT_DIR" "$id" verdant "${VERDANT_MOD[@]}"
 done
-echo "wrote $(( ${#UNITS[@]} * 2 )) sprites into $DIR"
+echo "wrote $(( ${#UNITS[@]} * 2 )) sprites into $UNIT_DIR"
+
+echo "tinting ${#BUILDINGS[@]} property buildings -> iron, verdant"
+for id in "${BUILDINGS[@]}"; do
+	tint_one "$BLDG_DIR" "$id" iron "${IRON_MOD[@]}"
+	tint_one "$BLDG_DIR" "$id" verdant "${VERDANT_MOD[@]}"
+done
+echo "wrote $(( ${#BUILDINGS[@]} * 2 )) sprites into $BLDG_DIR"
