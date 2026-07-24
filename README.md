@@ -420,3 +420,29 @@ The only external requirement is ImageMagick 7 (`brew install imagemagick`). The
 sprites are vendored under `assets/sprites/pixvoxel_src`, so a fresh clone rebuilds with no
 download. To build from a full extracted pack instead, override the default:
 `make tiles PIXVOXEL=/path/to/Revised_PixVoxel_Wargame/standing_frames`.
+
+### The menu design system
+
+The main menu and the commander-select page are dressed by the **Grid Commander Design System** — a
+handoff bundle (`handoff/main-menu/`: a spec, a mockup, five token sheets, three reference
+components, and a set of terrain sprites) whose palette was lifted pixel-for-pixel from this game's
+own tile and unit atlases, so adopting it was alignment, not invention. The numbers it defines live
+in one place, **`scenes/common/ui_theme.gd` (`UiTheme`)**: the shell palette (the slates, neutrals
+and capture green the game had no authority for), the stylebox recipes (cream/dark panels, the hard
+offset shadow, the faction/cream/ghost button and its states, the segmented control, the checkbox,
+the focus ring), and the font loaders. Colours that already had an authority are re-exported, never
+re-declared — faction hues stay `CommanderVisuals`', cream and ink stay
+`CommanderVisuals.PAPER / PAPER_INK / HARD_BORDER` — so there is still exactly one value per colour.
+It is built in code, not a `.tres` Theme, because that is the one form the repo can review in a diff.
+
+The map picker draws live board miniatures (`scenes/menu/map_thumbnail.gd`) by blitting the terrain
+atlas per cell — column from `TerrainType.atlas_col`, row from `SideIdentity.atlas_row`, the same
+authorities the battle board paints with — and the same renderer bakes the slow-panning terrain
+field behind the menu, so a thumbnail can never drift from the board it launches.
+
+Two fonts are vendored under `assets/fonts/`, both SIL OFL 1.1 from Google Fonts and recorded in
+`assets/LICENSES.md`: **Pixelify Sans** (display and UI chrome) and **Silkscreen** (micro-labels,
+numerals, badges). The design-system handoff named them "chosen substitutes" because the repo shipped
+no UI font; the substitution ends there — they are the game's faces now, rasterised with antialiasing
+off so they sit on the same pixel grid as the art. The battle HUD keeps its current dress; aligning it
+to `UiTheme` is a deliberate future step, not a rider on the menu work.
