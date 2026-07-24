@@ -8,9 +8,11 @@
 #
 # Usage:  tools/build_pixvoxel_atlases.sh [--check] <path-to-standing_frames>
 #
-# Writes assets/tiles/units_atlas.png outright, and repaints the city/base/hq
+# Writes assets/tiles/units_atlas.png outright, and repaints the property
 # columns of assets/tiles/terrain_atlas.png (which tools/generate_tiles.gd
-# leaves as bare paved lots). Run it after the `ground` step; see the `sprites`
+# leaves as bare grounds): city/base/hq from the PixVoxel pack, airport/port
+# from the hand-authored sprites under assets/sprites/iso_buildings (the pack
+# has no hangar and no quay). Run it after the `ground` step; see the `sprites`
 # target in the Makefile. Both steps are idempotent — the building columns are
 # rebuilt from a freshly drawn base rather than composited onto themselves.
 #
@@ -85,6 +87,16 @@ UNITS=(Infantry Infantry_T Supply_T Tank Tank_P Artillery_S Artillery Artillery_
 # Columns 5, 6, 7 of the terrain atlas: city, base, hq.
 BUILDINGS=(City Factory Castle)
 BLDG_COLS=(5 6 7)
+# Columns 9 and 10: airport, port. The pack has no hangar and no quay, so these
+# are hand-authored 64px cells (project-original, PixVoxel style) vendored under
+# assets/sprites/iso_buildings — five committed rows per building, the iron and
+# verdant ones derived from red by tools/tint_iso_air_sea.sh. Unlike the pack
+# sprites they are already cell-sized and per-row coloured, so they composite
+# straight onto their ground with no crop, scale, or ROW_TWEAK.
+ISO_BLDG="$ROOT/assets/sprites/iso_buildings"
+ISO_BUILDINGS=(airport port)
+ISO_BLDG_COLS=(9 10)
+ROW_NAMES=(neutral red blue iron verdant)
 # COLS in tools/generate_tiles.gd; rows are the team rows above.
 TERRAIN_COLS=14
 TERRAIN_ROWS=${#ROW_PALETTE[@]}
@@ -93,6 +105,14 @@ TERRAIN_ROWS=${#ROW_PALETTE[@]}
 # PAVE with a 1px (4px at this scale) PAVE.darkened(0.12) edge so the grid reads.
 PAVE="#cfcfcf"
 PAVE_EDGE="#b6b6b6"
+# Grounds under the airport and the port, matching _draw_airport/_draw_port in
+# tools/generate_tiles.gd the same way: base colour, darkened(0.12) edge, and
+# for the port the two wave strips.
+ASPHALT="#6f747c"
+ASPHALT_EDGE="#61666d"
+WATER_DARK="#2a6fbf"
+WATER_DARK_EDGE="#2461a8"
+WATER="#3f8fdc"
 
 # Inputs no other build step can produce. These are what `--check` exists to
 # assert: in the `make tiles` flow the `ground` step that follows replaces the
@@ -108,15 +128,28 @@ for row in "${!ROW_PALETTE[@]}"; do
 		[ -f "$sprite" ] || missing+=("$sprite")
 	done
 done
+for name in "${ISO_BUILDINGS[@]}"; do
+	for rowname in "${ROW_NAMES[@]}"; do
+		sprite="$ISO_BLDG/${name}_${rowname}.png"
+		if [ ! -f "$sprite" ]; then
+			missing+=("$sprite")
+		elif [ "$(magick identify -format '%wx%h' "$sprite")" != "${CELL}x${CELL}" ]; then
+			echo "error: $sprite is not ${CELL}x${CELL}" >&2
+			exit 1
+		fi
+	done
+done
 if [ "${#missing[@]}" -gt 0 ]; then
-	echo "error: ${#missing[@]} source sprite(s) missing under $SRC:" >&2
+	echo "error: ${#missing[@]} source sprite(s) missing:" >&2
 	printf '       %s\n' "${missing[@]}" >&2
+	echo "       (iron/verdant iso building rows come from tools/tint_iso_air_sea.sh)" >&2
 	exit 1
 fi
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
 	echo "preflight ok: ${#UNITS[@]} units + ${#BUILDINGS[@]} buildings" \
-		"x ${#ROW_PALETTE[@]} palettes in $SRC"
+		"x ${#ROW_PALETTE[@]} palettes in $SRC," \
+		"${#ISO_BUILDINGS[@]} iso buildings x ${#ROW_NAMES[@]} rows in $ISO_BLDG"
 	exit 0
 fi
 
@@ -182,6 +215,26 @@ for row in "${!ROW_PALETTE[@]}"; do
 		magick "$WORK/pave.png" "$WORK/b.png" -composite "$WORK/tile.png"
 		magick "$WORK/terrain.png" "$WORK/tile.png" \
 			-geometry "+$((BLDG_COLS[i] * CELL))+$((row * CELL))" \
+			-composite "$WORK/terrain.png"
+	done
+done
+
+echo "painting airport/port into terrain_atlas.png"
+magick -size ${CELL}x${CELL} "xc:$ASPHALT_EDGE" \
+	-fill "$ASPHALT" -draw "rectangle 4,4 $((CELL - 5)),$((CELL - 5))" \
+	-type TrueColor PNG32:"$WORK/asphalt.png"
+magick -size ${CELL}x${CELL} "xc:$WATER_DARK_EDGE" \
+	-fill "$WATER_DARK" -draw "rectangle 4,4 $((CELL - 5)),$((CELL - 5))" \
+	-fill "$WATER" -draw "rectangle 8,40 23,43" -draw "rectangle 44,48 55,51" \
+	-type TrueColor PNG32:"$WORK/water.png"
+for row in "${!ROW_NAMES[@]}"; do
+	for i in "${!ISO_BUILDINGS[@]}"; do
+		base="$WORK/asphalt.png"
+		[ "${ISO_BUILDINGS[$i]}" = "port" ] && base="$WORK/water.png"
+		magick "$base" "$ISO_BLDG/${ISO_BUILDINGS[$i]}_${ROW_NAMES[$row]}.png" \
+			-composite "$WORK/tile.png"
+		magick "$WORK/terrain.png" "$WORK/tile.png" \
+			-geometry "+$((ISO_BLDG_COLS[i] * CELL))+$((row * CELL))" \
 			-composite "$WORK/terrain.png"
 	done
 done

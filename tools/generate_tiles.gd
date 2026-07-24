@@ -2,10 +2,11 @@ extends SceneTree
 ## Generates the ground terrain atlas (9 terrain columns x 5 team rows), the
 ## range overlay, the grid cursor sprite, and the project icon.
 ##
-## Unit art and the city/base/hq buildings are deliberately NOT drawn here: they
-## come from the CC0 PixVoxel pack via tools/build_pixvoxel_atlases.sh, which
-## paints the property columns this script leaves as bare paved lots. Running
-## this alone would blank those buildings, so run the pair:  make tiles
+## Unit art and the property buildings are deliberately NOT drawn here: the
+## city/base/hq come from the CC0 PixVoxel pack and the airport/port from the
+## hand-authored sprites under assets/sprites/iso_buildings, both composited by
+## tools/build_pixvoxel_atlases.sh onto the bare grounds this script leaves.
+## Running this alone would blank those buildings, so run the pair:  make tiles
 ##
 ## Tiles are drawn at 16px — the world grid — then scaled 4x on save, because
 ## the atlas cell is 64px to give the PixVoxel art room.
@@ -41,17 +42,14 @@ const ROCK_DARK := Color("757575")
 const SNOW := Color("eeeeee")
 const PAVE := Color("cfcfcf")
 const ASPHALT := Color("6f747c")
-const ASPHALT_DARK := Color("585d64")
-const MARKING := Color("e4e7eb")
 const SAND := Color("e0d3a4")
 const SAND_DARK := Color("c4b585")
-# Neutral, then one hue per faction row. Rows 0-2 are the shipped values and must
-# not change (byte-identical proof). The iron and verdant entries are
-# CommanderVisuals' own faction colours, so the airport tower and port warehouse
-# a faction owns match the colour that faction wears everywhere else in the UI.
-const TEAM_COLORS: Array[Color] = [
-	Color("8a9099"), Color("d84a3c"), Color("3c64d8"), Color("4a5258"), Color("2c8636")
-]
+# The two classic team hues, sampled by the project icon. The per-row faction
+# colours that once painted the airport tower and port warehouse left with those
+# buildings: they are hand-authored sprites now, composited per team row by
+# tools/build_pixvoxel_atlases.sh from assets/sprites/iso_buildings.
+const TEAM_RED := Color("d84a3c")
+const TEAM_BLUE := Color("3c64d8")
 
 var img: Image
 
@@ -81,11 +79,11 @@ func _generate_atlas() -> void:
 		_ground(_at(6, row), PAVE)
 		_ground(_at(7, row), PAVE)
 		_draw_sea(_at(8, row))
-		# The airport and port are drawn whole here, buildings included, rather
-		# than left as lots for the PixVoxel step: that pack has no hangar and no
-		# quay, and at 16px a runway and a jetty read more clearly anyway.
-		_draw_airport(_at(9, row), row)
-		_draw_port(_at(10, row), row)
+		# airport, port: bare grounds, like the lots above. The PixVoxel pack has
+		# no hangar and no quay, so build_pixvoxel_atlases.sh composites the
+		# hand-authored buildings from assets/sprites/iso_buildings on top, per row.
+		_draw_airport(_at(9, row))
+		_draw_port(_at(10, row))
 		_draw_shoal(_at(11, row))
 		_draw_bridge(_at(12, row))
 		_draw_reef(_at(13, row))
@@ -165,28 +163,16 @@ func _draw_sea(o: Vector2i) -> void:
 	_fill(o, 12, 12, 2, 1, SNOW)
 
 
-## Runway with centre dashes and a team-coloured control tower, so who owns the
-## airfield reads from the tile itself the way a city's roof does.
-func _draw_airport(o: Vector2i, row: int) -> void:
+## Bare asphalt apron. The hand-authored airport building (runway, hangar and
+## team-coloured tower included) is composited on top by build_pixvoxel_atlases.sh.
+func _draw_airport(o: Vector2i) -> void:
 	_ground(o, ASPHALT)
-	_fill(o, 1, 6, 14, 5, ASPHALT_DARK)
-	for x: int in [2, 6, 10]:
-		_fill(o, x, 8, 3, 1, MARKING)
-	_fill(o, 9, 1, 5, 4, TEAM_COLORS[row].darkened(0.25))
-	_fill(o, 10, 2, 3, 2, MARKING)
-	_fill(o, 2, 12, 4, 2, TEAM_COLORS[row])
 
 
-## Deep water with a team-coloured warehouse on a quay: the naval factory, and
-## the only place hulls repair.
-func _draw_port(o: Vector2i, row: int) -> void:
+## Deep water with a wave or two. The hand-authored port building (quay
+## included) is composited on top by build_pixvoxel_atlases.sh.
+func _draw_port(o: Vector2i) -> void:
 	_ground(o, WATER_DARK)
-	_fill(o, 0, 0, TILE, 7, PAVE.darkened(0.12))
-	_fill(o, 1, 1, TILE - 2, 5, PAVE)
-	_fill(o, 2, 1, 6, 5, TEAM_COLORS[row].darkened(0.2))
-	_fill(o, 3, 2, 4, 2, MARKING)
-	_fill(o, 10, 2, 4, 4, ASPHALT)
-	_fill(o, 7, 7, 3, 6, ASPHALT_DARK)  # the jetty, running out into the water
 	_fill(o, 2, 10, 4, 1, WATER)
 	_fill(o, 11, 12, 3, 1, WATER)
 
@@ -264,6 +250,6 @@ func _generate_icon() -> void:
 	img.fill(GRASS)
 	img.fill_rect(Rect2i(56, 0, 16, 128), ROAD)
 	img.fill_rect(Rect2i(0, 56, 128, 16), ROAD)
-	img.fill_rect(Rect2i(14, 14, 28, 28), TEAM_COLORS[1])
-	img.fill_rect(Rect2i(86, 86, 28, 28), TEAM_COLORS[2])
+	img.fill_rect(Rect2i(14, 14, 28, 28), TEAM_RED)
+	img.fill_rect(Rect2i(86, 86, 28, 28), TEAM_BLUE)
 	img.save_png("res://assets/icon.png")

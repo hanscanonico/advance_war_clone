@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — The Capture Cut-In</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+      --gc-gold: #ffd25e;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    pre code { font-size: .8rem; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+
+    /* --- capture cut-in mock ------------------------------------------------ */
+    .cap-frame { overflow-x: auto; padding: .35rem; }
+    .cap {
+      width: min(560px, 100%);
+      margin: 0 auto;
+      border: 4px solid var(--gc-ink);
+      border-radius: 6px;
+      background: linear-gradient(#aee0f5 0 48%, #cfe9b6 48% 100%);
+      font-family: ui-monospace, monospace;
+      position: relative;
+      box-shadow: 6px 6px 0 rgba(7,34,55,.25);
+    }
+    .cap-plate {
+      display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+      background: rgba(23,40,56,.88); color: #fff;
+      padding: .3rem .6rem; font-size: .72rem; font-weight: 800;
+    }
+    .cap-plate.top { border-radius: 3px 3px 0 0; }
+    .cap-plate.bottom { border-radius: 0 0 3px 3px; }
+    .cap-tag { color: var(--gc-gold); letter-spacing: .14em; font-size: .62rem; }
+    .cap-stars { color: var(--gc-gold); letter-spacing: .1em; }
+    .cap-arena { position: relative; min-height: 132px; padding: .6rem .8rem .4rem; }
+    .cap-prop {
+      position: absolute; right: 24%; bottom: 14px;
+      width: 56px; height: 44px; border-radius: 4px 4px 3px 3px;
+      background: color-mix(in srgb, var(--gc-blue) 70%, white);
+      border: 2px solid rgba(0,0,0,.45);
+      transform: scale(1.06, .90); transform-origin: 50% 100%;
+    }
+    .cap-prop::after {
+      content: ""; position: absolute; inset: 6px 8px auto 8px; height: 10px;
+      background: rgba(255,255,255,.5); border-radius: 2px;
+    }
+    .cap-squad { position: absolute; left: 16%; bottom: 12px; display: flex; gap: .3rem; align-items: end; }
+    .cap-fig {
+      width: 26px; height: 26px; border-radius: 4px; border: 2px solid rgba(0,0,0,.4);
+      background: color-mix(in srgb, var(--gc-red) 78%, white);
+      display: grid; place-items: center; font-size: .8rem;
+    }
+    .cap-fig.hop { transform: translateY(-10px); }
+    .cap-chip {
+      position: absolute; right: 30%; top: 18px; font-weight: 900; color: var(--gc-gold);
+      text-shadow: 1px 1px 0 var(--gc-ink), -1px 1px 0 var(--gc-ink), 1px -1px 0 var(--gc-ink), -1px -1px 0 var(--gc-ink);
+    }
+    .cap-meter {
+      position: absolute; right: 10px; top: 8px; text-align: right;
+      background: rgba(23,40,56,.88); color: #fff; border-radius: 3px; padding: .25rem .5rem;
+    }
+    .cap-meter b { font-size: 1rem; color: var(--gc-gold); }
+    .cap-meter small { opacity: .6; }
+    .cap-pips { display: flex; gap: 1px; margin-top: 2px; }
+    .cap-pips i { width: 5px; height: 8px; background: var(--gc-gold); display: inline-block; border-radius: 1px; }
+    .cap-pips i.spent { background: rgba(255,255,255,.22); }
+    .beat-table td:first-child { white-space: nowrap; }
+  </style>
+</head>
+<body class="py-6">
+<div class="gc-shell rounded-box overflow-hidden">
+
+  <!-- ============================== HERO ============================== -->
+  <header class="gc-hero px-6 py-8 md:px-10">
+    <p class="gc-kicker opacity-80">Grid Commander · Battle presentation · Design of record</p>
+    <h1 class="text-3xl md:text-4xl font-black mt-2">The capture cut-in — mash, flip, banner</h1>
+    <p class="mt-3 max-w-3xl opacity-90">
+      When an infantry squad takes a property, the board gives way to a <strong>single-panel
+      cut-in</strong>: the squad marches up to the building, hops on it — squash, dust, a
+      <em>-4</em> chip per landing — while a capture-points meter drains, and on completion the
+      building flashes white and <strong>flips to the capturing faction's colours</strong> under a
+      CAPTURED! banner, exactly as Advance Wars staged it. It is the combat cut-in's sibling in
+      every structural sense: one awaited method on <span class="gc-file">BattleAnimator</span>,
+      one clock, one snapshot from the sim — <strong>it replays, it never decides</strong>. The
+      motion reference is the design-system handoff's <span class="gc-file">capture-scene.jsx</span>;
+      the timings in this plan are that reference retimed to this game's tempo.
+    </p>
+    <div class="mt-5 flex flex-wrap gap-2">
+      <span class="badge badge-warning badge-lg font-bold">DRAFT — awaiting review</span>
+      <span class="badge badge-outline badge-lg text-white">3 milestones · CP1–CP3</span>
+      <span class="badge badge-outline badge-lg text-white">presentation-only + 1 core snapshot</span>
+      <span class="badge badge-outline badge-lg text-white">port &amp; airport sprites: already landed</span>
+    </div>
+  </header>
+
+  <main class="px-6 md:px-10 py-8 space-y-12">
+
+    <!-- ============================== 0 · ALREADY LANDED ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">0</span> Already landed — every property is now presentable</h2>
+      <p class="max-w-3xl">
+        The cut-in's centrepiece is the property drawn at 64&nbsp;px, and until this session two of
+        the five capturables couldn't do it: the airport and the port were flat 16&nbsp;px
+        programmer art drawn whole by <span class="gc-file">tools/generate_tiles.gd</span>, fine on
+        a tile and wrong blown up beside the PixVoxel city, base and HQ. That prerequisite shipped
+        with this plan, as working tree changes ready to commit:
+      </p>
+      <ul class="gc-checks space-y-2 max-w-3xl text-sm">
+        <li><span class="gc-file">assets/sprites/iso_buildings/</span> — hand-authored 64&nbsp;px isometric airport and port buildings from the design-system handoff (project-original, drawn to match the PixVoxel style), neutral/red/blue committed, iron/verdant derived by the same masked-HSB run as the air/naval sprites (<span class="gc-file">tools/tint_iso_air_sea.sh</span>).</li>
+        <li><span class="gc-file">tools/build_pixvoxel_atlases.sh</span> now composites them into terrain-atlas columns 9–10 over rebuilt grounds (asphalt apron, open water), per team row, with the ten sources asserted by <code>--check</code>; <span class="gc-file">generate_tiles.gd</span> draws those cells as bare grounds, exactly like the city/base/hq lots.</li>
+        <li>All five faction rows verified in the atlas and in-game on <span class="gc-file">the_straits</span>; every other atlas byte — units, overlay, cursor, icon, the other twelve terrain columns — rebuilt byte-identical. <span class="gc-file">assets/LICENSES.md</span> and the README record the new art class.</li>
+      </ul>
+      <p class="max-w-3xl text-sm opacity-80">
+        Consequence for this plan: the property sprite the cut-in shows is <em>the board's own
+        atlas cell</em> — any capturable terrain, any faction row — with no special cases.
+      </p>
+    </section>
+
+    <!-- ============================== 1 · SEAMS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">1</span> The seams already exist</h2>
+      <p class="max-w-3xl">
+        Capture presentation has exactly <strong>two call sites</strong>, and both already sit in
+        an awaited flow: the player's <code>&amp;"capture"</code> branch and the AI runner's
+        <code>CaptureCommand</code> branch each run <code>command.apply(game)</code> and then patch
+        the board up inline — repaint, refresh, HUD. There is no animation between apply and
+        repaint today; the cut-in is one awaited call inserted at that seam, and the AI gets it for
+        free because the AI issues the same commands the player does. Almost everything else the
+        feature needs already has a single authority to ask.
+      </p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full">
+          <thead><tr><th>Piece</th><th>Where</th><th>What it gives the cut-in</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="gc-file">battle.gd:424</td><td>player capture path</td>
+              <td>the <code>&amp;"capture"</code> action: validate, <code>apply</code>, then repaint/refresh/HUD — the exact insertion point, already inside an input-locked flow</td>
+            </tr>
+            <tr>
+              <td class="gc-file">battle_ai_runner.gd:109</td><td>AI capture path</td>
+              <td>same shape after <code>animate_path</code>; the runner already <code>await</code>s its animations, so one more await paces the computer's turn correctly</td>
+            </tr>
+            <tr>
+              <td class="gc-file">CaptureCommand.capture_strength</td><td class="gc-file">core/commands/capture_command.gd</td>
+              <td>the one opinion on what a mash is worth (HP × doctrine, floored at 1) — public because the UI already shows it; the cut-in must never grow a second one</td>
+            </tr>
+            <tr>
+              <td class="gc-file">combat_cutscene.gd</td><td class="gc-file">scenes/battle/cutscene/</td>
+              <td>the proven chrome and the proven law: letterbox frame, <code>play(...)</code>/<code>skip()</code>/<code>pose_at(...)</code>, everything a pure function of one clock, <code>finished</code> fired exactly once</td>
+            </tr>
+            <tr>
+              <td class="gc-file">BattleAnimator._cut_in_applies</td><td class="gc-file">scenes/battle/battle_animator.gd:165</td>
+              <td>the four-part gate — toggle, <code>capturing</code>, Instant tier, viewer visibility via the view (and so via <code>Vision</code>) — reused wholesale, one unit instead of two</td>
+            </tr>
+            <tr>
+              <td class="gc-file">SideIdentity.atlas_row</td><td class="gc-file">scenes/common/side_identity.gd</td>
+              <td>the single authority for <code>team → atlas row</code>; the flip is a row swap on the property's atlas column, so the cut-in's colours are the board's by construction</td>
+            </tr>
+            <tr>
+              <td class="gc-file">UnitSprite.texture_for</td><td class="gc-file">scenes/battle/unit_sprite.gd</td>
+              <td>static atlas access to the squad figures' 64&nbsp;px art in every faction row — only infantry and mech can capture, both PixVoxel art</td>
+            </tr>
+            <tr>
+              <td class="gc-file">GameSpeed</td><td class="gc-file">scenes/common/game_speed.gd</td>
+              <td>every duration the cut-in uses, at the active tier, read at play time; <code>instant</code> is an explicit branch here as everywhere</td>
+            </tr>
+            <tr>
+              <td class="gc-file">Sfx <code>&amp;"capture"</code> · EventBus <code>property_captured</code></td><td class="gc-file">autoload/</td>
+              <td>a capture sample that is pooled but <em>never played</em>, and a typed signal that is emitted but <em>never heard</em> — both were built for this moment</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="alert border-2" role="note">
+        <span><strong>The one thing missing:</strong> <code>CaptureCommand.apply</code> returns
+        nothing — by the time any animation could run, <code>capture_progress</code> has already
+        moved and the owner may have flipped. So the command grows a <code>result</code> snapshot,
+        exactly as <code>AttackCommand</code> already carries one: <code>points_before</code>,
+        <code>points_after</code>, <code>captured</code>, filled inside <code>apply</code> and
+        covered by a core unit test. That is the entire core change. Everything else in this plan
+        lives in the presentation layer.</span>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · THE CUT-IN ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">2</span> What plays — anatomy of the cut-in</h2>
+      <p class="max-w-3xl">
+        A single centered panel wipes in over the darkened board, wearing the same letterbox chrome
+        as the combat cut-in. Top plate: the unit's name and a gold <strong>CAPTURE</strong> tag.
+        Arena: sky, far hills, a ground plane; the property sprite center-right in its
+        <em>current owner's</em> colours; a squad of three figures marching in from the left with a
+        bob. Bottom plate: the property's name and defence stars. Top-right, the
+        <strong>capture-points meter</strong> — a big <code>N/20</code> numeral over twenty tick
+        pips, posed at <code>points_before</code>. Then the mash: the squad hops onto the building,
+        and every landing squashes it, kicks dust, shakes the camera, thumps the
+        <code>capture</code> sample, and floats a <em>-N</em> chip while the meter drains. If
+        <code>points_after</code> is zero, the building flashes white, swaps to the capturing
+        team's atlas row at the flash peak, and a <strong>CAPTURED!</strong> banner lands with
+        celebration specks; otherwise the banner reads <strong>OCCUPYING — N/20 LEFT</strong>.
+        Wipe out, and the board — repainted while hidden — agrees with everything just shown.
+      </p>
+
+      <div class="cap-frame">
+        <div class="cap">
+          <div class="cap-plate top"><span>INFANTRY <span class="cap-tag">CAPTURE</span></span><span class="cap-tag">DAY 7</span></div>
+          <div class="cap-arena">
+            <div class="cap-meter">
+              <b>12</b><small>/20</small>
+              <div class="cap-pips"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="spent"></i><i class="spent"></i><i class="spent"></i><i class="spent"></i><i class="spent"></i><i class="spent"></i><i class="spent"></i><i class="spent"></i></div>
+            </div>
+            <div class="cap-chip">-4</div>
+            <div class="cap-prop"></div>
+            <div class="cap-squad">
+              <div class="cap-fig">▲</div><div class="cap-fig hop">▲</div><div class="cap-fig">▲</div>
+            </div>
+          </div>
+          <div class="cap-plate bottom"><span>CITY</span><span class="cap-stars">★★★☆</span></div>
+        </div>
+      </div>
+      <p class="text-sm opacity-70 text-center">Layout mock — a red infantry squad mid-hop on a blue city, second mash landing, meter draining 16&nbsp;→&nbsp;12. Faction rows pick every colour, via <span class="gc-file">SideIdentity</span>.</p>
+
+      <h3 class="text-lg font-bold mt-6">The beat sheet</h3>
+      <p class="max-w-3xl">
+        Budgets below are the <strong>Normal</strong> tier; every one is a <code>GameSpeed</code>
+        accessor scaled per tier like the rest of the game's motion. Unskipped it runs
+        <strong>≈&nbsp;2.4&nbsp;s</strong> for a completing capture and
+        <strong>≈&nbsp;2.0&nbsp;s</strong> for a partial one. The handoff reference plays the same
+        choreography in 4.6&nbsp;s; it is deliberately retimed here, because captures are the most
+        <em>frequent</em> ceremony in the game — a 20-point property is two turns of mashing
+        minimum — and the combat cut-in already set the house tempo at ≈&nbsp;2&nbsp;s (its R1).
+        Any press at any beat <strong>fast-forwards the clock to the end</strong> — the
+        combat cut-in's law, never a tween abort — so the await resolves exactly once.
+      </p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra w-full beat-table">
+          <thead><tr><th>Beat</th><th>Budget</th><th>Driven by</th><th>What shows</th></tr></thead>
+          <tbody>
+            <tr><td>1 · Wipe in + set</td><td>0.25&nbsp;s</td><td>—</td><td>panel slides over the darkened board; plates slide in; meter posed at <code>points_before</code>; property in the <em>previous</em> owner's row</td></tr>
+            <tr><td>2 · March</td><td>0.35&nbsp;s</td><td>—</td><td>three figures walk in from the left, bobbing; contact shadow under the squad</td></tr>
+            <tr><td>3 · Mash ×1–3</td><td>0.25&nbsp;s each</td><td><code>points_before − points_after</code></td><td>hop, land on the building: ≈12% squash, dust puff, decaying shake, <code>capture</code> thump, floating <em>-N</em> chip; meter numeral and pips tick down per landing</td></tr>
+            <tr><td>4 · Flip</td><td>0.30&nbsp;s</td><td><code>captured</code></td><td>white flash peaks mid-beat; the property's atlas row swaps to the capturer's at the peak; celebration specks fan up. Skipped entirely on a partial</td></tr>
+            <tr><td>5 · Banner</td><td>0.55&nbsp;s</td><td><code>captured</code></td><td><strong>CAPTURED!</strong> in gold, or <strong>OCCUPYING — N/20 LEFT</strong> with <code>points_after</code>; pop-in overshoot, holds a beat</td></tr>
+            <tr><td>6 · Wipe out</td><td>0.25&nbsp;s</td><td>—</td><td>reverse wipe; underneath, the board was already repainted and refreshed, so the return frame agrees with the banner</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="max-w-3xl text-sm opacity-80">
+        The mash count and the chips are a presentation split of the one number the sim committed:
+        <code>hops = min(3, points_before − points_after)</code>, with the removed points divided
+        across the hops largest-first (a strength-4 turn chips 2/1/1; a strength-12 doctrine turn
+        chips 4/4/4). The chips <em>sum to the removed points by construction</em> — the cut-in
+        never calls <code>capture_strength</code>, never reads the doctrine, and a mid-animation
+        press lands on the same meter value the terrain panel will report.
+      </p>
+
+      <h3 class="text-lg font-bold mt-6">The call-site surgery — all of it</h3>
+      <pre class="bg-base-300 rounded-box p-4 overflow-x-auto"><code># battle.gd &"capture" branch and battle_ai_runner.gd CaptureCommand branch, identically:
+command.apply(game)
+EventBus.unit_moved.emit(unit)
+await animator.animate_capture(command.result, unit, dest)   # the cut-in; CP1
+if game.owner_at(dest) == unit.team:
+	EventBus.property_captured.emit(dest, unit.team)
+	view.repaint_property(dest)
+view.refresh_sprite(unit)
+# ... then exactly what each site already does: selection/panel/HUD, victory check.</code></pre>
+      <p class="max-w-3xl text-sm opacity-80">
+        <code>animate_capture</code> gates like <code>animate_combat</code> does: cut-in only when
+        the toggle is on, not <code>capturing</code>, not Instant, and the viewer can see the
+        capturing unit — one unit this time, standing on the very cell it captures, so a single
+        <code>view.can_see_unit</code> answers for both. When the gate refuses, the method plays the
+        on-map fallback — a single <code>capture</code> thump if the viewer can see the cell, plus
+        the flag-pip pulse CP1 adds to the tile — and returns; under fog an enemy's hidden capture
+        stays exactly as silent and invisible as it is today. Repaint and the
+        <code>property_captured</code> emission move <em>after</em> the await: under the full-screen
+        panel the board is hidden, so the flip the player watches in the cut-in is the flip the
+        board wears when it returns; on the refused path the await returns immediately and the
+        order is today's, unchanged.
+      </p>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">3</span> Decisions</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D1 — The cut-in replays a snapshot; it computes nothing</h3>
+          <p class="text-sm"><code>CaptureCommand</code> gains a <code>result</code> the way
+          <code>AttackCommand</code> already has one: <code>points_before</code>,
+          <code>points_after</code>, <code>captured</code>, filled inside <code>apply</code> at the
+          moment the sim commits them, unit-tested in core. The cut-in reads the result, the unit,
+          and the cell — it never touches <code>capture_strength</code>, the doctrine hooks, or
+          <code>capture_progress</code>. The battle-animations plan's D1 said why once and it holds
+          twice: this repo has already paid for a second independent opinion (movement), and the
+          animation layer will not open that door for capture.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D2 — Board art, blown up; the flip is an atlas-row swap</h3>
+          <p class="text-sm">The property sprite is the terrain atlas's own 64&nbsp;px cell —
+          <code>(terrain.atlas_col, SideIdentity.atlas_row(owner))</code> — and completion swaps the
+          row from the previous owner's to the capturer's at the flash peak. No second palette, no
+          bespoke building art: whatever the board would show, the cut-in shows bigger, which is
+          what section&nbsp;0's sprite work bought. Squad figures are
+          <code>UnitSprite.texture_for</code> — infantry and mech are the only capturers, both
+          PixVoxel art. Squash, dust, chips, specks and flash are procedural, in the combat
+          cut-in's effect idiom.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D3 — One awaited seam on BattleAnimator, one clock behind it</h3>
+          <p class="text-sm"><code>animate_capture(result, unit, cell)</code> joins
+          <code>animate_combat</code> as the second full-screen seam: both call sites await it, it
+          returns exactly once, and the scene behind it —
+          <span class="gc-file">scenes/battle/cutscene/capture_cutscene.gd</span> beside the combat
+          one — is a pure function of a single clock. Skipping sets the clock to the end; nothing
+          is cancelled mid-flight, so any press at any beat lands on the right tableau by
+          construction, not by testing. Board repaint and the <code>property_captured</code>
+          emission move to after the await (section&nbsp;2) — the one deliberate reordering, and
+          invisible on every path where the cut-in doesn't play.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D4 — The combat gate, reused whole; no new toggle</h3>
+          <p class="text-sm">One switch governs full-screen theatre: <code>Settings.battle_animations</code>
+          covers this cut-in too, and the gate is <code>_cut_in_applies</code>' four questions with
+          one unit instead of two — toggle, <code>capturing</code> (screenshots stay byte-stable),
+          <code>Settings.speed.instant</code> (that tier exists to skip theatre), and viewer
+          visibility asked of the view, and so of <span class="gc-file">core/rules/vision.gd</span>,
+          never re-derived. A player who turned battle cut-ins off has answered this question
+          already; a second checkbox would be a setting nobody asked for.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D5 — Pacing belongs to GameSpeed; core stays deaf to it</h3>
+          <p class="text-sm">Every budget in the beat sheet is a constant on
+          <span class="gc-file">GameSpeed</span> read at play time, scaled per tier like the move
+          step and the banners — Slow lingers, Quick tightens, Instant never enters the scene at
+          all (the explicit branch, per the game-speed plan's D4). The standing invariant stands:
+          nothing under <span class="gc-file">core/</span> or <span class="gc-file">ai/</span>
+          imports <code>GameSpeed</code> or reads <code>Settings</code>; the snapshot fields are
+          plain ints and the sim neither knows nor cares whether its capture was watched.</p>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <h3 class="card-title text-base">D6 — The dormant sound and signal get their jobs</h3>
+          <p class="text-sm">The pooled-but-unplayed <code>capture</code> sample becomes the mash
+          thump (one per landing) and the on-map fallback's single tick;
+          <code>fanfare</code> — already the victory voice — marks the CAPTURED! banner.
+          <code>property_captured</code> keeps its shape and both emitters, just moved after the
+          await, and stays the seam any future listener (minimap, replay ticker) subscribes to.
+          Missing streams stay silently skipped, as <code>Sfx</code> already guarantees.</p>
+        </div></div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">4</span> Milestones — each one shippable</h2>
+
+      <div class="space-y-4">
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">CP1</span>
+            <h3 class="card-title text-base">The snapshot and the shell — every capture cuts in, readable, skippable</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li><strong>Core:</strong> <code>CaptureCommand.result</code> (<code>points_before</code> / <code>points_after</code> / <code>captured</code>) set in <code>apply</code>; tests prove the snapshot against chip-away, completion, doctrine-boosted (Tomás Reed) and floor-of-1 captures, and that save/load neither needs nor keeps it.</li>
+            <li><strong>Scene:</strong> <span class="gc-file">capture_cutscene.tscn/.gd</span> — wipe, plates, property sprite by atlas cell, points meter ticking <code>before → after</code> in one beat (no mash choreography yet), both banners, wipe out; <code>play</code>/<code>skip</code>/<code>pose_at</code>/<code>finished</code> contract identical to the combat scene's.</li>
+            <li><strong>Wiring:</strong> <code>animate_capture</code> on the animator with the reused gate; both call sites resequenced per section&nbsp;2; on-map fallback thump; a flag-pip pulse on the tile for the gate-refused-but-visible case.</li>
+            <li><strong>Ships:</strong> captures feel announced from day one; toggle off restores today's behaviour exactly.</li>
+          </ul>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">CP2</span>
+            <h3 class="card-title text-base">The mash — march, hops, squash, dust, chips, flip</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li>Squad march-in with bob; 1–3 hops from the removed-points split, each landing with squash, dust puff, decaying shake, <code>capture</code> thump and a floating <em>-N</em> chip synced to the meter.</li>
+            <li>Completion flip: white flash, atlas-row swap at the peak, celebration specks; partial keeps the plain OCCUPYING banner. Chip split verified against strength 1, 4, 10 and a doctrine-boosted 12.</li>
+            <li><strong>Ships:</strong> the full choreography of the reference, at house tempo, for all five property types and all five faction rows.</li>
+          </ul>
+        </div></div>
+
+        <div class="card bg-base-100 border-2 shadow-sm"><div class="card-body p-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="badge badge-primary badge-lg font-bold">CP3</span>
+            <h3 class="card-title text-base">Pace and polish — the ceremony survives a whole match</h3>
+          </div>
+          <ul class="mt-2 text-sm space-y-1 list-disc list-inside">
+            <li>Tier budgets on <code>GameSpeed</code> tuned by playing a property-heavy board at each tier; AI-turn compression via the animator's existing recent-cut-in pacing so a three-capture computer turn doesn't triple the ceremony.</li>
+            <li>The HQ handoff: a capture that sets <code>game.winner</code> plays its CAPTURED! beat first, then the victory flow enters — one ceremony after the other, never stacked.</li>
+            <li>Scenario driver gains a posed capture (<code>pose_at</code>) for screenshots; <span class="gc-file">make screenshot</span> stays byte-identical.</li>
+            <li><strong>Verification soak:</strong> a full AI-vs-AI match with animations on — captures, doctrine bonuses, an HQ finish; no softlock, meter always equal to the terrain panel's number; then the same match with the toggle off (R2, R5).</li>
+          </ul>
+        </div></div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">5</span> Risks</h2>
+      <div class="space-y-3">
+
+        <div class="card bg-base-100 gc-risk-high shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R1 · Ceremony fatigue — captures happen far more often than kills</h3>
+          <p class="text-sm">A 20-point property is at least two mash turns, an infantry rush is a
+          dozen captures a match, and every one now wants two seconds of theatre. Mitigations are
+          layered and mostly inherited: skip on any press, the shared toggle, house-tempo budgets
+          from day one (not the reference's 4.6&nbsp;s), and CP3's AI-turn compression. Held in
+          reserve as a plan amendment if the CP3 soak still grates: partial captures demote to the
+          on-map pulse and only <em>completions</em> earn the panel.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-high shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R2 · The await contract — a cut-in that never finishes is a softlock</h3>
+          <p class="text-sm">Both call sites hold the whole interaction flow on
+          <code>animate_capture</code>, exactly as combat does. Same design answer, because it is
+          proven here: one clock, skip fast-forwards state rather than cancelling tweens, every
+          branch funnels to one <code>finished</code>. Verified by CP3's soak plus deliberate
+          skip-spamming at every beat, including the frame of the row swap.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-medium shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R3 · A second opinion on capture math</h3>
+          <p class="text-sm">The tempting bug: the cut-in "just quickly" calling
+          <code>capture_strength</code> to size its chips, then drifting from the sim the day a
+          doctrine changes. D1 is the fence — chips are a split of
+          <code>points_before − points_after</code> and nothing else — and the acceptance check
+          pins it: chip sum equals the snapshot delta for every doctrine in the roster, including
+          Tomás Reed's boosted turns.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-medium shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R4 · Event resequencing — the one behavioural edit outside the cut-in</h3>
+          <p class="text-sm">Moving repaint and <code>property_captured</code> after the await is
+          the only change visible to code that never shows a cut-in, and the rules here live in two
+          layers (the memory this repo keeps: unit tests miss that split). Answer: the refused-gate
+          path returns immediately so ordering is byte-identical today, and CP3's AI-vs-AI soak —
+          the instrument that catches split-layer bugs here — runs with the toggle in both
+          positions before this merges.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-good shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R5 · Screenshot determinism</h3>
+          <p class="text-sm">Already solved by inheritance: the gate refuses while
+          <code>capturing</code>, exactly like the combat cut-in, the shake and the pulse, so
+          <span class="gc-file">make screenshot</span> and the smoke scenarios stay byte-stable; a
+          posed capture screenshot goes through <code>pose_at</code> at a settled beat, the
+          combat scene's precedent.</p>
+        </div></div>
+
+        <div class="card bg-base-100 gc-risk-good shadow-sm"><div class="card-body p-4">
+          <h3 class="font-bold text-sm">R6 · Fog — the cut-in must not out-see the viewer</h3>
+          <p class="text-sm">Handled at the gate, one question this time: the capturing unit stands
+          on the captured cell, so <code>view.can_see_unit</code> answers for the whole scene, and
+          the view asks <span class="gc-file">core/rules/vision.gd</span> — the single authority,
+          no new visibility logic anywhere. A hidden enemy's capture stays as silent and invisible
+          as it is today.</p>
+        </div></div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">6</span> Explicitly out of scope</h2>
+      <ul class="list-disc list-inside space-y-1 max-w-3xl text-sm">
+        <li><strong>Build / resupply / join cutscenes</strong> — this plan is capture only, as the battle-animations plan was combat only; the on-map language for everything else stays.</li>
+        <li><strong>Authored mash animation frames</strong> — squash, dust and chips carry the choreography; per-unit capture sprite sheets are the same scope-creep trap the combat plan fenced off (its R5), fenced identically here.</li>
+        <li><strong>Commander portraits in the capture frame</strong> — the power banner owns commander presentation; a doctrine-boosted mash reads through bigger chips, not a face.</li>
+        <li><strong>Replacing the terrain panel's capture readout</strong> — the panel's <code>N/20</code> stays the exact-number authority between turns; the meter is the same number, staged.</li>
+        <li><strong>Reworking the handoff's HP-cost model</strong> — the reference narrates "one action removes the unit's HP"; this game's truth is <code>capture_strength</code> (HP × doctrine, floor 1), and the cut-in simply replays whatever the sim committed.</li>
+      </ul>
+    </section>
+
+    <!-- ============================== 7 · ACCEPTANCE ============================== -->
+    <section class="space-y-4">
+      <h2 class="text-2xl font-black flex items-center gap-3"><span class="gc-section-number">7</span> Acceptance checks</h2>
+      <ul class="gc-checks space-y-2 max-w-3xl text-sm">
+        <li>Every capture — player or AI, partial or completing — plays the cut-in when the gate allows it; toggle off, Instant, <code>capturing</code>, or a fog-hidden capturer reproduces today's behaviour exactly.</li>
+        <li>Meter values, chips, hop count and the banner always equal the sim's snapshot: chip sum = <code>points_before − points_after</code> for every doctrine in the roster; the terrain panel agrees the moment the wipe clears. No capture number is computed in the presentation layer.</li>
+        <li>Any press at any beat — including mid-flash — lands on the correct final tableau and returns control immediately; skip-spamming a full AI turn of captures never softlocks.</li>
+        <li>The completion flip shows the capturer's faction row via <code>SideIdentity</code>, for all five property types and all five rows — including a mirror match and a commander-less side.</li>
+        <li>An HQ capture plays CAPTURED! to the end, then the victory flow begins; the two ceremonies never overlap.</li>
+        <li><span class="gc-file">make test</span> stays green including the new snapshot tests; <span class="gc-file">make screenshot</span> output is unchanged with the feature merged; no file under <span class="gc-file">core/</span> or <span class="gc-file">ai/</span> references a Node, a scene, <code>GameSpeed</code> or <code>Settings</code>.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer class="px-6 md:px-10 py-6 border-t-2 text-sm opacity-70">
+    Grid Commander · capture-animation plan · drafted 2026-07-23 · companion to
+    <span class="gc-file">.lavish/battle-animations-plan.html</span> (BA1–BA4 shipped) — motion
+    reference: the Grid Commander Design System handoff (<span class="gc-file">capture-scene.jsx</span>,
+    <span class="gc-file">SPEC.md</span>), retimed to house tempo. This work touches presentation
+    plus one snapshot on <code>CaptureCommand</code>, and changes no rule, no balance number, and
+    no map byte. The port and airport building sprites it depends on landed alongside this draft.
+  </footer>
+
+</div>
+</body>
+</html>
