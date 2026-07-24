@@ -81,7 +81,7 @@ func setup() -> void:
 	backdrop_layer.scale = terrain_layer.scale
 	move_overlay.tile_set = _build_overlay_tile_set()
 	attack_overlay.tile_set = move_overlay.tile_set
-	fog_layer.tile_set = move_overlay.tile_set
+	fog_layer.tile_set = _build_fog_tile_set()
 	_paint_map()
 	_paint_backdrop()
 	_spawn_unit_sprites()
@@ -120,6 +120,25 @@ func _build_overlay_tile_set() -> TileSet:
 	tile_set.tile_size = Vector2i(TILE, TILE)
 	var atlas := TileSetAtlasSource.new()
 	atlas.texture = load(OVERLAY_PATH)
+	atlas.texture_region_size = Vector2i(TILE, TILE)
+	atlas.create_tile(Vector2i.ZERO)
+	tile_set.add_source(atlas, ATLAS_SOURCE_ID)
+	return tile_set
+
+
+## The fog gets its own tile rather than sharing the move/attack overlay's.
+## `overlay.png` carries a brighter one-pixel border, which is what rings a single
+## range cell — but painted across a whole fogged region that border becomes a
+## grid of dark outlines around every cell, and the shroud reads as a field of
+## hard-edged boxes instead of one drawn-down curtain. A flat, seam-free cell
+## closes the region up; its colour and depth stay the FogLayer's modulate.
+func _build_fog_tile_set() -> TileSet:
+	var image := Image.create(TILE, TILE, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	var tile_set := TileSet.new()
+	tile_set.tile_size = Vector2i(TILE, TILE)
+	var atlas := TileSetAtlasSource.new()
+	atlas.texture = ImageTexture.create_from_image(image)
 	atlas.texture_region_size = Vector2i(TILE, TILE)
 	atlas.create_tile(Vector2i.ZERO)
 	tile_set.add_source(atlas, ATLAS_SOURCE_ID)
