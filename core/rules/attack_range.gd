@@ -61,3 +61,63 @@ static func can_engage(state: GameState, attacker: Unit, target: Unit) -> bool:
 ## from the type and no doctrine turns a direct unit into an indirect one.
 static func is_indirect(unit: Unit) -> bool:
 	return unit.type.min_range > 1
+
+
+## The cells `unit` could fire *from* this turn. An indirect unit cannot move and
+## fire, so it shoots only from where it stands; a direct unit may fire from any
+## cell it can stop on, its current one included.
+##
+## Promoted here from the AI's threat map so the planner and the range overlay
+## share one definition of a firing position — a red cell the player sees and a
+## cell the AI fears are then the same math, not two that agree until someone
+## edits one. The movement-overlay lesson (MoveCommand.validate) applied before
+## the second opinion, not after.
+static func firing_cells(state: GameState, unit: Unit) -> Array[Vector2i]:
+	if is_indirect(unit):
+		return [unit.cell]
+	var cells: Array[Vector2i] = []
+	var reach := MovementResolver.reachable(state, unit)
+	for cell in reach.cells():
+		if reach.can_stop_at(cell):
+			cells.append(cell)
+	return cells
+
+
+## Every in-bounds cell in the [low, high] Manhattan ring around `from`. The one
+## ring walk both the threat map's per-enemy attribution and threat_cells' union
+## draw on, so the two cannot disagree about the shape of a shot.
+static func ring_cells(state: GameState, from: Vector2i, low: int, high: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for dx in range(-high, high + 1):
+		var span := high - absi(dx)
+		for dy in range(-span, span + 1):
+			if absi(dx) + absi(dy) < low:
+				continue
+			var cell: Vector2i = from + Vector2i(dx, dy)
+			if state.map.terrain_at(cell) != null:
+				cells.append(cell)
+	return cells
+
+
+## Every board cell this unit could bring under fire this turn: the deduped union
+## of its [minimum, maximum] firing ring taken over every cell it could fire from.
+## Unarmed units (max_range <= 0) reach nowhere and return []. Ammo is *not*
+## consulted — this answers "what does the weapon reach", the capability a dry gun
+## keeps one resupply from firing; the threat map layers its own dry filter on top
+## for the different question of damage expected this turn.
+##
+## A pure read: no RNG, no mutation. The single authority the range overlay asks
+## and the AI's ThreatMap is built from.
+static func threat_cells(state: GameState, unit: Unit) -> Array[Vector2i]:
+	if unit.type.max_range <= 0:
+		return []
+	var low := minimum(state, unit)
+	var high := maximum(state, unit)
+	var seen := {}
+	for from in firing_cells(state, unit):
+		for cell in ring_cells(state, from, low, high):
+			seen[cell] = true
+	var result: Array[Vector2i] = []
+	for cell: Vector2i in seen:
+		result.append(cell)
+	return result
