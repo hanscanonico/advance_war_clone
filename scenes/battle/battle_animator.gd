@@ -173,11 +173,14 @@ func _cut_in_applies(attacker: Unit, defender: Unit) -> bool:
 	return view.can_see_unit(attacker) and view.can_see_unit(defender)
 
 
-## Sets how much ceremony this cut-in gets, from how long it has been since the
-## last one (plan BA4). Two seconds a battle is charming for ten battles and a
-## chore for two hundred — R1, the plan's own named risk — and a computer turn
-## that opens fire five times is exactly where that bites. So a run of attacks
-## tightens as it goes: faster overall, and most of the closing hold cut away.
+## Sets how much ceremony whichever cut-in is about to play gets, from how long
+## it has been since the last one (plan BA4). Two seconds a battle is charming for
+## ten battles and a chore for two hundred — R1, the plan's own named risk — and a
+## computer turn that opens fire or captures five times is exactly where that
+## bites. So a run of cut-ins tightens as it goes: faster overall, and most of the
+## closing hold cut away. Combat and capture share the one streak counter, so a
+## turn mixing attacks and captures tightens as a single run; the pacing is routed
+## to both cutscenes and whichever one is about to play reads it.
 ##
 ## What is *not* touched is the volley, the impact and the HP tick. Those carry
 ## the information; trimming them would make the cut-in shorter and worse, which
@@ -187,8 +190,14 @@ func _pace_cut_in() -> void:
 	_cut_in_streak = (
 		mini(_cut_in_streak + 1, CUT_IN_MAX_STREAK) if gap < CUT_IN_STREAK_GAP_MS else 0
 	)
-	cutscene.speed = 1.0 + _cut_in_streak * CUT_IN_STREAK_SPEED
-	cutscene.tail_scale = maxf(0.0, 1.0 - _cut_in_streak * CUT_IN_STREAK_TAIL)
+	var streak_speed := 1.0 + _cut_in_streak * CUT_IN_STREAK_SPEED
+	var streak_tail := maxf(0.0, 1.0 - _cut_in_streak * CUT_IN_STREAK_TAIL)
+	if cutscene != null:
+		cutscene.speed = streak_speed
+		cutscene.tail_scale = streak_tail
+	if capture_cutscene != null:
+		capture_cutscene.speed = streak_speed
+		capture_cutscene.tail_scale = streak_tail
 
 
 ## A short zoom onto the cell about to be struck, so the board flinches before
