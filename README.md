@@ -327,9 +327,10 @@ lives in one table at the top of `scenes/common/game_speed.gd`.
 Battle captures and `make smoke` pin **Instant**: a frame must not depend on which machine took it,
 and scenarios wait on the scene's state machine rather than a frame count, so skipping the theatre
 cannot change what is photographed. It is also four times faster on the scenario that plays a whole
-AI turn, for a byte-identical frame. `make menu-screenshot` pins **Normal** instead — the menu
-animates nothing, so the pin's only effect there is the dropdown's text, and that should read as
-the tier a fresh install ships with.
+AI turn, for a byte-identical frame. `make menu-screenshot` pins **Normal** instead — the menu's
+drifting backdrop and blinking **PRESS START** pin still under a capture (the animator's `capturing`
+precedent), so the pin's only effect on the frame is the **Speed** segment's highlight, and that
+should read as the tier a fresh install ships with.
 
 ## Difficulty
 
