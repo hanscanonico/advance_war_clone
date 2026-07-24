@@ -310,8 +310,8 @@ func confirm_at(cell: Vector2i) -> void:
 				# command, gated by the same sight rule targeting uses (so fog and a
 				# dived sub stay unclickable).
 				_enter_preview(unit)
-			elif unit == null:
-				_open_map_menu()
+			else:
+				_open_map_menu()  # empty, or an unseen occupant — same face, never probe fog
 		State.PREVIEW:
 			var unit := game.unit_at(cell)
 			if unit == null or not view.can_see_unit(unit):
