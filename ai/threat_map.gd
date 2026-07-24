@@ -46,41 +46,21 @@ static func build(state: GameState, enemies: Array[Unit]) -> ThreatMap:
 			continue  # unarmed or dry: no threat to map
 		var low := AttackRange.minimum(state, enemy)
 		var high := AttackRange.maximum(state, enemy)
-		for from in _firing_cells(state, enemy):
+		for from in AttackRange.firing_cells(state, enemy):
 			map._mark_ring(state, enemy, from, low, high)
 	return map
 
 
-## The cells `enemy` could fire from this turn. An indirect unit cannot move and
-## fire, so it shoots only from where it stands; a direct unit may fire from any
-## cell it can stop on, its current one included.
-static func _firing_cells(state: GameState, enemy: Unit) -> Array[Vector2i]:
-	if AttackRange.is_indirect(enemy):
-		return [enemy.cell]
-	var cells: Array[Vector2i] = []
-	var reach := MovementResolver.reachable(state, enemy)
-	for cell in reach.cells():
-		if reach.can_stop_at(cell):
-			cells.append(cell)
-	return cells
-
-
 ## Flags every in-bounds cell in the [low, high] firing ring around `from` as
-## threatened by `enemy`.
+## threatened by `enemy`. The ring geometry — which cells, in what order — is
+## AttackRange's, the same walk threat_cells and the range overlay use; this only
+## records who threatens each one, the attribution the union throws away.
 func _mark_ring(state: GameState, enemy: Unit, from: Vector2i, low: int, high: int) -> void:
-	for dx in range(-high, high + 1):
-		var span := high - absi(dx)
-		for dy in range(-span, span + 1):
-			var dist := absi(dx) + absi(dy)
-			if dist < low:
-				continue
-			var cell := from + Vector2i(dx, dy)
-			if state.map.terrain_at(cell) == null:
-				continue  # off the board
-			var here: Array = _by_cell.get(cell, [])
-			if enemy not in here:
-				here.append(enemy)
-				_by_cell[cell] = here
+	for cell in AttackRange.ring_cells(state, from, low, high):
+		var here: Array = _by_cell.get(cell, [])
+		if enemy not in here:
+			here.append(enemy)
+			_by_cell[cell] = here
 
 
 ## Expected luck-free damage `defender` would take standing on `cell`, summed

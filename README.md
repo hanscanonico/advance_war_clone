@@ -164,6 +164,16 @@ jumps to that team's first property.
   its movement range; move the cursor within range to preview the path, then confirm a destination
   to move there. Remaining fuel caps that range, so a dry unit is stranded where it stands
 - Cancel (`Esc` / `X` / `Backspace`): deselect, or undo an uncommitted move
+- Confirm or left-click on a unit you *cannot* command — an enemy, or one of yours that has
+  already acted — previews where it could move, in the same blue overlay. Clicking another
+  visible unit moves the preview there (a ready unit of your own still just selects), and cancel
+  or a click on an empty tile dismisses it. It is a look, not an order, and fog applies: a unit
+  you cannot see cannot be inspected
+- `R`, while any unit's movement range is on screen — selected or previewed — toggles a red
+  overlay of every cell that unit could bring under fire this turn: a direct unit firing from
+  anywhere it could stop, an indirect only from where it stands, since it cannot move and shoot.
+  It shows what the weapon *reaches* — a unit out of ammo still shows its ring, one resupply from
+  meaning it — and it paints over the blue until pressed again
 - After a move, the action menu opens: **Fire** (offered only when an enemy is in weapon range
   from the destination and the unit still has ammo), **Capture** (offered when a capture-capable
   unit ends on a property you don't own), **Drop** and **Supply** (see transports below),
