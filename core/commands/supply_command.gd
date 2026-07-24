@@ -29,7 +29,9 @@ func validate(state: GameState) -> String:
 
 
 func apply(state: GameState) -> void:
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	if ambushed:
+		return  # stopped short by a hidden enemy; no top-up this turn
 	for friendly in friendlies_in_reach(state, unit.cell):
 		friendly.resupply()
 
@@ -41,7 +43,7 @@ func friendlies_in_reach(state: GameState, from: Vector2i) -> Array[Unit]:
 	var radius := state.commander_of(unit.team).supply_range(state, unit)
 	for other in state.units_of(unit.team):
 		if other == unit or other.carrier != null:
-			continue  # passengers are refilled by their transport, not beside it
+			continue  # passengers are refilled by their transport at begin_turn (TurnRules), not beside it
 		var dist := absi(other.cell.x - from.x) + absi(other.cell.y - from.y)
 		if dist >= 1 and dist <= radius:
 			result.append(other)

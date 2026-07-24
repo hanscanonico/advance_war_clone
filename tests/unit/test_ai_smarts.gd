@@ -224,6 +224,50 @@ func test_measuring_a_cell_never_moves_the_unit() -> void:
 	assert_eq(state.unit_at(origin), tank, "and the board still finds it where it was")
 
 
+## A battleship on the surface threatens a sea cell, and the map routes its
+## who-may-shoot question through AttackRange.can_engage — so a dived friendly sub
+## sitting in that cell is charged nothing. The battleship has a chart entry
+## against subs but cannot hit a submerged one, exactly the shot AttackCommand
+## would refuse; pricing it in would make the boat flee threats that do not exist.
+func test_a_battleship_does_not_threaten_a_dived_sub() -> void:
+	var state := _state("[terrain]\nSSSSSSS\n[units]\n1 s 0 0\n2 B 3 0")
+	var sub := state.units_of(1)[0]
+	sub.dived = true
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_eq(
+		map.incoming_damage(state, sub, Vector2i(0, 0)),
+		0,
+		"a battleship cannot hit a submerged sub, so it threatens it with nothing",
+	)
+
+
+## The gate is the dive and only the dive: a cruiser can hit submerged, so going
+## under does not hide the boat from it and the map still prices its forecast.
+func test_a_cruiser_still_threatens_a_dived_sub() -> void:
+	var state := _state("[terrain]\nSSSSSSS\n[units]\n1 s 0 0\n2 c 3 0")
+	var sub := state.units_of(1)[0]
+	sub.dived = true
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_gt(
+		map.incoming_damage(state, sub, Vector2i(0, 0)),
+		0,
+		"a cruiser can hit submerged, so a dive does not hide the sub from it",
+	)
+
+
+## And an undived sub is an ordinary battleship target, so the gate leaves the
+## surfaced number untouched: routing through can_engage changed nothing here.
+func test_an_undived_sub_still_takes_the_battleships_forecast() -> void:
+	var state := _state("[terrain]\nSSSSSSS\n[units]\n1 s 0 0\n2 B 3 0")
+	var sub := state.units_of(1)[0]
+	var map := ThreatMap.build(state, state.units_of(2))
+	assert_gt(
+		map.incoming_damage(state, sub, Vector2i(0, 0)),
+		0,
+		"a surfaced sub is a legal battleship target and takes its forecast",
+	)
+
+
 ## The same guarantee across a whole Difficult turn on a real board: the sim
 ## changes when a command is *applied*, never while one is being planned. Guards
 ## the pure read above from anything a future capability adds beside it.
@@ -296,6 +340,49 @@ func test_focus_fire_adds_nothing_to_a_shot_that_already_kills() -> void:
 	assert_true(command is AttackCommand)
 	assert_eq(
 		(command as AttackCommand).target_cell, Vector2i(1, 0), "the kill is still the best shot"
+	)
+
+
+## The follow-up total credits only friendlies that could actually land a shot,
+## so it routes who-may-shoot through AttackRange.can_engage — not the damage
+## chart raw. A battleship has a chart entry against subs but cannot hit a
+## submerged one, exactly the shot AttackCommand.validate would refuse; crediting
+## its follow-up would over-rank a cruiser's attack on a dived sub. The gate is
+## the dive and only the dive: a cruiser hits submerged and a surfaced sub is an
+## ordinary target, so both of those still count in full.
+##
+## One function rather than three because test_ai_smarts.gd is at the lint's
+## public-method ceiling; the three scenarios read as one claim about the gate.
+func test_follow_up_gates_a_dived_sub_on_can_engage() -> void:
+	var ai := AIController.new(unit_db, _profile())
+	var battleship_board := "[terrain]\nSSSSSSSS\n[units]\n1 c 0 0\n1 B 4 0\n2 s 7 0"
+
+	# A battleship cannot hit a submerged sub, so it adds no follow-up.
+	var dived := _state(battleship_board)
+	var dived_sub := dived.units_of(2)[0]
+	dived_sub.dived = true
+	assert_eq(
+		ai._follow_up_damage(dived, dived.units_of(1)[0], dived_sub),
+		0,
+		"a battleship threatens a dived sub with nothing it could legally land",
+	)
+
+	# The same battleship against a surfaced sub is unchanged: an ordinary target.
+	var surfaced := _state(battleship_board)
+	assert_gt(
+		ai._follow_up_damage(surfaced, surfaced.units_of(1)[0], surfaced.units_of(2)[0]),
+		0,
+		"a surfaced sub is a legal battleship target, so its follow-up still counts",
+	)
+
+	# A cruiser can hit submerged, so a dive does not hide the sub from its follow-up.
+	var hunted := _state("[terrain]\nSSSSSSSS\n[units]\n1 B 0 0\n1 c 6 0\n2 s 7 0")
+	var hunted_sub := hunted.units_of(2)[0]
+	hunted_sub.dived = true
+	assert_gt(
+		ai._follow_up_damage(hunted, hunted.units_of(1)[0], hunted_sub),
+		0,
+		"a cruiser hits submerged, so its follow-up still counts against a dive",
 	)
 
 

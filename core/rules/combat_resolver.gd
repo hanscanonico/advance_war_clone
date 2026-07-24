@@ -153,6 +153,7 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 	defender.hp = maxi(0, defender.hp - result.attack_damage)
 	if defender.hp == 0:
 		result.defender_died = true
+		_bank_cargo_losses(state, defender, attacker.team)
 		state.remove_unit(defender)
 		return result
 	if not _defender_can_counter(state, defender, defender.cell, attacker, attacker.cell):
@@ -177,8 +178,23 @@ static func resolve(state: GameState, attacker: Unit, defender: Unit) -> CombatR
 	attacker.hp = maxi(0, attacker.hp - result.counter_damage)
 	if attacker.hp == 0:
 		result.attacker_died = true
+		_bank_cargo_losses(state, attacker, defender.team)
 		state.remove_unit(attacker)
 	return result
+
+
+## Cargo that drowns with its transport banks the same as if each passenger had
+## been killed in the open: the value basis is the passenger's remaining HP
+## fraction of its cost, split by the same loser/dealer rates bank_losses gives
+## the transport itself. Recurses because remove_unit's erase does — an old save
+## may nest transports even though the load commands now refuse it. This runs
+## before remove_unit so cargo_of can still see the passengers, and stays here in
+## the resolver where every other charge accrual lives; the fuel-crash death in
+## turn_rules erases cargo without a fight and deliberately banks nothing.
+static func _bank_cargo_losses(state: GameState, transport: Unit, dealer_team: int) -> void:
+	for passenger in state.cargo_of(transport):
+		state.bank_losses(passenger, passenger.hp, dealer_team)
+		_bank_cargo_losses(state, passenger, dealer_team)
 
 
 static func _defender_can_counter(

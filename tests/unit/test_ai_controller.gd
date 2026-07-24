@@ -70,6 +70,46 @@ func test_advances_when_out_of_reach() -> void:
 	assert_eq(path[path.size() - 1], Vector2i(6, 0), "move the full 6 toward the enemy")
 
 
+## A property only shelters a damaged unit if it can actually mend it, and repair
+## needs the terrain to service the unit's domain. An airport repairs aircraft,
+## never a tank, so a hurt tank whose team owns only an airport must not adopt it
+## as a retreat goal — parked on tarmac that never heals, it is removed from play.
+## With no servicing property it falls through and presses on toward the enemy.
+func test_hurt_unit_will_not_retreat_to_a_property_that_cannot_repair_it() -> void:
+	var state := _state(
+		"[terrain]\nA.................\n[owners]\n1 0 0\n[units]\n1 t 3 0\n2 t 16 0"
+	)
+	state.units[0].hp = 40  # at or below retreat_hp, so it is fleeing, not advancing
+	var command := ai.plan_next_command(state)
+	assert_true(command is MoveCommand, "expected an advance, got %s" % command)
+	var path: Array[Vector2i] = (command as MoveCommand).path
+	assert_gt(
+		path[path.size() - 1].x,
+		3,
+		"an airport cannot repair a tank, so it is no refuge — the tank advances instead"
+	)
+	assert_eq(command.validate(state), "")
+
+
+## The other half of the same rule: a city services land, so a hurt tank does
+## retreat onto an owned one to be repaired. Guards the fix from over-correcting
+## into never breaking off at all.
+func test_hurt_unit_retreats_to_a_property_that_can_repair_it() -> void:
+	var state := _state(
+		"[terrain]\nC.................\n[owners]\n1 0 0\n[units]\n1 t 3 0\n2 t 16 0"
+	)
+	state.units[0].hp = 40
+	var command := ai.plan_next_command(state)
+	assert_true(command is MoveCommand, "expected a retreat, got %s" % command)
+	var path: Array[Vector2i] = (command as MoveCommand).path
+	assert_eq(
+		path[path.size() - 1],
+		Vector2i(0, 0),
+		"a city repairs land units, so the hurt tank falls back onto it"
+	)
+	assert_eq(command.validate(state), "")
+
+
 func test_waits_when_isolated() -> void:
 	var state := _state("[terrain]\nS.S.\nSSSS\n[units]\n1 t 1 0\n2 t 3 0")
 	var command := ai.plan_next_command(state)

@@ -115,7 +115,11 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 		map_path = DEFAULT_MAP_PATH
 		result.map = MapData.load_from_file(map_path, terrain_db)
 	assert(result.map != null, "failed to load %s" % map_path)
-	result.game = GameState.create(result.map, unit_db, chart)
+	# Commanders resolved *before* the state is built, so the opening side's day-1
+	# begin_turn runs against its real doctrine (a supply radius, a repair discount)
+	# rather than the neutral one it would see if commanders were set afterward.
+	var commanders := _resolve_commanders(result, commander_db, difficulty_db, picked, sides)
+	result.game = GameState.create(result.map, unit_db, chart, commanders)
 	assert(result.game != null, "failed to build game state from %s" % map_path)
 	result.game.map_path = map_path
 	result.game.fog_enabled = fog
@@ -126,26 +130,34 @@ static func build(terrain_db: TerrainDB, unit_db: UnitDB, commander_db: Commande
 		result.game.rng.seed = seed_val
 	else:
 		result.game.rng.randomize()
-	for team: int in picked:
-		result.game.set_commander(team, commander_db.by_id(picked[team]))
-	_apply_side_specs(result, commander_db, difficulty_db, sides)
 	return result
 
 
-## `--red=<co>:<tier>` / `--blue=<co>:<tier>`: the Balance Lab's side grammar,
-## read through the Lab's own parser so a spec means the same thing in the window
-## as it did in the report. Sets each side's commander and records its tier, so
-## the scene can hand each team a planner of its own.
-static func _apply_side_specs(
-	result: BuiltMatch, commander_db: CommanderDB, difficulty_db: DifficultyDB, sides: Dictionary
-) -> void:
+## `--co` / MatchConfig ids together with the Balance Lab's `--red=<co>:<tier>` /
+## `--blue=<co>:<tier>` grammar, resolved to `team -> CommanderType` before the
+## state is built so the opening side's day-1 begin_turn sees its real doctrine.
+## Side specs — read through the Lab's own parser so a spec means the same thing
+## in the window as in the report — win over `--co` for the same team, as they did
+## when both called set_commander in turn; each records its tier so the scene can
+## hand that team a planner of its own.
+static func _resolve_commanders(
+	result: BuiltMatch,
+	commander_db: CommanderDB,
+	difficulty_db: DifficultyDB,
+	picked: Dictionary,
+	sides: Dictionary
+) -> Dictionary:
+	var commanders: Dictionary = {}
+	for team: int in picked:
+		commanders[team] = commander_db.by_id(picked[team])
 	for team: int in sides:
 		var spec := BalanceSideSpec.parse(sides[team], commander_db, difficulty_db)
 		if spec.error != "":
 			push_error("battle: %s" % spec.error)
 			continue
-		result.game.set_commander(team, commander_db.by_id(spec.commander))
+		commanders[team] = commander_db.by_id(spec.commander)
 		result.per_team_difficulty[team] = difficulty_db.by_id(spec.tier)
+	return commanders
 
 
 ## Resolves the tier and makes MatchConfig agree with it, so the id the save

@@ -4,7 +4,10 @@ extends RefCounted
 ##
 ## Rules (Advance Wars):
 ## - Edge cost is the destination terrain's cost for the unit's move class.
-## - Enemy-occupied cells cannot be entered at all.
+## - A cell held by an enemy the moving team can SEE cannot be entered at all.
+## - A cell held by an enemy the moving team cannot see (fogged, dived, or
+##   doctrine-cloaked) is planned through as if empty — the mover does not know
+##   it is there; the ambush springs on commit (see GameState.advance_unit).
 ## - Friendly-occupied cells can be passed through but not stopped on.
 
 const DIRECTIONS: Array[Vector2i] = [
@@ -82,6 +85,11 @@ static func reachable(state: GameState, unit: Unit, extra: int = 0) -> MoveRange
 	result.costs[unit.cell] = 0
 	result.stoppable[unit.cell] = true
 	var budget := move_budget(state, unit, extra)
+	# The mover's visible cells decide whether an enemy on a cell walls or is
+	# planned through. Computed on first need and reused, so a fill that meets no
+	# enemy — and any fill at all with fog off — never pays for it.
+	var visible: Dictionary = {}
+	var visible_computed := false
 	var frontier: Array[Vector2i] = [unit.cell]
 	while not frontier.is_empty():
 		# Maps are small; a linear min-scan beats a heap in simplicity.
@@ -100,8 +108,17 @@ static func reachable(state: GameState, unit: Unit, extra: int = 0) -> MoveRange
 			if step == TerrainType.IMPASSABLE:
 				continue
 			var occupant := state.unit_at(next)
+			var hidden_enemy := false
 			if occupant != null and occupant.team != unit.team:
-				continue
+				if state.fog_enabled and not visible_computed:
+					visible = Vision.visible_cells(state, unit.team)
+					visible_computed = true
+				# A visible enemy is a wall; one the mover cannot see is planned
+				# through as if empty, and looks like a place to stop, because the
+				# mover has no way to know to avoid it — the trap springs on commit.
+				if Vision.can_see_unit(state, unit.team, occupant, visible):
+					continue
+				hidden_enemy = true
 			var next_cost: int = result.costs[current] + step
 			if next_cost > budget:
 				continue
@@ -109,6 +126,6 @@ static func reachable(state: GameState, unit: Unit, extra: int = 0) -> MoveRange
 				continue
 			result.costs[next] = next_cost
 			result.parents[next] = current
-			result.stoppable[next] = occupant == null
+			result.stoppable[next] = occupant == null or hidden_enemy
 			frontier.append(next)
 	return result

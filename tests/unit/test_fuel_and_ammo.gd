@@ -110,6 +110,25 @@ func test_turn_start_resupplies_next_to_apc() -> void:
 	assert_eq(state.units[1].ammo, 9)
 
 
+func test_turn_start_resupplies_carried_passenger() -> void:
+	# A mech aboard a friendly T-Copter is refilled by its transport at
+	# begin_turn, wherever the transport sits; a unit merely beside it is not.
+	var state := _state("[terrain]\n...\n[units]\n1 H 0 0\n1 t 1 0\n1 m 2 0")
+	var mech := state.units[2]
+	mech.carrier = state.units[0]  # aboard the T-Copter
+	mech.fuel = 5
+	mech.ammo = 0
+	var beside := state.units[1]  # adjacent to the transport, on the board
+	beside.fuel = 5
+	beside.ammo = 1
+	EndTurnCommand.new().apply(state)
+	EndTurnCommand.new().apply(state)  # back to red; its begin_turn refills passengers
+	assert_eq(mech.fuel, 70, "the transport refuels its passenger")
+	assert_eq(mech.ammo, 3, "the transport re-ammoes its passenger")
+	assert_eq(beside.fuel, 5, "a unit merely beside the transport is untouched")
+	assert_eq(beside.ammo, 1, "a unit merely beside the transport is untouched")
+
+
 func test_no_resupply_in_the_field() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 t 0 0")
 	state.units[0].fuel = 5

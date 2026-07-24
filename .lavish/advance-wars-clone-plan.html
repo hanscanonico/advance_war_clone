@@ -573,7 +573,12 @@ stateDiagram-v2
           <p class="text-sm">Fog touches rendering, AI, and rules. The mitigation held: every
           "what can this player see" query goes through one <code>Vision</code> API
           (<code>core/rules/vision.gd</code>), so M7 only had to fill it in and let the presentation
-          layer honour it. The sim itself stays permissive and the AI deliberately sees everything.</p>
+          layer honour it. The sim itself stays permissive and the AI deliberately sees everything —
+          with one deliberate exception carried in since: when it plans a <em>move</em> it uses only
+          its own vision, so a unit hidden from it (a fogged enemy, a dived sub it is not next to) can
+          spring an ambush on the mover just as it can on a human. Its <em>targeting</em> stays
+          omniscient bar the doctrine-hidden units it asks <code>is_hidden_from</code> about; only its
+          pathing is fog-limited.</p>
         </div>
       </div>
     </div>

@@ -173,8 +173,10 @@ jumps to that team's first property.
 - Confirming onto a reachable cell held by one of *your* units offers **Load** (board a transport
   with room) or **Join** (merge into a damaged unit of the same type, adding up HP, fuel, and
   ammo). Cancel snaps the mover back, as with any uncommitted move
-- A loaded transport offers **Drop**, which enters a cell picker: the legal unload cells get the
-  blue overlay, and confirming on one puts the passenger out there, exhausted for the turn. What a
+- A loaded transport offers **Drop** — one row per passenger with somewhere legal to step off, so
+  a Lander carrying two shows a row naming each. Choosing one enters a cell picker: that
+  passenger's legal unload cells get the blue overlay, and confirming on one puts it out there,
+  exhausted for the turn. What a
   transport carries is its own: an APC or a T-Copter takes infantry, a Lander takes two of anything
   that drives — and unloads only onto a shoal or a port, since a landing craft cannot tip a tank
   over the side mid-channel. **Supply** refills every friendly unit within the APC's supply reach —
@@ -183,7 +185,8 @@ jumps to that team's first property.
   that step cheaper, so you are never billed more than the range overlay showed; attacking spends
   one ammo, and so does each counter-attack, so a dry unit can neither fire nor counter. At the
   start of your turn every unit standing on a property that services it, or in reach of one of your
-  APCs, is refilled. Which property services what is the point: a city refits vehicles, an airport
+  APCs, is refilled — and a transport tops up every unit riding aboard it. Which property services
+  what is the point: a city refits vehicles, an airport
   aircraft, a port hulls, and none of them does another's job
 - A submarine adds one row of its own: **Dive** takes it under, **Surface** brings
   it back. Submerged, only a Cruiser or another Sub can engage it, and it is
@@ -272,12 +275,20 @@ lengthen their own units' sight, see into cover at range, jam the enemy's sight 
 their units outright on a tile you can otherwise see. Vision is recomputed after each committed
 action and turn change, not as the cursor moves.
 
-A submerged submarine is the one thing hidden with fog switched off entirely —
-see Dive above. Everything else here needs fog to be on.
+A hidden enemy can also **ambush** a move: paths are planned with the mover's own vision, so a
+committed move that runs onto or through an enemy you could not see stops your unit at the last
+free cell short of it under an "Ambush!" banner — fuel is spent only for the steps actually
+walked, and whatever the move was bound to (an attack, a capture, a drop) is called off.
 
-The view is always *your* team's, including while the AI plays. The AI itself sees the whole
-board — an openly cheating opponent, not a guessing one — with one deliberate exception: a unit a
-doctrine has hidden is hidden from it too, so an invisibility power is not inert against it.
+A submerged submarine is the one thing hidden with fog switched off entirely —
+see Dive above (it springs the same ambush). Everything else here needs fog to be on.
+
+The view is always *your* team's, including while the AI plays — a computer move made entirely
+inside your fog is applied silently, with no cursor, camera pan or footsteps to give it away. The
+AI itself sees the whole board — an openly cheating opponent, not a guessing one — with two
+deliberate exceptions: a unit a doctrine has hidden is hidden from it too, so an invisibility
+power is not inert against it; and it plans and walks its moves with only its own vision, so a
+unit it cannot see can ambush it exactly as one can ambush you.
 In a fogged hot-seat match a handoff
 screen blanks the board between turns so the incoming player never sees the outgoing one's
 vision.

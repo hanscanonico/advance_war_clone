@@ -40,5 +40,7 @@ func validate(state: GameState) -> String:
 
 func apply(state: GameState) -> void:
 	var target := state.unit_at(target_cell)
-	state.advance_unit(unit, path)
+	ambushed = state.advance_unit(unit, path)
+	if ambushed:
+		return  # the move stopped short of the firing cell; the shot is off
 	result = CombatResolver.resolve(state, unit, target)

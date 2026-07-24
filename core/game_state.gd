@@ -46,8 +46,17 @@ var map_path := ""
 ## Builds the starting state from a parsed map. Returns null (with a pushed
 ## error) if any starting unit is invalid. The damage chart is optional for
 ## states that never resolve combat (e.g. movement-only tests).
+##
+## `p_commanders` (team -> CommanderType) is assigned *before* the opening
+## begin_turn, so the first player's day-1 start-of-turn doctrine — a supply
+## radius, a repair discount — is resolved against its real commander rather
+## than the neutral one. Callers that name commanders must pass them here, not
+## set_commander after: begin_turn only runs once, and it runs inside create.
 static func create(
-	p_map: MapData, unit_db: UnitDB, p_damage_chart: DamageChart = null
+	p_map: MapData,
+	unit_db: UnitDB,
+	p_damage_chart: DamageChart = null,
+	p_commanders: Dictionary = {}
 ) -> GameState:
 	var state := GameState.new()
 	state.map = p_map
@@ -73,6 +82,8 @@ static func create(
 			)
 			return null
 		state.units.append(Unit.create(type, entry.team, cell))
+	for team: int in p_commanders:
+		state.set_commander(team, p_commanders[team])
 	TurnRules.begin_turn(state)  # day-1 income and upkeep for the first player
 	return state
 
@@ -158,8 +169,11 @@ func remove_unit(unit: Unit) -> void:
 	for passenger in cargo_of(unit):
 		remove_unit(passenger)
 	units.erase(unit)
-	# A dying unit abandons any capture in progress.
-	capture_progress.erase(unit.cell)
+	# A dying unit abandons any capture in progress. A passenger owns no cell of
+	# its own — its stored cell is stale from wherever it last boarded — so it can
+	# hold no capture, and erasing by that cell would wipe an unrelated one.
+	if unit.carrier == null:
+		capture_progress.erase(unit.cell)
 	_check_rout(unit.team)
 
 
@@ -184,21 +198,41 @@ func properties_of(team: int) -> Array[Vector2i]:
 ## resets to the full point count, fuel is spent per terrain cost, cargo rides
 ## along, and the unit is exhausted. Sole move-commit entry point, shared by
 ## every movement-type command's apply.
-func advance_unit(unit: Unit, path: Array[Vector2i]) -> void:
-	var dest: Vector2i = path[path.size() - 1]
-	if dest != path[0]:
-		capture_progress.erase(path[0])
-	var fuel_spent := 0
+##
+## The path was planned with the mover's knowledge, so it may run onto or through
+## an enemy the mover could not see (fogged, or a dived sub it was not next to).
+## When it does, the move is cut short at the last free cell before that enemy —
+## the Advance Wars trap — and the return says so, telling the caller to drop any
+## follow-on it had bound to the move. Fuel is charged only for the steps taken.
+func advance_unit(unit: Unit, path: Array[Vector2i]) -> bool:
+	var stop := path.size() - 1
+	var ambushed := false
 	for i in range(1, path.size()):
+		var blocker := unit_at(path[i])
+		if blocker != null and blocker.team != unit.team:
+			ambushed = true
+			# Never end on a cell a friendly is passing-through, nor past the
+			# origin: back up to the last cell that is actually free to stand on.
+			stop = i - 1
+			while stop > 0 and unit_at(path[stop]) != null:
+				stop -= 1
+			break
+	var walked: Array[Vector2i] = path.slice(0, stop + 1)
+	var dest: Vector2i = walked[walked.size() - 1]
+	if dest != walked[0]:
+		capture_progress.erase(walked[0])
+	var fuel_spent := 0
+	for i in range(1, walked.size()):
 		# Through MovementResolver, not the terrain directly, so a doctrine that
 		# discounts terrain charges the discounted fuel too — the player is never
 		# billed for a step the range overlay showed them as cheaper.
-		fuel_spent += MovementResolver.step_cost(self, unit, map.terrain_at(path[i]))
+		fuel_spent += MovementResolver.step_cost(self, unit, map.terrain_at(walked[i]))
 	unit.fuel = maxi(0, unit.fuel - fuel_spent)
 	unit.cell = dest
 	unit.acted = true
 	for passenger in cargo_of(unit):
 		passenger.cell = dest
+	return ambushed
 
 
 func next_team() -> int:
