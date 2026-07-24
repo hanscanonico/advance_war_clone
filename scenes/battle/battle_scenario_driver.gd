@@ -228,7 +228,7 @@ func _run_transport_demo(mode: String) -> void:
 	_battle.confirm_at(Vector2i(3, 3))  # select the loaded APC
 	_battle.confirm_at(Vector2i(3, 5))  # drive it south
 	await _until_state(Battle.State.MENU)
-	_battle.action_menu.choose(&"drop")
+	_battle.action_menu.choose(&"drop_0")  # rows are per-passenger now (see BattleMenus)
 	await _until_state(Battle.State.DROP_TARGETING)
 	if mode == "drop":
 		return
