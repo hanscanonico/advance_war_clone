@@ -377,6 +377,42 @@ func _visible_unit_at(cell: Vector2i) -> Unit:
 	return unit
 
 
+## Adjacent cells where `transport` (previewed at `dest`) could set `passenger`
+## down: the transport must be somewhere it can unload from, the passenger must be
+## able to stand on the cell, and the cell must hold no friendly and no visible
+## enemy. The vacated origin counts as free, and a hidden enemy is left to foil the
+## drop on apply rather than shown here, which would reveal it. A per-passenger
+## query because a Lander's two riders need not share a move class. Underscored
+## for the same reason as `_can_see_cell` below: Battle is the only caller and
+## the view is at its public-method ceiling.
+func _drop_cells(transport: Unit, dest: Vector2i, passenger: Unit) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	if passenger == null or not transport.type.can_unload_from(map.terrain_at(dest).id):
+		return cells
+	for dir in MovementResolver.DIRECTIONS:
+		var cell := dest + dir
+		var terrain := map.terrain_at(cell)
+		if terrain == null or not terrain.is_passable(passenger.type.move_class):
+			continue
+		var occupant := game.unit_at(cell)
+		if occupant != null and occupant != transport and can_see_unit(occupant):
+			continue
+		cells.append(cell)
+	return cells
+
+
+## The transport's cargo that has at least one legal drop cell from `dest`, in load
+## order. Empty when nothing aboard can step off here — which is how Battle knows
+## whether to offer a Drop, and per passenger so each gets its own menu row.
+## Underscored with its sibling above; Battle is the only caller.
+func _droppable_passengers(transport: Unit, dest: Vector2i) -> Array[Unit]:
+	var droppable: Array[Unit] = []
+	for passenger in game.cargo_of(transport):
+		if not _drop_cells(transport, dest, passenger).is_empty():
+			droppable.append(passenger)
+	return droppable
+
+
 ## Whether the viewing team may see activity on `cell` — the single authority in
 ## the view for cell-scoped visibility, as `can_see_unit` is for a unit. Ask it
 ## before disclosing anything a hidden unit could be doing on the tile, such as a

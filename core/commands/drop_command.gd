@@ -12,12 +12,19 @@ extends Command
 var unit: Unit  # the transport
 var path: Array[Vector2i]
 var drop_cell: Vector2i
+## Which passenger to unload. Left null it means the first loaded, which is what a
+## single-slot transport always drops; a Lander holds two, and either might be the
+## one that can stand where the other cannot, so the caller names it explicitly.
+var passenger: Unit
 
 
-func _init(p_unit: Unit, p_path: Array[Vector2i], p_drop_cell: Vector2i) -> void:
+func _init(
+	p_unit: Unit, p_path: Array[Vector2i], p_drop_cell: Vector2i, p_passenger: Unit = null
+) -> void:
 	unit = p_unit
 	path = p_path
 	drop_cell = p_drop_cell
+	passenger = p_passenger
 
 
 func validate(state: GameState) -> String:
@@ -27,6 +34,9 @@ func validate(state: GameState) -> String:
 	var cargo := state.cargo_of(unit)
 	if cargo.is_empty():
 		return "nothing to drop"
+	var rider := _rider(cargo)
+	if rider == null:
+		return "unit is not aboard"
 	var dest: Vector2i = path[path.size() - 1]
 	if not unit.type.can_unload_from(state.map.terrain_at(dest).id):
 		return "cannot unload here"
@@ -34,7 +44,7 @@ func validate(state: GameState) -> String:
 	if dist != 1:
 		return "drop cell must be adjacent"
 	var terrain := state.map.terrain_at(drop_cell)
-	if terrain == null or not terrain.is_passable(cargo[0].type.move_class):
+	if terrain == null or not terrain.is_passable(rider.type.move_class):
 		return "cargo cannot stand there"
 	var occupant := state.unit_at(drop_cell)
 	if occupant != null and occupant != unit:
@@ -51,13 +61,22 @@ func validate(state: GameState) -> String:
 
 
 func apply(state: GameState) -> void:
-	var passenger: Unit = state.cargo_of(unit)[0]
+	var rider := _rider(state.cargo_of(unit))
 	ambushed = state.advance_unit(unit, path)
 	# The move can stop short of where the drop was planned, or the drop cell can
 	# turn out to hold a hidden enemy: either way the passenger stays aboard.
 	if ambushed or state.unit_at(drop_cell) != null:
 		ambushed = true
 		return
-	passenger.carrier = null
-	passenger.cell = drop_cell
-	passenger.acted = true
+	rider.carrier = null
+	rider.cell = drop_cell
+	rider.acted = true
+
+
+## The passenger this drop unloads: the one named when it is genuinely aboard,
+## else the first loaded when none was named. Null when a passenger was named that
+## this transport is not carrying, which `validate` refuses.
+func _rider(cargo: Array[Unit]) -> Unit:
+	if passenger == null:
+		return cargo[0]
+	return passenger if cargo.has(passenger) else null

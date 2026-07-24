@@ -69,6 +69,8 @@ var move_range: MovementResolver.MoveRange
 var planned_path: Array[Vector2i] = []
 var _attack_targets: Array[Vector2i] = []
 var _drop_targets: Array[Vector2i] = []
+## The passenger the chosen Drop row unloads; cleared with the targeting state.
+var _drop_passenger: Unit
 var _pending_special_actions: Array[Dictionary] = []
 var _menu_context: StringName = &"unit"
 var _build_cell := Vector2i.ZERO
@@ -324,6 +326,7 @@ func _cancel() -> void:
 	elif state == State.DROP_TARGETING:
 		view.paint_move_overlay([])
 		_drop_targets = []
+		_drop_passenger = null
 		_on_move_animation_done()  # back to the unit menu
 
 
@@ -375,7 +378,7 @@ func _on_move_animation_done() -> void:
 		selected,
 		planned_path,
 		not _attack_targets.is_empty(),
-		not _drop_cells(dest).is_empty()
+		view._droppable_passengers(selected, dest)
 	)
 	action_menu.open(actions, view.screen_pos_for_cell(dest))
 
@@ -392,11 +395,13 @@ func _on_menu_action(action: StringName) -> void:
 
 
 func _handle_unit_action(action: StringName) -> void:
+	if String(action).begins_with("drop_"):
+		# The row's id carries which passenger it unloads (see BattleMenus).
+		_enter_drop_targeting(String(action).trim_prefix("drop_").to_int())
+		return
 	match action:
 		&"fire":
 			_enter_targeting()
-		&"drop":
-			_enter_drop_targeting()
 		&"load":
 			# The refresh inside _commit hides the boarded sprite.
 			_commit(action, LoadCommand.new(selected, planned_path))
@@ -730,48 +735,34 @@ func _exit_targeting_to_menu() -> void:
 # --- transport flow ----------------------------------------------------------
 
 
-## Adjacent cells where the selected transport (previewed at `dest`) could
-## unload its passenger, empty when it is somewhere it cannot unload from at all.
-## The vacated origin cell counts as free.
-func _drop_cells(dest: Vector2i) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	var cargo := game.cargo_of(selected)
-	if cargo.is_empty() or not selected.type.can_unload_from(map.terrain_at(dest).id):
-		return cells
-	for dir in MovementResolver.DIRECTIONS:
-		var cell := dest + dir
-		var terrain := map.terrain_at(cell)
-		if terrain == null or not terrain.is_passable(cargo[0].type.move_class):
-			continue
-		var occupant := game.unit_at(cell)
-		if occupant != null and occupant != selected and view.can_see_unit(occupant):
-			continue  # a hidden enemy foils the drop on apply, not in the overlay
-		cells.append(cell)
-	return cells
-
-
-func _enter_drop_targeting() -> void:
+## The menu row named the passenger by its index into the droppable list; the
+## drop-cell overlay and the command are built for exactly that rider. The cell
+## math lives on the view (_drop_cells), which knows the viewer's fog.
+func _enter_drop_targeting(index: int) -> void:
 	state = State.DROP_TARGETING
-	_drop_targets = _drop_cells(planned_path[planned_path.size() - 1])
+	var dest: Vector2i = planned_path[planned_path.size() - 1]
+	_drop_passenger = view._droppable_passengers(selected, dest)[index]
+	_drop_targets = view._drop_cells(selected, dest, _drop_passenger)
 	view.paint_move_overlay(_drop_targets)
 	set_cursor_cell(_drop_targets[0])
 
 
 func _execute_drop(drop_cell: Vector2i) -> void:
-	var command := DropCommand.new(selected, planned_path, drop_cell)
+	var command := DropCommand.new(selected, planned_path, drop_cell, _drop_passenger)
 	var error := command.validate(game)
 	if error != "":
 		# The UI only offers legal drops, so this is a bug guard.
 		push_error("DropCommand rejected: %s" % error)
 		_cancel()
 		return
-	var passenger: Unit = game.cargo_of(selected)[0]
+	var passenger: Unit = _drop_passenger
 	var transport := selected
 	command.apply(game)
 	EventBus.unit_moved.emit(transport)
 	animator.settle_move(command, transport)
 	view.refresh_sprite(passenger)  # reappears, exhausted, at the drop cell (or stays aboard)
 	_drop_targets = []
+	_drop_passenger = null
 	_clear_selection()
 	_refresh_panel()
 
