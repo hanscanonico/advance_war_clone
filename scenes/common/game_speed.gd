@@ -38,9 +38,11 @@ const BASE_DEATH_FADE_SECONDS := 0.25
 const BASE_COMMAND_DELAY_SECONDS := 0.2
 ## Banners are information, not theatre: they hold at a readable length whatever
 ## the tier and only tighten under Instant, because whose day it is must still
-## register even when nothing else is being shown.
+## register even when nothing else is being shown. The power banner holds longer
+## than the day banner because its card opens with the general's spoken line
+## (plan PQ1) — a sentence needs more of a beat than a title.
 const BANNER_SECONDS := 1.2
-const POWER_BANNER_SECONDS := 1.1
+const POWER_BANNER_SECONDS := 1.5
 const INSTANT_BANNER_SECONDS := 0.5
 ## The AI opens its turn just after the day banner has cleared, so its opening
 ## beat tracks whatever the banner holds for at this tier rather than fixing a

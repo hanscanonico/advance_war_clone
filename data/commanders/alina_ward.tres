@@ -10,6 +10,7 @@ faction = "Meridian Coalition"
 doctrine_text = "+10% attack when adjacent to a friendly unit of a different movement class."
 power_name = "Coordinated Push"
 power_text = "All units +1 movement, +10% attack and +10% defence this turn."
+power_quotes = Array[String](["All units, advance as one. No one fights alone today.", "Every axis, every echelon — push!", "This is what coordination buys. Forward!"])
 power_cost = 14000
 power_duration = 0
 combined_arms_pct = 10

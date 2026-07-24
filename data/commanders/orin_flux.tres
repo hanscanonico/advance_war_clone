@@ -10,6 +10,7 @@ faction = "Aurora Compact"
 doctrine_text = "Recon and APC +1 vision."
 power_name = "Signal Jam"
 power_text = "Enemies lose 10 fuel and 1 ammo, and -1 vision until your next turn."
+power_quotes = Array[String](["Enjoy the static.", "Your orders just got lost in the noise.", "All their channels, silent. All of ours, singing."])
 power_cost = 11000
 power_duration = 1
 scout_ids = Array[StringName]([&"recon", &"apc"])

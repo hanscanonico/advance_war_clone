@@ -10,6 +10,7 @@ faction = "Meridian Coalition"
 doctrine_text = "APCs supply from 2 tiles away. Property repairs cost 20% less."
 power_name = "Open the Depots"
 power_text = "Every unit refills fuel and ammo, and heals 1 HP."
+power_quotes = Array[String](["Depots open! Fuel, shells, and a hot meal all round.", "Wars are won by the army still supplied to fight one.", "Take what you need — today the ledger's on me."])
 power_cost = 10000
 power_duration = 0
 apc_supply_range = 2

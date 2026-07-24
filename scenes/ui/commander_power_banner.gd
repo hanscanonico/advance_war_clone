@@ -1,20 +1,39 @@
 class_name CommanderPowerBanner
 extends PanelContainer
-## The Command Power activation card: a portrait, the power's name, and its exact
-## effect text, faction-tinted, shown center-screen for a beat when a power fires.
-## The third and largest density of the shared card component (plan G1); it reads
-## the same CommanderType and CommanderVisuals as the select card and HUD chip, so
-## the three never disagree about a commander's face, colour, or copy.
+## The Command Power activation card: a portrait, the general's spoken line, the
+## power's name, and its exact effect text, faction-tinted, shown center-screen
+## for a beat when a power fires. The third and largest density of the shared
+## card component (plan G1); it reads the same CommanderType and CommanderVisuals
+## as the select card and HUD chip, so the three never disagree about a
+## commander's face, colour, or copy.
+##
+## The quote is the card's headline and reads as the portrait speaking (plan PQ1:
+## face left, words right — a quote never appears without the bust beside it).
+## Lines rotate per side by activation count, never by RNG, so a replayed match
+## speaks the same words and a captured activation is always the same frame. A
+## commander with no quotes gets today's card unchanged: label hidden, power name
+## back at full size.
 ##
 ## Pure presentation, and deliberately inert as far as the sim is concerned: it is
 ## populated from the already-fired PowerCommand's event and only *shows* what the
 ## power did. It may briefly gate input while it holds, but it never owns or
 ## alters simulation state — save/replay determinism stays entirely in core/.
 
+## The headline hierarchy: with a quote on the card the power name steps down so
+## the general's words lead; without one it keeps the size it always had.
+const _QUOTE_SIZE := 16
+const _POWER_NAME_SIZE := 22
+const _POWER_NAME_QUOTED_SIZE := 13
+
 var _built := false
+## Activations announced so far, per team — the rotation index for the next
+## quote. Scene-lifetime state: a loaded save restarts the rotation, which is
+## cosmetic by construction.
+var _spoken: Dictionary = {}
 var _field: Panel
 var _portrait: TextureRect
 var _eyebrow: Label
+var _quote: Label
 var _power_name: Label
 var _power_text: Label
 
@@ -56,11 +75,17 @@ func _build() -> void:
 
 	_eyebrow = _mono(9, Color(0.431, 0.463, 0.482))
 	copy.add_child(_eyebrow)
-	_power_name = _mono(22, Color(0.667, 0.224, 0.184))
+	# A fixed wrap width for the two autowrap Labels, so each computes a sane min
+	# height instead of reporting the pathological "one word per line" height
+	# that would balloon the whole banner.
+	_quote = Label.new()
+	_quote.custom_minimum_size = Vector2(300, 0)
+	_quote.add_theme_font_size_override("font_size", _QUOTE_SIZE)
+	_quote.add_theme_color_override("font_color", CommanderVisuals.PAPER_INK)
+	_quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.add_child(_quote)
+	_power_name = _mono(_POWER_NAME_SIZE, Color(0.667, 0.224, 0.184))
 	copy.add_child(_power_name)
-	# A fixed wrap width, so the autowrap Label computes a sane min height instead
-	# of reporting the pathological "one word per line" height that would balloon
-	# the whole banner.
 	_power_text = Label.new()
 	_power_text.custom_minimum_size = Vector2(300, 0)
 	_power_text.add_theme_font_size_override("font_size", 11)
@@ -71,7 +96,7 @@ func _build() -> void:
 	_built = true
 
 
-func bind(commander: CommanderType) -> void:
+func bind(commander: CommanderType, team: int) -> void:
 	if not _built:
 		_build()
 	var theme := CommanderVisuals.theme_for(commander)
@@ -79,9 +104,27 @@ func bind(commander: CommanderType) -> void:
 	_field.add_theme_stylebox_override("panel", _flat(theme.color))
 	_portrait.texture = CommanderVisuals.portrait_for(commander)
 	_eyebrow.text = "%s · COMMAND POWER" % commander.display_name.to_upper()
+	var line := _next_quote(commander, team)
+	_quote.visible = not line.is_empty()
+	_quote.text = "“%s”" % line
 	_power_name.text = commander.power_name.to_upper()
+	_power_name.add_theme_font_size_override(
+		"font_size", _POWER_NAME_SIZE if line.is_empty() else _POWER_NAME_QUOTED_SIZE
+	)
 	_power_name.add_theme_color_override("font_color", theme.color_dark)
 	_power_text.text = commander.power_text
+
+
+## The next line in this side's rotation. Activation count picks quotes in
+## order — deliberately not randf(), in the tradition of shake_camera's note
+## about game.rng: a replayed match must speak the same words, and the scenario
+## gallery's activation #1 must always photograph the same frame.
+func _next_quote(commander: CommanderType, team: int) -> String:
+	if commander.power_quotes.is_empty():
+		return ""
+	var count: int = _spoken.get(team, 0)
+	_spoken[team] = count + 1
+	return commander.power_quotes[count % commander.power_quotes.size()]
 
 
 func _mono(size: int, color: Color) -> Label:

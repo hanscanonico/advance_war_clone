@@ -10,6 +10,7 @@ faction = "Iron Dominion"
 doctrine_text = "Tanks and Md Tanks +15% attack. Infantry and Mechs -10% attack."
 power_name = "Armoured Breakthrough"
 power_text = "Tread units +1 movement and ignore one terrain defence star when attacking."
+power_quotes = Array[String](["Treads forward! Armour makes its own roads.", "Their cover is gravel under my columns.", "Breakthrough! Don't slow. Don't turn."])
 power_cost = 13000
 power_duration = 0
 armour_ids = Array[StringName]([&"tank", &"md_tank"])

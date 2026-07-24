@@ -10,6 +10,7 @@ faction = "Iron Dominion"
 doctrine_text = "Direct units +20% counterattack damage, -10% when initiating."
 power_name = "Hold the Line"
 power_text = "+30% defence and +40% counter damage through the opponent's next turn."
+power_quotes = Array[String](["Come on, then. The line does not move.", "Every blow you land comes back with interest.", "Stand fast. Steel does not step back."])
 power_cost = 13000
 power_duration = 1
 counter_attack_pct = 20

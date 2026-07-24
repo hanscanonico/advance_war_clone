@@ -542,7 +542,7 @@ func _fire_command_power() -> void:
 ## fires powers through the same command and should look the same doing it.
 func _announce_power(fired: PowerCommand) -> void:
 	Sfx.play(&"fanfare")
-	animator.show_power_banner(fired.commander)
+	animator.show_power_banner(fired.commander, fired.team)
 	EventBus.power_activated.emit(fired.team, fired.commander)
 
 

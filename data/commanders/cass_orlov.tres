@@ -10,6 +10,7 @@ faction = "Iron Dominion"
 doctrine_text = "+15% attack against enemies at 5 HP or below, -10% defence."
 power_name = "No Escape"
 power_text = "+30% attack against damaged enemies; Recon and Tanks +1 movement."
+power_quotes = Array[String](["They're bleeding. Run them down.", "No retreat. No rescue. No escape.", "Wounded prey runs slow."])
 power_cost = 12000
 power_duration = 0
 finish_hp = 5
