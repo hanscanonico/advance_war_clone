@@ -85,6 +85,7 @@ DEFAULT_MODES=(
 	power_ready power_active power_banner commander_info commander_victory
 	cutin cutin_ko cutin_skip
 	cutin:bomber:tank cutin:sub:cruiser cutin:cruiser:sub cutin:artillery:mech
+	capture_cutin capture_cutin_partial capture_cutin_skip
 )
 
 if [[ ! -x "$GODOT" ]]; then
