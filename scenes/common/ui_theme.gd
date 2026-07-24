@@ -263,8 +263,8 @@ static func apply_button(
 		"hover", _button_box(_brighten(fill, ghost), border, not ghost)
 	)
 	button.add_theme_stylebox_override("pressed", _pressed_box(fill, border))
-	button.add_theme_stylebox_override("disabled", _disabled_box(fill, border, not ghost))
-	button.add_theme_stylebox_override("focus", focus_box())
+	button.add_theme_stylebox_override("disabled", _disabled_box(fill, border))
+	button.add_theme_stylebox_override("focus", focus_box(WHITE))
 
 	button.add_theme_color_override("font_color", fg)
 	button.add_theme_color_override("font_hover_color", fg)
@@ -302,10 +302,9 @@ static func _pressed_box(fill: Color, border: Color) -> StyleBoxFlat:
 	return box
 
 
-static func _disabled_box(fill: Color, border: Color, shadow: bool) -> StyleBoxFlat:
+static func _disabled_box(fill: Color, border: Color) -> StyleBoxFlat:
 	var faded := Color(fill.r, fill.g, fill.b, fill.a * 0.45)
-	var box := _button_box(_desaturate(faded), border, shadow)
-	return box
+	return _button_box(_desaturate(faded), border, false)
 
 
 # --- small colour maths ------------------------------------------------------

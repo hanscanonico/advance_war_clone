@@ -334,6 +334,8 @@ func _build_choices_row() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 
+	if _difficulties.is_empty():
+		push_error("main menu: no difficulty tiers found in %s" % DifficultyDB.DIFFICULTY_DIR)
 	var diff_labels := PackedStringArray()
 	var diff_selected := 0
 	for i in _difficulties.size():
@@ -343,7 +345,15 @@ func _build_choices_row() -> Control:
 	_difficulty_index = diff_selected
 	var meridian := UiTheme.menu_identity().theme(1)
 	var difficulty := _build_segment(
-		"Difficulty", diff_labels, diff_selected, meridian.color, _on_difficulty_selected
+		"Difficulty",
+		diff_labels,
+		diff_selected,
+		meridian.color,
+		(
+			"How well the computer plays.\nSame rules, economy and dice at every tier — only its\n"
+			+ "judgement changes. Ignored in a 2-Player hot-seat."
+		),
+		_on_difficulty_selected
 	)
 	difficulty.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(difficulty)
@@ -355,7 +365,15 @@ func _build_choices_row() -> Control:
 		if _speed_tiers[i].id == Settings.speed.id:
 			speed_selected = i
 	var speed := _build_segment(
-		"Speed", speed_labels, speed_selected, meridian.color, _on_speed_selected
+		"Speed",
+		speed_labels,
+		speed_selected,
+		meridian.color,
+		(
+			"How fast moves and battles play out on screen.\nNever changes an outcome — pacing "
+			+ "only. Changeable\nany time from the in-battle menu."
+		),
+		_on_speed_selected
 	)
 	speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(speed)
@@ -409,7 +427,7 @@ func _build_action_stack(animate: bool) -> Control:
 	chips.add_theme_constant_override("separation", 4)
 	chips.alignment = BoxContainer.ALIGNMENT_CENTER
 	chips.add_child(_identity_chip(identity, 1, "P1"))
-	chips.add_child(_identity_chip(identity, 2, "AI"))
+	chips.add_child(_identity_chip(identity, 2, "P2"))
 	col.add_child(chips)
 
 	_press_start = Label.new()
@@ -448,10 +466,16 @@ func _action_button(
 ## the authority that owns them (GameSpeed / DifficultyDB), never typed in, so the
 ## control can never disagree with the tiers it drives (plan section 2).
 func _build_segment(
-	micro: String, labels: PackedStringArray, selected: int, accent: Color, on_select: Callable
+	micro: String,
+	labels: PackedStringArray,
+	selected: int,
+	accent: Color,
+	tooltip: String,
+	on_select: Callable
 ) -> Control:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 3)
+	col.tooltip_text = tooltip
 	col.add_child(_micro_label(micro))
 
 	var frame := PanelContainer.new()
@@ -472,6 +496,7 @@ func _build_segment(
 		seg.text = labels[i]
 		seg.toggle_mode = true
 		seg.clip_text = true
+		seg.tooltip_text = tooltip
 		seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		seg.custom_minimum_size = Vector2(0, 18)
 		seg.add_theme_font_override("font", UiTheme.display())
