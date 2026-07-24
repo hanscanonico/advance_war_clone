@@ -238,7 +238,8 @@ match with neither plays exactly as the game did before commanders existed.
 the damage — halving a 7 000 Tank is worth 3 500 points. The side that *loses* the HP banks all
 of it; the side that dealt it banks half, so winning the field does not run away with the meter
 as well. The meter is capped at what that general's power costs, so it never holds a second
-power's worth.
+power's worth. And a side whose power is *running* banks nothing, dealt or lost, until it comes
+down — every power is re-earned from empty, not refilled by the fighting it enables.
 
 **Firing.** When the meter fills, the HUD **Power** button lights up and the map menu (confirm on
 an empty tile) lists the power as its first entry. Firing spends the whole cost and raises the

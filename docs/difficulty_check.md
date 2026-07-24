@@ -11,9 +11,11 @@ Normal at all**. Details and the reasoning below — read §4 before changing a
 weight, and §5 before deciding what to do about it.
 
 **The recorded numbers are also out of date.** They were measured before this
-branch's later planner fixes — §4 says which. Both tiers plan differently now, so
-`make difficulty-check` must be re-run and its output committed over §4 before the
-standings are quoted again.
+branch's later planner fixes — §4 says which — and before the charge-meter fix
+that stopped a team from banking charge while its own power is active, which
+slows power cadence for every commander at every tier. Both tiers plan
+differently now, so `make difficulty-check` must be re-run and its output
+committed over §4 before the standings are quoted again.
 
 ## 1. What difficulty is allowed to change
 
