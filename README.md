@@ -133,9 +133,9 @@ The game boots to the menu: pick a map, a **Difficulty** and a **Speed**, toggle
 and **Battle animations** (the full-screen combat and capture cut-ins — a saved preference, on by
 default),
 then start a **1 Player** match against the AI or a **2 Player** hot-seat game. Either opens the
-**commander selection page**; **Continue** appears only when a save exists and skips selection,
-resuming the save with its own map, fog setting, difficulty, commanders, and AI sides. **Quit**
-exits.
+**commander selection page**; **Continue** skips selection and resumes the save with its own map,
+fog setting, difficulty, commanders, and AI sides — it is greyed out (disabled, not hidden) when no
+save exists. **Quit** exits.
 
 On the selection page you pick **side 1**'s commander, confirm, then **side 2**'s, confirm — the
 turn chips preview each side's faction name and colour as you browse, mirror rule included. Four
