@@ -1,10 +1,11 @@
 # CLAUDE.md
 
 Guidance for AI agents (and humans) working in this repository.
+`AGENTS.md` is a symlink to this file — edit only `CLAUDE.md`; both names stay in sync.
 
 ## Project
 
-An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with **GDScript**.
+An **Advance Wars-style turn-based tactics game** built in **Godot 4.7+** with **GDScript**.
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
@@ -126,7 +127,7 @@ three movement domains (land, air, sea), property capture and income, and a comp
   presentation-only (D5): clicking a unit you cannot command previews its move range and **R** paints
   its fire ring, both pure reads gated by the same `view.can_see_unit` fog rule targeting uses, so
   nothing under `core/` or `ai/` learns the overlay exists and `make screenshot` stays byte-stable.
-- **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
+- **Engine:** Godot 4.7+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
 > Legal: this is a *reimplementation of mechanics*, not a copy. No Nintendo sprites, music,
@@ -165,15 +166,17 @@ res://
 │              # battle_anim/ (weapon signatures), damage_chart
 ├─ scenes/
 │  ├─ battle/   # battle.tscn, cursor, unit_sprite
-│  │  └─ cutscene/  # the combat cut-in and the BattleStyle class it reads
+│  │  └─ cutscene/  # the combat & capture cut-ins and the BattleStyle they read
 │  ├─ menu/     # main_menu.tscn — map and commander select, match options
-│  ├─ common/   # helpers shared by both scenes
+│  ├─ common/   # helpers shared by both scenes (SideIdentity, GameSpeed, …)
 │  └─ ui/       # menus, panels, damage preview
 ├─ autoload/    # singletons: EventBus, MatchConfig, Settings, Sfx
 ├─ ai/          # ai_controller.gd — plans Commands; ai_profile.gd — its weights
 │              (NO Node references)
 ├─ maps/        # map scenes / map resources
 ├─ assets/      # sprites, audio, fonts  (+ LICENSES.md)
+├─ tools/       # offline scripts: balance harness (tools/balance/), art & sfx pipeline
+├─ docs/        # balance_sim.md, commander_balance.md, difficulty_check.md
 └─ tests/       # GUT tests — target the Node-free layers only (see Testing)
 ```
 
@@ -190,7 +193,7 @@ Follow the official Godot GDScript style guide. Key points:
 - **Private** members and methods are prefixed with `_` (`_recalculate_range()`).
 - **Signals** are named in past tense (`unit_moved`, `unit_damaged`, `turn_ended`) and declared
   with typed parameters. Emit domain events from the sim; the presentation layer subscribes.
-- Prefer **composition and small resolvers** (`MovementResolver`, `CombatResolver`, `CaptureRules`)
+- Prefer **composition and small resolvers** (`MovementResolver`, `CombatResolver`, `AttackRange`)
   over god-objects.
 - Use `@export` for inspector-editable fields on Resources/Nodes; validate in code, don't trust it.
 - Don't `preload`/`load` scene or Node types inside `core/`.
@@ -210,6 +213,13 @@ Follow the official Godot GDScript style guide. Key points:
 
 Run the suite with `make test` — it runs GUT headless against `tests/unit` via `.gutconfig.json`.
 See README.md for engine setup and the other `make` targets.
+
+Before a change is done, run `make verify` — the aggregate gate it chains, in order: `check`
+(`tools/check_scripts.sh`, a lightweight script audit), `lint` (`gdlint`), `format-check`
+(`gdformat --check`), then the GUT suite. `make format` rewrites files to satisfy `format-check`,
+and any gate also runs alone (`make lint`, `make test`, …). GDScript is tab-indented — let
+`gdformat` settle whitespace rather than hand-aligning, and a green `make verify` is the bar a
+change clears before it ships.
 
 ## Running the game
 
