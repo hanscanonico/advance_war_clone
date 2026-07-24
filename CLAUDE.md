@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** twelve designs of record, all worth reading before an architectural decision.
+- **Status:** thirteen designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -64,6 +64,12 @@ three movement domains (land, air, sea), property capture and income, and a comp
   is the standing boundary: **"Red"/"Blue" survive only as developer slot vocabulary** — the Balance
   Lab's `--red`/`--blue` grammar and its byte-stable reports, code identifiers, comments — never on a
   screen a player sees; if a player can see it, it speaks faction.
+  `.lavish/tile-info-panel-plan.html` owns the hovered-tile corner panel — the unit-first redesign,
+  shipped: the occupant is the headline card and terrain drops to a compact card below, with star
+  defense and the move row filtered to the occupant's class on occupied tiles. Presentation-only by
+  scope — the fog/doctrine gate stays in `battle_view.gd`'s `refresh_panel`, which nulls units the
+  viewer cannot see before the panel ever gets them — the two `show_*` methods merged into one
+  `show_tile()`, and the node deliberately keeps the `TerrainPanel` name.
   `.lavish/battle-animations-plan.html` owns the combat cut-in — milestones BA1–BA4, all shipped —
   and its D1: **the cut-in replays a snapshot, it computes nothing.** The only thing `core/` gained
   for it is `CombatResult.attacker_hp_before` / `defender_hp_before`, because the animation runs
