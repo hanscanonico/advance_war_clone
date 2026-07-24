@@ -222,9 +222,13 @@ Prefer the running game (or a GUT test) over reasoning alone when verifying a ch
   the AI deliberately sees everything **except** units a doctrine hides — it asks
   `Vision.is_hidden_from` for that one case, so an invisibility power is not inert against it.
   Terrain, range and property sight stay invisible to the AI's omniscience; don't widen the
-  exception without a matching decision in the plan. A submerged submarine is hidden through the
-  same hook and is the one rule there that holds **with fog off** — being under the water is not a
-  question of how far anyone can see.
+  exception without a matching decision in the plan. The one widening made with such a decision is
+  **movement-obstacle detection**: a committed path is planned and walked with the mover's *own*
+  visibility, so a unit hidden from the AI (a fogged enemy, or a dived sub it is not next to) can
+  spring an ambush on its move exactly as one can on a human's — only the AI's *pathing* is
+  fog-limited, its *targeting* stays omniscient-except-doctrine-hidden. A submerged submarine is
+  hidden through the same hook and is the one rule there that holds **with fog off** — being under
+  the water is not a question of how far anyone can see.
 - **The battle cut-in replays; it never decides.** `BattleAnimator.animate_combat` is the one seam —
   both call sites `await` it, and it either plays the full-screen cut-in or falls through to the
   on-map hit, returning exactly once either way. Inside `scenes/battle/cutscene/`, everything is a

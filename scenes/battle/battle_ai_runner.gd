@@ -96,8 +96,14 @@ func _leave() -> void:
 ## action the viewer can actually see (`_can_watch`). A computer move made entirely
 ## inside the viewer's fog is applied without moving the cursor, panning the camera
 ## or sounding its footsteps, so a fogged turn no longer broadcasts every hidden
-## step; the mover's sprite stays hidden and the post-apply `refresh_sprite` (or
-## `spawn_sprite_for`) lands it on its committed cell without a tween.
+## step; the mover's sprite stays hidden and lands on its committed cell without a
+## tween.
+##
+## The move-family branches (Move, Capture, Dive) apply the command first, then
+## tween only the path actually walked — an ambush by a hidden enemy cut it short
+## of the plan — and land the sprite through `BattleAnimator.settle_move`, the same
+## seam the player flow uses, so a watched ambush springs the same "Ambush!" banner
+## and a fogged one places the sprite in silence.
 func _execute(command: Command) -> void:
 	var game := _battle.game
 	var view := _battle.view
@@ -116,33 +122,27 @@ func _execute(command: Command) -> void:
 		await animator.animate_combat(attack.result, attack.unit, target)
 	elif command is CaptureCommand:
 		var capture := command as CaptureCommand
-		var dest: Vector2i = capture.path[capture.path.size() - 1]
-		if _can_watch(capture.unit, capture.path):
-			_battle.set_cursor_cell(dest)
-			await animator.animate_path(view.sprite_for(capture.unit), capture.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(capture.unit)
+		var watched: bool = await _walk_move(capture.unit, _walked_path(capture.unit, capture.path))
+		var dest: Vector2i = capture.path[capture.path.size() - 1]
 		await animator.animate_capture(capture.result, capture.unit, dest)
 		if game.owner_at(dest) == capture.unit.team:
 			EventBus.property_captured.emit(dest, capture.unit.team)
 			view.repaint_property(dest)
-		view.refresh_sprite(capture.unit)
+		_settle_move(command, capture.unit, watched)
 	elif command is DiveCommand:
 		var dive := command as DiveCommand
-		if _can_watch(dive.unit, dive.path):
-			_battle.set_cursor_cell(dive.path[dive.path.size() - 1])
-			await animator.animate_path(view.sprite_for(dive.unit), dive.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(dive.unit)
-		view.refresh_sprite(dive.unit)
+		var watched: bool = await _walk_move(dive.unit, _walked_path(dive.unit, dive.path))
+		_settle_move(command, dive.unit, watched)
 	elif command is MoveCommand:
 		var move := command as MoveCommand
-		if _can_watch(move.unit, move.path):
-			_battle.set_cursor_cell(move.path[move.path.size() - 1])
-			await animator.animate_path(view.sprite_for(move.unit), move.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(move.unit)
-		view.refresh_sprite(move.unit)
+		var watched: bool = await _walk_move(move.unit, _walked_path(move.unit, move.path))
+		_settle_move(command, move.unit, watched)
 	elif command is PowerCommand:
 		command.apply(game)
 		_battle._announce_power(command as PowerCommand)
@@ -181,3 +181,40 @@ func _can_watch(unit: Unit, cells: Array[Vector2i]) -> bool:
 		if view._can_see_cell(cell):
 			return true
 	return false
+
+
+## The path the mover actually walked, sliced from its plan at the cell the sim
+## left it on: the whole plan for a clean move, and cut short at the last free cell
+## when a hidden enemy sprang an ambush (`GameState.advance_unit`). Animating this
+## rather than the plan keeps the sprite off the cells the unit never reached.
+func _walked_path(unit: Unit, planned: Array[Vector2i]) -> Array[Vector2i]:
+	var walked: Array[Vector2i] = []
+	for cell in planned:
+		walked.append(cell)
+		if cell == unit.cell:
+			break
+	return walked
+
+
+## Tweens an already-applied move along the path it actually walked and follows it
+## with the cursor, but only when the viewer can watch (`_can_watch`): a move made
+## entirely inside the viewer's fog places its sprite without a tween or a camera
+## move. Returns whether it was watched, so the caller springs the ambush cue only
+## for a move the viewer could see.
+func _walk_move(unit: Unit, walked: Array[Vector2i]) -> bool:
+	if not _can_watch(unit, walked):
+		return false
+	_battle.set_cursor_cell(walked[walked.size() - 1])
+	await _battle.animator.animate_path(_battle.view.sprite_for(unit), walked)
+	return true
+
+
+## Lands a move-family unit's sprite the way the player flow does. A watched move
+## goes through `BattleAnimator.settle_move`, which springs the "Ambush!" banner
+## when the move was cut short; an unwatched (fogged) move refreshes the sprite in
+## place with no banner, so a hidden ambush leaks no cue.
+func _settle_move(command: Command, unit: Unit, watched: bool) -> void:
+	if watched:
+		_battle.animator.settle_move(command, unit)
+	else:
+		_battle.view.refresh_sprite(unit)

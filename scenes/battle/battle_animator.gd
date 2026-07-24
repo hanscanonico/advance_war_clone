@@ -239,12 +239,18 @@ func _sync_aftermath() -> void:
 ## flow resumes once the banner has cleared. The sibling of `animate_combat`, and
 ## it obeys the same gate, the same streak pacing, and the same camera contract.
 ##
+## A null result means the move was ambushed short of the property — nothing was
+## captured, and the `settle_move` both call sites run afterwards plays the trap
+## cue — so there is nothing here to replay.
+##
 ## With the cut-in gated out — animations off, while capturing, at the Instant
 ## tier, or when the viewer cannot see the capturer — the map path is a single
 ## `capture` thump if the cell is visible, and nothing else: the board repaint
 ## the caller runs after this is what shows the result, byte-for-byte as it did
 ## before the cut-in existed. Either way this returns exactly once.
 func animate_capture(result: CaptureCommand.CaptureResult, unit: Unit, cell: Vector2i) -> void:
+	if result == null:
+		return
 	if _capture_cut_in_applies(unit):
 		_pace_cut_in()
 		var resting := camera.zoom
