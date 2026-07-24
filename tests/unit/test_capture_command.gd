@@ -90,3 +90,60 @@ func test_non_property_rejected() -> void:
 	var state := _state("[terrain]\n..\n[units]\n1 i 0 0")
 	var command := CaptureCommand.new(state.units[0], _path([Vector2i(0, 0)]))
 	assert_eq(command.validate(state), "destination is not a property")
+
+
+func test_result_snapshot_on_partial_capture() -> void:
+	var state := _state("[terrain]\nC.\n[units]\n1 i 0 0")
+	var command := CaptureCommand.new(state.units[0], _path([Vector2i(0, 0)]))
+	command.apply(state)
+	# A fresh 20-point property, 10 removed by a full-HP infantry: still theirs.
+	assert_eq(command.result.points_before, 20)
+	assert_eq(command.result.points_after, 10)
+	assert_eq(command.result.owner_before, MapData.NEUTRAL)
+	assert_false(command.result.captured)
+
+
+func test_result_snapshot_on_completing_capture() -> void:
+	var state := _state("[terrain]\nC.\n[units]\n1 i 0 0")
+	state.capture_progress[Vector2i(0, 0)] = 10
+	var command := CaptureCommand.new(state.units[0], _path([Vector2i(0, 0)]))
+	command.apply(state)
+	assert_eq(command.result.points_before, 10)
+	assert_eq(command.result.points_after, 0)
+	assert_eq(command.result.owner_before, MapData.NEUTRAL)
+	assert_true(command.result.captured)
+
+
+func test_result_points_after_clamped_on_overshoot() -> void:
+	# 5 points left, a full-HP infantry removes 10: the finishing turn removes
+	# only the 5 that were there, so the meter drains by 5, not 10.
+	var state := _state("[terrain]\nC.\n[units]\n1 i 0 0")
+	state.capture_progress[Vector2i(0, 0)] = 5
+	var command := CaptureCommand.new(state.units[0], _path([Vector2i(0, 0)]))
+	command.apply(state)
+	assert_eq(command.result.points_before, 5)
+	assert_eq(command.result.points_after, 0)
+	assert_true(command.result.captured)
+	assert_eq(command.result.points_before - command.result.points_after, 5)
+
+
+func test_result_owner_before_is_the_dislodged_enemy() -> void:
+	# Blue owns the city; a red infantry finishes taking it. owner_before is Blue,
+	# so the cut-in shows Blue's colours right up to the flip.
+	var state := _state("[terrain]\nC.\n[owners]\n2 0 0\n[units]\n1 i 0 0")
+	state.capture_progress[Vector2i(0, 0)] = 8
+	var command := CaptureCommand.new(state.units[0], _path([Vector2i(0, 0)]))
+	command.apply(state)
+	assert_eq(command.result.owner_before, 2)
+	assert_true(command.result.captured)
+	assert_eq(state.owner_at(Vector2i(0, 0)), 1)
+
+
+func test_result_captured_on_hq_win() -> void:
+	var state := _state("[terrain]\nQ.\n[owners]\n2 0 0\n[units]\n1 i 0 0\n2 i 1 0")
+	state.capture_progress[Vector2i(0, 0)] = 5
+	var command := CaptureCommand.new(state.units[0], _path([Vector2i(0, 0)]))
+	command.apply(state)
+	assert_true(command.result.captured)
+	assert_eq(command.result.owner_before, 2)
+	assert_eq(state.winner, 1)
