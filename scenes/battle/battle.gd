@@ -14,6 +14,7 @@ const MAIN_MENU_SCENE := "res://scenes/menu/main_menu.tscn"
 enum State {
 	IDLE,
 	UNIT_SELECTED,
+	PREVIEW,
 	ANIMATING,
 	MENU,
 	TARGETING,
@@ -67,6 +68,13 @@ var state := State.IDLE
 var selected: Unit
 var move_range: MovementResolver.MoveRange
 var planned_path: Array[Vector2i] = []
+## A unit inspected but not commanded — an enemy, or one of ours that has acted.
+## Its move range shows in blue; `selected` stays null, so the menu flow keeps its
+## meaning of "a unit I am commanding" and no command can act on a previewed one.
+var _previewed: Unit
+var _preview_range: MovementResolver.MoveRange
+## Whether R's red fire ring is painted; every exit from a range state clears it.
+var _range_shown := false
 var _attack_targets: Array[Vector2i] = []
 var _drop_targets: Array[Vector2i] = []
 ## The passenger the chosen Drop row unloads; cleared with the targeting state.
@@ -275,6 +283,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		confirm_at(cursor_cell)
 	elif event.is_action_pressed(&"cancel"):
 		_cancel()
+	elif event.is_action_pressed(&"show_range"):
+		_toggle_range()
 	else:
 		for dir: Array in DIR_ACTIONS:
 			if event.is_action_pressed(dir[0], true):
@@ -295,8 +305,22 @@ func confirm_at(cell: Vector2i) -> void:
 				_select(unit)
 			elif _is_own_empty_factory(cell):
 				_open_build_menu(cell)
+			elif unit != null and view.can_see_unit(unit):
+				# A click that did nothing before now previews a unit we cannot
+				# command, gated by the same sight rule targeting uses (so fog and a
+				# dived sub stay unclickable).
+				_enter_preview(unit)
 			elif unit == null:
 				_open_map_menu()
+		State.PREVIEW:
+			var unit := game.unit_at(cell)
+			if unit == null or not view.can_see_unit(unit):
+				_clear_preview()  # empty, or an unseen occupant — dismiss, never probe fog
+			elif unit.team == game.current_team and not unit.acted:
+				_clear_preview()
+				_select(unit)  # intel never blocks play — a ready unit still selects
+			else:
+				_enter_preview(unit)  # a visible other unit: switch the preview to it
 		State.UNIT_SELECTED:
 			if move_range.has(cell) and move_range.can_stop_at(cell):
 				planned_path = move_range.path_to(cell)
@@ -321,6 +345,8 @@ func confirm_at(cell: Vector2i) -> void:
 func _cancel() -> void:
 	if state == State.UNIT_SELECTED:
 		_clear_selection()
+	elif state == State.PREVIEW:
+		_clear_preview()
 	elif state == State.TARGETING:
 		_exit_targeting_to_menu()
 	elif state == State.DROP_TARGETING:
@@ -335,6 +361,7 @@ func _select(unit: Unit) -> void:
 	selected = unit
 	move_range = MovementResolver.reachable(game, unit)
 	planned_path = [unit.cell]
+	_range_shown = false
 	view.paint_move_overlay(move_range.cells())
 	view.update_path_line(planned_path)
 	state = State.UNIT_SELECTED
@@ -345,6 +372,7 @@ func _clear_selection() -> void:
 	move_range = null
 	planned_path = []
 	_attack_targets = []
+	_range_shown = false
 	view.paint_move_overlay([])
 	view.paint_attack_overlay([])
 	view.update_path_line([])
@@ -353,9 +381,47 @@ func _clear_selection() -> void:
 	_refresh_fog()
 
 
+## Previews a unit we cannot command. Its move range shows in blue and R adds the
+## fire ring; `selected` stays clear so the command flow never touches it.
+func _enter_preview(unit: Unit) -> void:
+	Sfx.play(&"select")
+	_previewed = unit
+	_preview_range = MovementResolver.reachable(game, unit)
+	_range_shown = false
+	view.paint_move_overlay(_preview_range.cells())
+	view.paint_attack_overlay([])
+	view.update_path_line([])  # a preview plans no route
+	state = State.PREVIEW
+
+
+func _clear_preview() -> void:
+	_previewed = null
+	_preview_range = null
+	_range_shown = false
+	view.paint_move_overlay([])
+	view.paint_attack_overlay([])
+	state = State.IDLE
+
+
+## R toggles the red fire ring for whatever unit's move range is on screen. A
+## momentary lens painted from the AttackRange authority; it issues nothing.
+func _toggle_range() -> void:
+	# The unit whose range is up: the selected one, or a previewed one.
+	var unit: Unit = selected if state == State.UNIT_SELECTED else _previewed
+	if unit == null:  # not in a range state
+		return
+	_range_shown = not _range_shown
+	if _range_shown:
+		view.paint_attack_overlay(AttackRange.threat_cells(game, unit))
+	else:
+		view.paint_attack_overlay([])
+
+
 func _animate_move() -> void:
 	state = State.ANIMATING
+	_range_shown = false
 	view.paint_move_overlay([])
+	view.paint_attack_overlay([])  # a fire ring shown with R does not survive the move
 	view.update_path_line([])
 	await animator.animate_path(view.sprite_for(selected), planned_path)
 	_on_move_animation_done()
