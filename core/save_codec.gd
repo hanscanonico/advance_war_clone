@@ -208,7 +208,10 @@ static func _decode_commanders(
 		state.set_commander(team, db.by_id(StringName(String(record.get("id", "")))))
 		var co_state := state.commander_state(team)
 		# Through add_charge so a hand-edited meter is still capped at the cost,
-		# and so a commander who has since lost their power banks nothing.
+		# and so a commander who has since lost their power banks nothing. The
+		# charge is restored *before* the power is raised: add_charge banks nothing
+		# for a team whose power is already active, so a mid-power save must fill
+		# the meter while it still reads down.
 		state.add_charge(team, int(record.get("charge", 0)))
 		co_state.power_active = bool(record.get("active", false)) and co_state.type.has_power()
 

@@ -63,7 +63,10 @@ func test_the_power_cannot_be_fired_twice() -> void:
 	var state := _state()
 	_charged(state, 1, CommanderType.Duration.OWNER_TURN)
 	PowerCommand.new().apply(state)
-	state.add_charge(1, 1000)  # even a meter that refilled mid-turn
+	# A running power banks nothing, so this no-ops; the active flag is what
+	# refuses the second fire either way.
+	state.add_charge(1, 1000)
+	assert_eq(state.commander_state(1).charge, 0, "the meter stays empty under an active power")
 	assert_eq(PowerCommand.new().validate(state), "a Command Power is already active")
 
 
