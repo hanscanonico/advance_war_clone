@@ -160,6 +160,9 @@ func _set_owner_from_line(line: String) -> bool:
 	if parts.size() != 3:
 		push_error("MapData: bad owner line '%s' (expected: team x y)" % line)
 		return false
+	if not parts[1].is_valid_int() or not parts[2].is_valid_int():
+		push_error("MapData: owner cell must be integer coordinates in '%s'" % line)
+		return false
 	var team := int(parts[0])
 	var cell := Vector2i(int(parts[1]), int(parts[2]))
 	if team <= 0:
@@ -179,6 +182,9 @@ func _append_unit_from_line(line: String) -> bool:
 	var parts := line.split(" ", false)
 	if parts.size() != 4:
 		push_error("MapData: bad unit line '%s' (expected: team symbol x y)" % line)
+		return false
+	if not parts[2].is_valid_int() or not parts[3].is_valid_int():
+		push_error("MapData: unit cell must be integer coordinates in '%s'" % line)
 		return false
 	var team := int(parts[0])
 	var cell := Vector2i(int(parts[2]), int(parts[3]))

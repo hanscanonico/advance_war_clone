@@ -76,6 +76,21 @@ func test_owner_out_of_bounds_rejected() -> void:
 	assert_push_error("out of bounds")
 
 
+# String→int coercion reads "x" as 0, so a coordinate typo like `1 x 0` would
+# silently place the owner at column 0 — in bounds and a property on this board —
+# instead of failing the way every other malformed line does. A non-numeric
+# coordinate has to take the same loud error path; a negative one stays numeric
+# and keeps failing on the bounds check as before.
+func test_owner_non_numeric_coordinate_rejected() -> void:
+	assert_not_null(MapData.parse("[terrain]\nCC\n[owners]\n1 0 0", db), "valid line still parses")
+	assert_null(MapData.parse("[terrain]\nCC\n[owners]\n1 x 0", db))
+	assert_push_error("owner cell must be integer coordinates")
+	assert_null(MapData.parse("[terrain]\nCC\n[owners]\n1 1 y", db))
+	assert_push_error("owner cell must be integer coordinates")
+	assert_null(MapData.parse("[terrain]\nCC\n[owners]\n1 0 -1", db))
+	assert_push_error("owner cell (0, -1) out of bounds")
+
+
 func test_units_section_parsed() -> void:
 	var text := "[terrain]\n....\n[units]\n1 i 0 0\n2 t 3 0"
 	var map := MapData.parse(text, db)
@@ -93,6 +108,19 @@ func test_bad_unit_line_rejected() -> void:
 func test_unit_out_of_bounds_rejected() -> void:
 	assert_null(MapData.parse("[terrain]\n..\n[units]\n1 i 5 0", db))
 	assert_push_error("unit cell (5, 0) out of bounds")
+
+
+# Same String→int coercion trap as owners: `1 i x 0` would coerce to column 0 and
+# spawn a unit where none was written, while a negative coordinate stays numeric
+# and keeps failing on the bounds check as before.
+func test_unit_non_numeric_coordinate_rejected() -> void:
+	assert_not_null(MapData.parse("[terrain]\n..\n[units]\n1 i 0 0", db), "valid line still parses")
+	assert_null(MapData.parse("[terrain]\n..\n[units]\n1 i x 0", db))
+	assert_push_error("unit cell must be integer coordinates")
+	assert_null(MapData.parse("[terrain]\n..\n[units]\n1 i 0 y", db))
+	assert_push_error("unit cell must be integer coordinates")
+	assert_null(MapData.parse("[terrain]\n..\n[units]\n1 i 0 -1", db))
+	assert_push_error("unit cell (0, -1) out of bounds")
 
 
 func test_unit_bad_team_rejected() -> void:
