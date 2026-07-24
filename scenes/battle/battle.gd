@@ -214,6 +214,8 @@ func _build_animator() -> BattleAnimator:
 	built.power_banner = %CommanderBanner
 	built.cutscene = %Cutscene
 	built.cutscene.view = view
+	built.capture_cutscene = %CaptureCutscene
+	built.capture_cutscene.view = view
 	return built
 
 
@@ -432,6 +434,8 @@ func _handle_unit_action(action: StringName) -> void:
 			var dest: Vector2i = planned_path[planned_path.size() - 1]
 			command.apply(game)
 			EventBus.unit_moved.emit(selected)
+			set_cursor_cell(dest)  # the cut-in punches the camera onto the taken cell
+			await animator.animate_capture(command.result, selected, dest)
 			if game.owner_at(dest) == selected.team:
 				EventBus.property_captured.emit(dest, selected.team)
 				view.repaint_property(dest)

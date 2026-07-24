@@ -71,18 +71,26 @@ three movement domains (land, air, sea), property capture and income, and a comp
   rule on the other side of the line: how a weapon looks is a `BattleStyle` under
   `data/battle_anim/`, `UnitType.battle_style` is a presentation key exactly like `atlas_col`, and
   no gameplay number may ever appear in a style.
-  `.lavish/capture-animation-plan.html` owns the capture cut-in — milestones CP1–CP3, **none
-  implemented yet**; only its art prerequisite has landed: the hand-authored 64px airport and port
-  buildings under `assets/sprites/iso_buildings`, composited into terrain-atlas columns 9–10 by
-  `build_pixvoxel_atlases.sh` over the bare grounds `generate_tiles.gd` now draws for those cells
-  (the PixVoxel pack has no hangar and no quay), with the iron/verdant rows derived by the same
-  `tint_iso_air_sea.sh` recipe as the air/naval sprites — one tint authority for every hand-authored
-  family. The plan inherits the combat cut-in's D1 wholesale and prescribes exactly one `core/`
-  change — a `CaptureCommand.result` snapshot (`points_before`, `points_after`, `captured`), as
-  `AttackCommand` already carries one — and one seam, `BattleAnimator.animate_capture` behind the
-  combat gate reused whole. It deliberately retimes its handoff reference's 4.6s choreography to
-  ≈2.4s house tempo, because its R1 (ceremony fatigue — captures far outnumber kills) is the named
-  top risk.
+  `.lavish/capture-animation-plan.html` owns the capture cut-in — milestones CP1–CP3, all shipped —
+  and it is the combat cut-in's sibling in every structural sense, sharing its D1: **the cut-in
+  replays a snapshot, it computes nothing.** The only thing `core/` gained is a
+  `CaptureCommand.result` snapshot (`points_before`, `points_after`, `owner_before`, `captured`),
+  filled in `apply` exactly as `AttackCommand.result` is; the mash chips are a presentation split of
+  `points_before − points_after`, never a call back into `capture_strength`. `BattleAnimator`
+  gained one seam, `animate_capture`, behind the combat gate reused whole (`capturing`, Instant, and
+  viewer visibility via the view and so `Vision` — one unit this time, since the capturer stands on
+  the cell it takes), and the property flip is a `SideIdentity.atlas_row` swap so the cut-in's
+  colours are the board's. It reads no `GameSpeed` accessor for its beat lengths — fixed constants
+  on `CaptureCutscene` scaled by the animator's shared streak pacing, identical to the combat
+  cut-in, deliberately not the plan's D5 tier-scaling, because the shipped combat sibling does not
+  tier-scale and structural parity is the stronger rule. Its art prerequisite landed alongside: the
+  hand-authored 64px airport and port buildings under `assets/sprites/iso_buildings`, composited
+  into terrain-atlas columns 9–10 by `build_pixvoxel_atlases.sh` over the bare grounds
+  `generate_tiles.gd` now draws for those cells (the PixVoxel pack has no hangar and no quay), with
+  the iron/verdant rows derived by the same `tint_iso_air_sea.sh` recipe as the air/naval sprites —
+  one tint authority for every hand-authored family. It deliberately retimes its handoff reference's
+  4.6s choreography to ≈2.4s house tempo, because its R1 (ceremony fatigue — captures far outnumber
+  kills) is the named top risk.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 

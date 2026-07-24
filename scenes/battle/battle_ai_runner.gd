@@ -113,6 +113,7 @@ func _execute(command: Command) -> void:
 		await animator.animate_path(view.sprite_for(capture.unit), capture.path)
 		command.apply(game)
 		EventBus.unit_moved.emit(capture.unit)
+		await animator.animate_capture(capture.result, capture.unit, dest)
 		if game.owner_at(dest) == capture.unit.team:
 			EventBus.property_captured.emit(dest, capture.unit.team)
 			view.repaint_property(dest)

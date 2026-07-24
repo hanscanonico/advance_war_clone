@@ -34,6 +34,13 @@ const KO_POSE := 1.15
 ## by prefix and parsed rather than matched name-for-name.
 const CUT_IN_MODE := "cutin"
 const KO_SUFFIX := "_ko"
+## The capture cut-in's poses. `capture_cutin` freezes a completing capture late
+## in its banner — the property already flipped, the meter at zero, the specks
+## out; `capture_cutin_partial` freezes an occupying one over its OCCUPYING tag.
+const CAPTURE_CUT_IN_MODE := "capture_cutin"
+const CAPTURE_CUT_IN_POSE := 1.75
+const CAPTURE_PARTIAL_POSE := 1.65
+const PARTIAL_SUFFIX := "_partial"
 ## `cutin_skip` walks a skip across the whole cut-in — see _spam_skip. One entry
 ## per beat boundary and a couple past the end, which is where a double-finish
 ## would show up.
@@ -130,6 +137,9 @@ func _run_demo(mode: String) -> void:
 	_battle.game.rng.seed = DEMO_SEED  # deterministic demo
 	# The cut-in modes carry a matchup in the name, so they are parsed rather
 	# than matched — see _stage_cut_in.
+	if mode.begins_with(CAPTURE_CUT_IN_MODE):
+		await _stage_capture_cut_in(mode)
+		return
 	if mode.begins_with(CUT_IN_MODE):
 		await _stage_cut_in(mode)
 		return
@@ -347,6 +357,85 @@ func _stage_cut_in(spec: String) -> void:
 		await _spam_skip(result, attacker, defender)
 	_battle.animator.cutscene.pose_at(
 		result, attacker, defender, KO_POSE if lethal else CUT_IN_POSE
+	)
+
+
+## The capture cut-in, held still for the shutter — the sibling of `_stage_cut_in`.
+##
+##   --demo=capture_cutin           a completing capture, late in its banner
+##   --demo=capture_cutin_partial   an occupying capture over its OCCUPYING tag
+##   --demo=capture_cutin_skip      walks a skip across the whole clock (a test)
+##
+## Like the combat still it is posed rather than driven through the menu, because
+## the capture flow suppresses the cut-in while capturing for exactly the same
+## byte-stability reason (BattleAnimator._capture_cut_in_applies). A real
+## CaptureResult, frozen at one moment of the cut-in's own clock, on the default
+## board's neutral city at (3,4) — the same property the `capture` demo takes.
+func _stage_capture_cut_in(mode: String) -> void:
+	var game := _battle.game
+	var cell := Vector2i(3, 4)  # the neutral city
+	var unit := game.unit_at(Vector2i(4, 3))  # the red infantry
+	if unit == null:
+		push_error("capture_cutin demo: no infantry at (4,3)")
+		return
+	var partial := mode.begins_with(CAPTURE_CUT_IN_MODE + PARTIAL_SUFFIX)
+	var result := CaptureCommand.CaptureResult.new()
+	result.owner_before = MapData.NEUTRAL
+	result.points_before = 20 if partial else 8
+	result.points_after = 10 if partial else 0
+	result.captured = not partial
+	_battle.view.sync_sprites()
+	if mode.ends_with(SKIP_SUFFIX):
+		await _spam_capture_skip(result, unit, cell)
+	_battle.animator.capture_cutscene.pose_at(
+		result, unit, cell, CAPTURE_PARTIAL_POSE if partial else CAPTURE_CUT_IN_POSE
+	)
+
+
+## The capture cut-in's half of risk R2, made checkable exactly as `_spam_skip`
+## makes combat's: the same capture is played and skipped again and again, one
+## frame later each time, so the skip walks every beat — the wipe, the march, the
+## three mashes, the flip and the banner. Each run must emit `finished` exactly
+## once and land the punched-in camera back at its resting zoom.
+func _spam_capture_skip(result: CaptureCommand.CaptureResult, unit: Unit, cell: Vector2i) -> void:
+	var cutscene := _battle.animator.capture_cutscene
+	var camera := _battle.camera
+	var tree := _battle.get_tree()
+	var resting := camera.zoom
+	for delay in SKIP_FRAMES:
+		var finishes := [0]
+		var tally := func() -> void: finishes[0] += 1
+		cutscene.finished.connect(tally)
+		camera.zoom = resting * BattleAnimator.PUNCH_ZOOM
+		cutscene.play(result, unit, cell, camera, resting)  # deliberately not awaited
+		for frame in delay:
+			await tree.process_frame
+		for spam in 3:
+			cutscene.skip()
+			await tree.process_frame
+		await tree.process_frame  # the exit lands on the frame after the skip
+		cutscene.finished.disconnect(tally)
+		if finishes[0] != 1:
+			push_error(
+				"capture cut-in skipped after %d frame(s) finished %d times" % [delay, finishes[0]]
+			)
+			tree.quit(1)
+			return
+		if not camera.zoom.is_equal_approx(resting):
+			push_error(
+				(
+					"capture cut-in skipped after %d frame(s) left camera zoom at %s, not resting %s"
+					% [delay, camera.zoom, resting]
+				)
+			)
+			tree.quit(1)
+			return
+	camera.zoom = resting
+	print(
+		(
+			"capture_cutin_skip: %d skips, each resolved exactly once and camera home"
+			% SKIP_FRAMES.size()
+		)
 	)
 
 

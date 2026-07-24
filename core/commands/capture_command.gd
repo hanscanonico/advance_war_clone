@@ -3,8 +3,31 @@ extends Command
 ## Moves a capture-capable unit onto a property and chips at its capture
 ## points. Reaching zero flips ownership; taking the enemy HQ wins the match.
 
+
+## The snapshot the capture cut-in replays (plan D1). Filled by apply() at the
+## moment the sim commits the numbers, and read only by the presentation layer —
+## nothing in core/ or ai/ touches it, exactly as AttackCommand.result is read
+## only by the animator. The cut-in must replay these, never recompute them: a
+## second opinion on capture math is the bug class this repo already paid for
+## once with movement.
+class CaptureResult:
+	## Capture points remaining before and after this action, 0-20. `points_after`
+	## is clamped at zero, so `points_before - points_after` is the honest count
+	## the meter drains by — and the chips sum to — even when a strong unit
+	## overshoots the last few points.
+	var points_before := 0
+	var points_after := 0
+	## Who owned the property going in, for the atlas row the cut-in shows before
+	## the flip. On a partial capture it is the owner throughout.
+	var owner_before := 0
+	## True when this action flipped ownership — the completing capture.
+	var captured := false
+
+
 var unit: Unit
 var path: Array[Vector2i]
+## Populated by apply() so the presentation layer can animate the capture.
+var result: CaptureResult
 
 
 func _init(p_unit: Unit, p_path: Array[Vector2i]) -> void:
@@ -30,10 +53,15 @@ func validate(state: GameState) -> String:
 func apply(state: GameState) -> void:
 	state.advance_unit(unit, path)
 	var dest: Vector2i = path[path.size() - 1]
-	var points: int = state.capture_progress.get(dest, GameState.CAPTURE_POINTS)
-	points -= capture_strength(state, unit)
-	if points > 0:
-		state.capture_progress[dest] = points
+	var before: int = state.capture_progress.get(dest, GameState.CAPTURE_POINTS)
+	var remaining := before - capture_strength(state, unit)
+	result = CaptureResult.new()
+	result.points_before = before
+	result.points_after = maxi(remaining, 0)
+	result.owner_before = state.owner_at(dest)
+	result.captured = remaining <= 0
+	if remaining > 0:
+		state.capture_progress[dest] = remaining
 		return
 	state.capture_progress.erase(dest)
 	state.set_owner(dest, unit.team)

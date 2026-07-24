@@ -30,7 +30,8 @@ set -uo pipefail
 GODOT="${GODOT:-bin/Godot.app/Contents/MacOS/Godot}"
 BATTLE="${BATTLE:-scenes/battle/battle.tscn}"
 # Every scenario opens a window. Launching through the wrapper keeps a
-# scripted/agent run (no tty) from stealing the user's window focus 26 times;
+# scripted/agent run (no tty) from stealing the user's window focus once per
+# scenario;
 # interactive runs exec $GODOT directly as before. The wrapper `exec`s the
 # engine, so run_with_timeout's kill still lands on the Godot process itself.
 export GODOT
@@ -85,6 +86,7 @@ DEFAULT_MODES=(
 	power_ready power_active power_banner commander_info commander_victory
 	cutin cutin_ko cutin_skip
 	cutin:bomber:tank cutin:sub:cruiser cutin:cruiser:sub cutin:artillery:mech
+	capture_cutin capture_cutin_partial capture_cutin_skip
 )
 
 if [[ ! -x "$GODOT" ]]; then
