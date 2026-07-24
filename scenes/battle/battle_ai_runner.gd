@@ -99,11 +99,12 @@ func _leave() -> void:
 ## step; the mover's sprite stays hidden and lands on its committed cell without a
 ## tween.
 ##
-## The move-family branches (Move, Capture, Dive) apply the command first, then
-## tween only the path actually walked — an ambush by a hidden enemy cut it short
-## of the plan — and land the sprite through `BattleAnimator.settle_move`, the same
-## seam the player flow uses, so a watched ambush springs the same "Ambush!" banner
-## and a fogged one places the sprite in silence.
+## The move-family branches (Attack, Capture, Dive, Move) apply the command first,
+## then tween only the path actually walked — an ambush by a hidden enemy cut it
+## short of the plan — and land the sprite through `BattleAnimator.settle_move`, the
+## same seam the player flow uses, so a watched ambush springs the same "Ambush!"
+## banner and a fogged one places the sprite in silence. An attack that reached its
+## firing cell hands off to `animate_combat` for the shot instead.
 func _execute(command: Command) -> void:
 	var game := _battle.game
 	var view := _battle.view
@@ -111,15 +112,15 @@ func _execute(command: Command) -> void:
 	if command is AttackCommand:
 		var attack := command as AttackCommand
 		var target := game.unit_at(attack.target_cell)
-		var cells: Array[Vector2i] = attack.path.duplicate()
-		cells.append(attack.target_cell)
-		if _can_watch(attack.unit, cells):
-			_battle.set_cursor_cell(attack.path[attack.path.size() - 1])
-			await animator.animate_path(view.sprite_for(attack.unit), attack.path)
-			_battle.set_cursor_cell(attack.target_cell)
 		command.apply(game)
 		EventBus.unit_moved.emit(attack.unit)
-		await animator.animate_combat(attack.result, attack.unit, target)
+		var watched: bool = await _walk_move(attack.unit, _walked_path(attack.unit, attack.path))
+		if attack.ambushed:
+			_settle_move(command, attack.unit, watched)
+		else:
+			if watched or view._can_see_cell(attack.target_cell):
+				_battle.set_cursor_cell(attack.target_cell)
+			await animator.animate_combat(attack.result, attack.unit, target)
 	elif command is CaptureCommand:
 		var capture := command as CaptureCommand
 		command.apply(game)
