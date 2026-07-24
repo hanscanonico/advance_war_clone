@@ -66,23 +66,27 @@ A mode may carry a `+fog` suffix (`make smoke MODES="victory+fog"`) to rerun tha
 of war on. Fog is the only setting under which the scene hides units rather than just drawing them,
 so two scenarios run both ways by default.
 
-The battle cut-in has its own family of modes, because it is deliberately suppressed while
-capturing — a mid-animation frame is what would make two identical captures differ. They pose the
-overlay at a fixed moment of its own clock instead, and the matchup is part of the mode name:
+The cut-ins — combat and its capture sibling — have their own family of modes, because they are
+deliberately suppressed while capturing — a mid-animation frame is what would make two identical
+captures differ. These pose the overlay at a fixed moment of its own clock instead, and the combat
+modes carry the matchup in the name:
 
 ```sh
 make smoke MODES="cutin"                      # the frontline tanks, defender survives
 make smoke MODES="cutin_ko"                   # the same pair, defender routed
 make smoke MODES="cutin:bomber:tank"          # any matchup, staged wherever it fits the board
 make smoke MODES="cutin_skip"                 # walks a skip across every beat; must never hang
+make smoke MODES="capture_cutin"              # a completing capture, late in its banner
+make smoke MODES="capture_cutin_partial"      # an occupying capture, the property not yet flipped
+make smoke MODES="capture_cutin_skip"         # the same skip walk over the capture cut-in
 ```
 
-`cutin_skip` is the one that is a test rather than a picture: it plays the same exchange ten times,
-skipping one frame later each time, and fails unless every run finishes exactly once. Both call
-sites hold the whole interaction flow on that, so a cut-in that ever failed to finish would freeze
-input for the rest of the session.
+`cutin_skip` and `capture_cutin_skip` are the ones that are tests rather than pictures: each plays
+the same cut-in ten times, skipping one frame later each time, and fails unless every run finishes
+exactly once. Both call sites hold the whole interaction flow on that, so a cut-in that ever failed
+to finish would freeze input for the rest of the session.
 
-`--no-battle-anim` forces the cut-in off for one run without touching the saved preference, which
+`--no-battle-anim` forces the cut-ins off for one run without touching the saved preference, which
 is how "with the animation off, the match plays out identically" is checked against the offline
 harness.
 
@@ -126,7 +130,8 @@ Any Godot 4.7+ works too — open the project folder in the editor.
 ## Main menu
 
 The game boots to the menu: pick a map, a **Difficulty** and a **Speed**, toggle **Fog of war**
-and **Battle animations** (the full-screen combat cut-in — a saved preference, on by default),
+and **Battle animations** (the full-screen combat and capture cut-ins — a saved preference, on by
+default),
 then start a **1 Player** match against the AI or a **2 Player** hot-seat game. Either opens the
 **commander selection page**; **Continue** appears only when a save exists and skips selection,
 resuming the save with its own map, fog setting, difficulty, commanders, and AI sides. **Quit**
@@ -343,7 +348,7 @@ result, including one capability that measured *negative* and ships switched off
 - `scenes/` — presentation: main menu, battle scene, cursor, UI panels.
 - `autoload/` — singletons: the event bus, the match setup the menu hands to the battle scene,
   the device preferences this machine keeps between launches (`Settings` — the game speed above
-  and whether battles play the full-screen cut-in), and the sound-effect player.
+  and whether battles play the full-screen cut-ins), and the sound-effect player.
 - `tools/` — the art and sound build scripts: the headless ground-tile, unit-placeholder, sound,
   and portrait generators, the air/naval sprite paste step, plus the PixVoxel atlas builder (see
   Assets below); and the offline balance
