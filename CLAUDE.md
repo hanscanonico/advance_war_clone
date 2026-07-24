@@ -5,7 +5,7 @@ Guidance for AI agents (and humans) working in this repository.
 
 ## Project
 
-An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with **GDScript**.
+An **Advance Wars-style turn-based tactics game** built in **Godot 4.7+** with **GDScript**.
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
@@ -127,7 +127,7 @@ three movement domains (land, air, sea), property capture and income, and a comp
   presentation-only (D5): clicking a unit you cannot command previews its move range and **R** paints
   its fire ring, both pure reads gated by the same `view.can_see_unit` fog rule targeting uses, so
   nothing under `core/` or `ai/` learns the overlay exists and `make screenshot` stays byte-stable.
-- **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
+- **Engine:** Godot 4.7+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
 > Legal: this is a *reimplementation of mechanics*, not a copy. No Nintendo sprites, music,
