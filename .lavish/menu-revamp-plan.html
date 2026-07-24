@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Menu Revamp Plan</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&family=Silkscreen:wght@400;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+      /* handoff tokens, quoted for the swatches & mock below */
+      --hx-slate-900: #23272b;
+      --hx-slate-800: #2b2f34;
+      --hx-ink: #3a3f45;
+      --hx-paper: #e8e0d0;
+      --hx-paper-raised: #f4efe3;
+      --hx-red: #d84a3c;
+      --hx-red-dark: #8c3026;
+      --hx-blue: #3c64d8;
+      --hx-blue-dark: #26408c;
+      --hx-capture: #6cc24a;
+      --hx-neutral-light: #adb1b7;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-proposed { border-color: #d58a24; box-shadow: 0 0 0 2px color-mix(in srgb, #d58a24 30%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+    .gc-crosses li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-crosses li::before { content: "✗"; color: var(--gc-red); font-weight: 900; }
+    table.gc-nums td, table.gc-nums th { font-size: .85rem; }
+    table.gc-nums td:first-child { font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: .8rem; }
+
+    /* ---- in-plan demo of the handoff look (plan-only CSS, not shipped) ---- */
+    .hx-swatch { display: inline-grid; place-items: center; width: 100%; height: 3.2rem; border: 3px solid var(--hx-ink); box-shadow: 3px 3px 0 rgba(35,39,43,.9); font: 700 .68rem ui-monospace, monospace; }
+    .hx-mock {
+      background: radial-gradient(circle at 50% 12%, var(--hx-slate-800) 0%, var(--hx-slate-900) 72%);
+      padding: 1.6rem; display: grid; justify-content: center;
+    }
+    .hx-mock * { font-family: 'Pixelify Sans', sans-serif; }
+    .hx-wordmark { color: #eee; font-size: 1.8rem; font-weight: 700; text-transform: uppercase; line-height: 1.15; text-shadow: 3px 3px 0 var(--hx-ink); }
+    .hx-tagline { font-family: 'Silkscreen', monospace; font-size: .55rem; letter-spacing: .14em; line-height: 1.6; color: var(--hx-neutral-light); margin-top: .45rem; }
+    .hx-panel { background: var(--hx-paper); border: 3px solid var(--hx-ink); border-radius: 3px; box-shadow: 4px 4px 0 rgba(35,39,43,.9); overflow: hidden; }
+    .hx-panel-head { background: var(--hx-ink); color: #eee; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; line-height: 1.4; padding: .3rem .6rem; display: flex; justify-content: space-between; gap: .5rem; }
+    .hx-panel-head .r { font-family: 'Silkscreen', monospace; font-size: .5rem; line-height: 1.5; align-self: center; white-space: nowrap; }
+    .hx-btn { display: block; width: 100%; text-align: center; color: #eee; font-weight: 700; padding: .55rem 0; border-radius: 2px; box-shadow: 2px 2px 0 rgba(35,39,43,.9); }
+    .hx-btn .sub { font-family: 'Silkscreen', monospace; font-size: .5rem; opacity: .85; margin-left: .35rem; }
+    .hx-seg { display: flex; border: 3px solid var(--hx-ink); border-radius: 2px; overflow: hidden; box-shadow: 2px 2px 0 rgba(35,39,43,.9); }
+    .hx-seg span { flex: 1; text-align: center; font-size: .55rem; font-weight: 600; line-height: 1.4; padding: .28rem .05rem; background: var(--hx-paper); color: var(--hx-ink); border-left: 2px solid var(--hx-ink); }
+    .hx-seg span:first-child { border-left: 0; }
+    .hx-seg .on { background: var(--hx-red); color: #eee; }
+    .hx-microlabel { font-family: 'Silkscreen', monospace; font-size: .5rem; letter-spacing: .08em; line-height: 1.5; text-transform: uppercase; color: #595d63; margin-bottom: .25rem; }
+    .hx-check { display: inline-grid; place-items: center; width: 1rem; height: 1rem; border: 3px solid var(--hx-ink); box-shadow: 2px 2px 0 rgba(35,39,43,.9); font-family: 'Silkscreen', monospace; font-size: .45rem; line-height: 1; color: var(--hx-slate-900); }
+    .hx-chip { display: inline-flex; align-items: center; gap: .25rem; background: var(--hx-paper); border: 2px solid var(--hx-ink); border-radius: 2px; box-shadow: 2px 2px 0 rgba(35,39,43,.9); font-family: 'Silkscreen', monospace; font-size: .45rem; letter-spacing: .04em; line-height: 1.5; text-transform: uppercase; padding: .12rem .3rem; color: var(--hx-ink); white-space: nowrap; }
+    .hx-chip i { width: .55rem; height: .55rem; border: 2px solid var(--hx-ink); display: inline-block; }
+    .hx-thumb { border: 3px solid var(--hx-ink); box-shadow: 2px 2px 0 rgba(35,39,43,.9); height: 3.6rem; background:
+      repeating-conic-gradient(#78c850 0% 25%, #69b046 0% 50%) 0 0 / 12px 12px; position: relative; }
+    .hx-thumb.sea { background:
+      repeating-conic-gradient(#2a6fbf 0% 25%, #2461a8 0% 50%) 0 0 / 12px 12px; }
+  </style>
+</head>
+<body>
+  <div class="gc-shell">
+
+    <!-- ============================== HERO ============================== -->
+    <header class="gc-hero px-6 py-10 md:px-12">
+      <p class="gc-kicker opacity-80">Grid Commander · Stretch item · Draft for review · rev 1</p>
+      <h1 class="text-3xl md:text-4xl font-black mt-2">Menu Revamp — the design system comes home</h1>
+      <p class="mt-3 max-w-3xl opacity-90">
+        The main menu is the only screen in the game with no art direction: stock Godot greys on a flat
+        olive rectangle, while the board, the HUD and both cut-ins all speak with one voice. The
+        <strong>Grid Commander Design System</strong> handoff (<code>handoff/main-menu/</code> in the
+        Downloads zip) writes that voice down — cream panels, ink borders, hard offset shadows, pixel
+        type, a live terrain field breathing behind everything — and its palette was
+        <em>lifted from this game's own atlases</em>, so adopting it is alignment, not invention.
+        This plan adapts the mockup to the game as it actually ships: <strong>12 maps</strong>, not 2;
+        <strong>four speed tiers</strong>, not three; commanders, factions, and a rule that
+        "Red"/"Blue" never reaches a player's screen.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <span class="badge badge-lg" style="background:var(--hx-paper); border:0;">Cream &amp; ink, hard shadows</span>
+        <span class="badge badge-lg" style="background:var(--gc-road); border:0;">Pixel type, vendored &amp; licensed</span>
+        <span class="badge badge-lg" style="background:var(--gc-grass); border:0;">The board renders its own thumbnails</span>
+        <span class="badge badge-lg" style="background:var(--gc-blue); color:white; border:0;">Presentation-only by construction</span>
+      </div>
+    </header>
+
+    <!-- ============================== 1 · THE HANDOFF & THE GAP ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">1</span>
+        <h2 class="text-2xl font-black">What the handoff hands us, and what stands today</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4 mb-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The handoff inventory</h3>
+          <p class="text-sm mt-1"><code>SPEC.md</code> (the screen, element by element), a working
+          React mockup (<code>Main Menu.html</code>), five token sheets
+          (<code>colors / effects / fonts / spacing / typography</code>), three reference components
+          (<code>Button / Panel / FactionTag</code> — source to read, not code to port), and a folder
+          of 32px terrain sprites the mockup previews with. Source:
+          <span class="gc-file">~/Downloads/Grid Commander Design System (5).zip</span> — every number
+          this plan needs is quoted here, so the repo never depends on the zip.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The menu today</h3>
+          <p class="text-sm mt-1"><span class="gc-file">scenes/menu/main_menu.tscn</span> is a centered
+          <code>VBoxContainer</code> of stock controls — an <code>OptionButton</code> each for map,
+          difficulty and speed, two <code>CheckButton</code>s, four buttons — on a flat
+          <code>Color(0.10, 0.14, 0.10)</code> backdrop. <strong>No Theme resource, no font file, no
+          StyleBox exists anywhere in the project</strong>; the entire game runs on Godot's default
+          font. The commander select panel (<span class="gc-file">commander_select_panel.gd</span>,
+          built in code, opened over the menu) and the battle HUD widgets each carry their own inline
+          styleboxes around the shared <span class="gc-file">CommanderVisuals</span> constants.</p>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 border p-4 mb-4">
+        <h3 class="font-black mb-2">The signature look, in one strip</h3>
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-3">
+          <div class="hx-swatch" style="background:var(--hx-slate-900); color:#eee;">slate-900</div>
+          <div class="hx-swatch" style="background:var(--hx-paper);">paper</div>
+          <div class="hx-swatch" style="background:var(--hx-ink); color:#eee;">ink</div>
+          <div class="hx-swatch" style="background:var(--hx-red); color:#fff;">red</div>
+          <div class="hx-swatch" style="background:var(--hx-blue); color:#fff;">blue</div>
+          <div class="hx-swatch" style="background:var(--hx-capture); color:#23272b;">capture</div>
+        </div>
+        <p class="text-sm">Square corners (2–3px whisker at most), <strong>3px ink borders</strong>,
+        <strong>hard offset shadows with zero blur</strong> (<code>4px 4px 0</code> — the signature),
+        inset light on cream edges, motion short and mechanical (90–240ms, <code>steps()</code> where
+        it reads). Two faces: <strong>Pixelify Sans</strong> for display and UI chrome,
+        <strong>Silkscreen</strong> for micro-labels, numerals and badges — both OFL.</p>
+      </div>
+
+      <div class="card bg-base-100 border p-4">
+        <h3 class="font-black mb-2">The lucky fact: the tokens are the game's own colors, transcribed</h3>
+        <p class="text-sm mb-3">The token sheet says it itself: <em>"palette lifted pixel-for-pixel from
+        the generated tile &amp; unit atlases."</em> Side-by-side with the shipped authorities:</p>
+        <div class="overflow-x-auto">
+          <table class="table gc-nums">
+            <thead><tr><th>token</th><th>handoff value</th><th>shipped authority</th><th>verdict</th></tr></thead>
+            <tbody>
+              <tr><td>--red</td><td>#d84a3c</td><td><code>CommanderVisuals</code> meridian ≈ #db4a3b</td><td>one hex step apart</td></tr>
+              <tr><td>--blue</td><td>#3c64d8</td><td><code>CommanderVisuals</code> aurora ≈ #3865d8</td><td>one hex step apart</td></tr>
+              <tr><td>--paper</td><td>#e8e0d0</td><td><code>CommanderVisuals.PAPER</code> ≈ #eee7d6</td><td>a shade apart</td></tr>
+              <tr><td>--slate-800</td><td>#2b2f34</td><td>select panel <code>_INACTIVE</code> ≈ #2b3136</td><td>a shade apart</td></tr>
+              <tr><td>--ink</td><td>#3a3f45</td><td><code>PAPER_INK</code> ≈ #252b30 · <code>HARD_BORDER</code> ≈ #111619</td><td>differs — game wins (D1)</td></tr>
+              <tr><td>--slate-900 / neutrals / capture green</td><td>#23272b et al.</td><td>no existing authority</td><td>new tokens</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs mt-3 opacity-70">Where a token and a shipped authority disagree by a hair, the
+        shipped value wins: the tokens were transcribed <em>from</em> the game, and a transcription
+        error is not a redesign. Faction colors are never re-declared at all — they stay
+        <code>CommanderVisuals.FactionTheme</code>'s, resolved through <code>SideIdentity</code>.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · THE SCREEN ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">2</span>
+        <h2 class="text-2xl font-black">The screen, adapted to the game that shipped</h2>
+      </div>
+
+      <div class="card bg-base-100 border p-0 mb-4 overflow-hidden">
+        <div class="hx-mock">
+          <div style="width: min(560px, 100%);">
+            <div style="display:flex; align-items:center; gap: .8rem; margin-bottom: 1rem;">
+              <div style="width:2.6rem; height:2.6rem; background:var(--hx-red); border:3px solid var(--hx-ink); box-shadow:3px 3px 0 rgba(35,39,43,.9);"></div>
+              <div>
+                <div class="hx-wordmark">Grid Commander</div>
+                <div class="hx-tagline">TURN-BASED TACTICS · PICK YOUR GROUND</div>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 142px; gap:.7rem; align-items:stretch;">
+              <div class="hx-panel">
+                <div class="hx-panel-head"><span>Match Setup</span><span class="r">CROSSFIRE · 20×15</span></div>
+                <div style="padding:.6rem;">
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem;">
+                    <div>
+                      <div class="hx-thumb sea" style="outline:3px solid var(--hx-red); outline-offset:-1px;"></div>
+                      <div style="font-size:.6rem; font-weight:600; color:var(--hx-ink); text-align:center; margin-top:.2rem;">Crossfire ✓</div>
+                    </div>
+                    <div>
+                      <div class="hx-thumb"></div>
+                      <div style="font-size:.6rem; font-weight:600; color:var(--hx-ink); text-align:center; margin-top:.2rem;">First Steps</div>
+                    </div>
+                  </div>
+                  <div style="font-family:'Silkscreen',monospace; font-size:.5rem; color:#8a9099; text-align:center; margin-top:.2rem;">▼ 10 MORE — SCROLLS ▼</div>
+                  <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:.5rem; margin-top:.5rem; padding-top:.5rem; border-top:2px solid rgba(58,63,69,.45);">
+                    <div>
+                      <div class="hx-microlabel">Difficulty</div>
+                      <div class="hx-seg"><span>Easy</span><span class="on">Normal</span><span>Hard</span></div>
+                    </div>
+                    <div>
+                      <div class="hx-microlabel">Speed</div>
+                      <div class="hx-seg"><span>Slow</span><span class="on">Normal</span><span>Quick</span><span>Instant</span></div>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:1rem; margin-top:.55rem; padding-top:.5rem; border-top:2px solid rgba(58,63,69,.45); align-items:center;">
+                    <span style="display:inline-flex; align-items:center; gap:.35rem;"><span class="hx-check" style="background:#cfcfcf;"></span><span style="font-size:.62rem; font-weight:600; color:var(--hx-ink);">Fog of war</span></span>
+                    <span style="display:inline-flex; align-items:center; gap:.35rem;"><span class="hx-check" style="background:var(--hx-capture);">✓</span><span style="font-size:.62rem; font-weight:600; color:var(--hx-ink);">Battle animations</span></span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:.45rem;">
+                <a class="hx-btn" style="background:var(--hx-red); border:3px solid var(--hx-red-dark); font-size:.78rem;">1 Player<span class="sub">VS AI</span></a>
+                <a class="hx-btn" style="background:var(--hx-blue); border:3px solid var(--hx-blue-dark); font-size:.78rem;">2 Player<span class="sub">HOT-SEAT</span></a>
+                <a class="hx-btn" style="background:var(--hx-paper); border:3px solid var(--hx-ink); color:var(--hx-ink); font-size:.7rem; opacity:.45;">Continue</a>
+                <a class="hx-btn" style="background:transparent; border:3px solid transparent; box-shadow:none; font-size:.7rem;">Quit</a>
+                <div style="display:flex; flex-wrap:wrap; gap:.3rem; justify-content:center; margin-top:auto; padding-top:.4rem;">
+                  <span class="hx-chip"><i style="background:var(--hx-red);"></i>Meridian · P1</span>
+                  <span class="hx-chip"><i style="background:var(--hx-blue);"></i>Aurora · AI</span>
+                </div>
+                <div style="text-align:center; font-family:'Silkscreen',monospace; font-size:.5rem; letter-spacing:.08em; color:#8a9099;">PRESS START</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs opacity-70 px-4 py-2">Layout sketch in the handoff's own tokens and web fonts
+        (illustrative — the game draws this with vendored fonts, real tile-grid thumbnails, and the
+        slow-panning terrain field behind it at 14% opacity).</p>
+      </div>
+
+      <p class="max-w-3xl mb-4">
+        The mockup's bones survive whole: header with icon and wordmark, a Match Setup panel beside an
+        action stack, the blinking <code>PRESS START</code>. Five places the mockup and the shipped
+        game disagree, and in every one <strong>the game wins</strong>:
+      </p>
+      <div class="grid md:grid-cols-2 gap-4 mb-6">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">12 maps, not 2 → a scrollable two-up grid</h3>
+          <p class="text-sm mt-1">The mockup shows two thumbnails side by side; the roster
+          (<span class="gc-file">core/map_catalog.gd</span>, smallest board first) ships twelve. The
+          picker becomes a <code>ScrollContainer</code> holding the mockup's two-up thumbnail cells —
+          selected map gets the raised surface, 3px red border and "✓" exactly per spec, and the panel
+          header-right shows <em>name · size</em>. Each cell keeps the current dropdown's tooltip
+          (size, property count, description) so no information is lost in the trade.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Four speed tiers, not three — and it stays a device preference</h3>
+          <p class="text-sm mt-1">The segmented control reads <code>GameSpeed.ordered()</code> —
+          Slow · Normal · Quick · Instant — and difficulty reads <code>DifficultyDB</code>'s three
+          tiers. <strong>Segment labels are populated from those authorities, never typed in.</strong>
+          Speed keeps the game-speed plan's D1 semantics untouched: tapping a segment writes
+          <code>Settings.set_speed</code> immediately and never rides <code>MatchConfig</code>. Battle
+          animations likewise stays the standing <code>Settings</code> preference it already is.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">No "Red vs Blue" — the menu speaks faction</h3>
+          <p class="text-sm mt-1">The mockup's chips say <em>"Red · P1 / Blue · AI"</em> and its
+          tagline says <em>"RED VS BLUE"</em> — both illegal under faction-identity D5, which this
+          repo already enforces everywhere else. Chips render the default side identities
+          (<em>Meridian · P1</em>, <em>Aurora · AI/P2</em>) through
+          <span class="gc-file">CommanderVisuals</span>, and the tagline drops the faction words.
+          The 1P/2P button <em>hues</em> stay — colors are not words — but they are read from the
+          faction theme table, not re-declared.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Continue: disabled, not hidden — and the flows do not move</h3>
+          <p class="text-sm mt-1">Today <code>ContinueButton</code> vanishes without a save; the spec
+          shows it present-but-disabled (45% opacity, desaturated), which teaches that continuing is a
+          thing this menu does. That is the <strong>only behavior change in the whole plan</strong>.
+          Everything else rewires nothing: 1P/2P still open the commander select, confirm still walks
+          <code>_start → MatchConfig → battle.tscn</code>, and the <code>--co-select</code> capture
+          hooks keep working.</p>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 border p-4">
+        <h3 class="font-black mb-2">Starting numbers — the ÷2 rule</h3>
+        <p class="text-sm mb-3">The mockup is authored for a ~1280px viewport; the game canvas is
+        <strong>640×360</strong> stretched 2× into the default 1280×720 window
+        (<span class="gc-file">project.godot</span>, untouched). So every handoff pixel maps to canvas
+        at <strong>÷2 and renders at mockup size</strong> in the default window. Rounded to whole
+        canvas pixels, favouring the chunkier reading:</p>
+        <div class="overflow-x-auto">
+          <table class="table gc-nums">
+            <thead><tr><th>element</th><th>handoff</th><th>canvas (640×360)</th><th>on the default window</th></tr></thead>
+            <tbody>
+              <tr><td>content column / action stack</td><td>740px / 244px</td><td>370 / 122</td><td>as mocked</td></tr>
+              <tr><td>panel border / thin rule</td><td>3px / 2px</td><td>2 / 1</td><td>4 / 2 — a touch chunkier</td></tr>
+              <tr><td>hard shadow (panel / control)</td><td>4px / 2px</td><td>2 / 1</td><td>as mocked</td></tr>
+              <tr><td>wordmark / panel title</td><td>48px / 14px</td><td>24 / 8</td><td>as mocked</td></tr>
+              <tr><td>button lg / segment height</td><td>48px / 34px</td><td>24 / 18</td><td>≈ as mocked</td></tr>
+              <tr><td>Silkscreen micro-labels</td><td>10–11px</td><td>6</td><td>12 — one step larger, legibility</td></tr>
+              <tr><td>map thumbnail tile</td><td>9.5px</td><td>4–5 (fit to cell)</td><td>≈ as mocked</td></tr>
+              <tr><td>icon</td><td>64px</td><td>32</td><td>as mocked</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs mt-3 opacity-70">These are starting values in the game-speed-plan tradition:
+        characterized here, then tuned by eye at both 1× (640×360 window) and the default 2× before the
+        milestone closes.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">3</span>
+        <h2 class="text-2xl font-black">Decisions</h2>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D1 · Where do the tokens live? <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">In <strong>one new presentation authority,
+        <span class="gc-file">scenes/common/ui_theme.gd</span></strong> (<code>class_name UiTheme</code>):
+        the shell palette (slates, neutrals, capture green), the two vendored fonts, and stylebox
+        factories for the recipes — cream panel, dark panel, hard shadow, faction button, segment,
+        checkbox, focus ring. Where a color already has an authority, <code>UiTheme</code>
+        <strong>re-exports it rather than re-declaring it</strong>: faction colors stay
+        <code>CommanderVisuals.FactionTheme</code>'s, cream and ink stay
+        <code>CommanderVisuals.PAPER / PAPER_INK / HARD_BORDER</code>. Not a <code>.tres</code> Theme —
+        this repo's whole UI is code-built styleboxes (<code>CommanderSelectPanel._flat/_hard</code>,
+        <code>commander_card._flat_box</code>…) and a hand-edited Theme resource is the one format
+        nobody can review in a diff. Not <span class="gc-file">data/</span> — data/ is for numbers the
+        <em>sim</em> reads (the game-speed plan's D2 precedent), and the sim must never read a menu
+        color.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D2 · Typography: vendor the two faces, for real <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm"><strong>Pixelify Sans</strong> (display &amp; UI chrome) and
+        <strong>Silkscreen</strong> (micro-labels, numerals) land as TTFs under
+        <span class="gc-file">assets/fonts/</span>, recorded in
+        <span class="gc-file">assets/LICENSES.md</span> — both SIL OFL, exactly the diligence the
+        project's legal note demands. The handoff calls them "chosen substitutes" because the repo had
+        no font; the substitution ends here — they become the game's faces. Antialiasing off, sizes on
+        the ÷2 grid, so they rasterize on the pixel grid the rest of the art lives on. The handoff's
+        Google-Fonts <code>@import</code> cannot ship in an engine build; vendoring is the only
+        option that works offline and in export.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D3 · The resolution does not move; the shadow is a StyleBox trick <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">The 640×360 canvas and <code>canvas_items</code> stretch are the board's
+        contract — the battle scene is composed against them — so the menu adapts to the canvas, never
+        the reverse (§2's ÷2 rule). The signature hard shadow needs no custom drawing:
+        <code>StyleBoxFlat</code> with <code>shadow_size&nbsp;=&nbsp;n</code>,
+        <code>shadow_offset&nbsp;=&nbsp;(n,&nbsp;n)</code> and antialiasing off grows the shadow rect
+        by <em>n</em> then shifts it — flush under the top-left edges, exactly <em>2n</em> of hard ink
+        past the bottom-right — reproducing CSS <code>2n 2n 0</code> with zero blur. Verified visually
+        in MN1 before anything builds on it. The press-down interaction (button translates 2px,
+        shadow collapses) is the pressed stylebox plus a content-margin shift — state swap, no tween.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D4 · Identity on the menu speaks faction <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">Faction-identity D5 is already the law: "Red"/"Blue" survive as developer
+        slot vocabulary only. The mockup predates that rule, so its literals are corrected at the
+        door: chips say <em>Meridian · P1</em> / <em>Aurora · AI</em> (or P2) in the classic default
+        hues, the tagline becomes faction-silent (<em>"TURN-BASED TACTICS · PICK YOUR GROUND"</em> as
+        the starting text), and every faction hue on the screen — button fills, chip dots, selected
+        map border — resolves through <code>CommanderVisuals</code> so a future palette change lands
+        here for free. The menu shows the <em>default</em> identities deliberately: commanders are
+        picked after 1P/2P, and the defaults are exactly what a commander-less match plays as.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D5 · One renderer draws every board pixel on the menu <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">A new <span class="gc-file">scenes/menu/map_thumbnail.gd</span> — one
+        <code>Control</code>, one canvas item — draws a <code>MapData</code> by blitting
+        <span class="gc-file">assets/tiles/terrain_atlas.png</span> regions per cell:
+        <strong>column from <code>TerrainType.atlas_col</code>, row from
+        <code>SideIdentity.atlas_row</code></strong> — the exact authorities
+        <span class="gc-file">battle_view.gd</span> paints the board with. No symbol table, no
+        per-terrain color list, no second opinion (the movement-resolver lesson, again). The panning
+        backdrop is the same renderer's output baked once to an <code>ImageTexture</code>, tiled and
+        scrolled at 14% opacity behind the whole screen. Owned properties draw in the default
+        meridian/aurora rows, so a thumbnail is a truthful miniature of day 1.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4">
+        <h3 class="font-black mb-2">D6 · Scope: the menu flow, whole — the battle HUD, not at all <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">The revamp covers <strong>everything a player sees between boot and the
+        first turn</strong>: the menu screen and the commander select panel that opens over it (an
+        alignment pass — its dark palette already sits a shade from the slate tokens; it gains the
+        fonts, the hard shadows and the shared constants, and keeps its layout, its gold selection
+        highlight and its <code>begin/confirmed/cancelled</code> API untouched). The battle HUD keeps
+        its current dress: it already shares <code>CommanderVisuals</code>, nothing forks, and its
+        alignment to <code>UiTheme</code> is a named follow-up rather than silent drift. Restyling
+        half the game's HUD as a rider on a menu plan is how scope creep — the named top risk of the
+        base plan — happens.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">4</span>
+        <h2 class="text-2xl font-black">Milestones — each one shippable</h2>
+      </div>
+      <div class="grid gap-4">
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">MN1 · The system lands: tokens, fonts, and the dressed screen <span class="badge badge-sm">size M</span></h3>
+          <p class="text-sm mt-1 mb-2">After MN1 the menu <em>is</em> the mockup's layout in the
+          mockup's dress — with the map picker still the styled dropdown for one more milestone, so
+          the scene rebuild and the thumbnail renderer never land in the same diff.</p>
+          <ul class="gc-checks text-sm">
+            <li><span class="gc-file">scenes/common/ui_theme.gd</span> — shell palette (new tokens only; re-exports for everything that has an authority), stylebox factories (panel, button×4 variants×states, segment, checkbox, focus ring), font loaders. The D3 shadow trick proven here first.</li>
+            <li><span class="gc-file">assets/fonts/</span> — Pixelify Sans + Silkscreen TTFs, antialiasing off; <span class="gc-file">assets/LICENSES.md</span> gains both OFL entries.</li>
+            <li><span class="gc-file">main_menu.tscn</span> rebuilt to the two-column layout: header (icon, wordmark with ink offset shadow, faction-silent tagline), Match Setup panel (dropdown map row for now, segmented Difficulty/Speed from their DBs, Fog/Animations checkboxes), action stack (1P meridian / 2P aurora with Silkscreen suffixes, Continue disabled-until-save, ghost Quit, identity chips, blinking PRESS START).</li>
+            <li><span class="gc-file">main_menu.gd</span> keeps every flow and hook: <code>Settings</code> speed/animations writes, <code>_start → MatchConfig</code>, <code>--co-select</code> capture, focus opens on 1 Player; segmented controls and checkboxes are keyboard/gamepad navigable with the chunky focus ring.</li>
+            <li>Proof: <code>make run</code> at 2× and at a 640×360 window — every label legible, every control reachable without a mouse; <code>make verify</code> green (nothing under <span class="gc-file">core/</span> or <span class="gc-file">ai/</span> changes in this plan, ever).</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">MN2 · The board comes to the menu <span class="badge badge-sm">size M</span></h3>
+          <p class="text-sm mt-1 mb-2">The dropdown dies; the roster becomes visible terrain.</p>
+          <ul class="gc-checks text-sm">
+            <li><span class="gc-file">scenes/menu/map_thumbnail.gd</span> — D5's renderer: one canvas item per map, atlas columns × identity rows, sized to its cell (4–5px canvas tiles for a 20×15 board).</li>
+            <li>The scrollable two-up grid replaces <code>MapOption</code>: selected cell gets raised surface + meridian border + ✓, panel header-right reads <em>name · size</em>, every cell carries the old tooltip's facts. Scroll position follows keyboard focus; twelve maps, smallest first, exactly <code>MapCatalog.ordered()</code>.</li>
+            <li>The panning backdrop: one shipped board baked to an <code>ImageTexture</code>, tiled 3×3, drifting −64px canvas diagonally over 40s at 14% opacity behind a radial slate highlight. <strong>Pinned still whenever <code>ScreenshotUtil.requested()</code></strong> — the capture must not depend on when it was taken (the animator's <code>capturing</code> precedent), and the PRESS START blink pins with it.</li>
+            <li>Proof: <code>make run</code> — flip through all twelve thumbnails against the boards they launch; a <code>--co-select</code> capture is byte-stable across two runs.</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">MN3 · The select panel joins the system <span class="badge badge-sm">size S</span></h3>
+          <p class="text-sm mt-1 mb-2">The alignment pass of D6, plus the polish debt of MN1–MN2.</p>
+          <ul class="gc-checks text-sm">
+            <li><span class="gc-file">commander_select_panel.gd</span> swaps its private palette for <code>UiTheme</code> tokens (its slate was already a shade away), gains the two fonts and the hard shadows; layout, gold selection highlight and public API untouched.</li>
+            <li>Press-down (2px translate, shadow collapse), hover brightness, disabled desaturation land on every button through the shared factories — one implementation, both screens.</li>
+            <li>The <code>--co-select</code> gallery captures re-baselined once, deliberately, in their own commit — the diff <em>is</em> the restyle, reviewed as such.</li>
+            <li>README gains the design-system note: where the tokens live, where the fonts came from, what the handoff zip was.</li>
+            <li>Proof: <code>make run</code> through menu → select → battle and back; the seam between the two screens reads as one game. <code>make verify</code> green, still zero <span class="gc-file">core/</span>/<span class="gc-file">ai/</span> lines touched.</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">5</span>
+        <h2 class="text-2xl font-black">Risks</h2>
+      </div>
+      <div class="grid gap-3">
+        <div class="card bg-base-100 border gc-risk-high p-4">
+          <h3 class="font-bold">R1 · Pixel type at 640×360 stops being readable</h3>
+          <p class="text-sm mt-1">The named top risk. Silkscreen at 6px canvas is 12 physical pixels
+          on the default window and <em>6</em> in a 1× window; a fractional OS scale could smear
+          either face into mud. Mitigation is mechanical: antialiasing off, sizes only on the ÷2
+          grid, and MN1's gate explicitly plays the menu at 1× and 2× before building further. If a
+          label fails at 1×, the size table moves up a step — the mockup is a reference, not a
+          contract, and legibility outranks fidelity.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R2 · The thumbnail becomes a second opinion on terrain</h3>
+          <p class="text-sm mt-1">A renderer with its own symbol map or color table would drift from
+          the board the moment a terrain is added — the range-overlay-vs-command bug, relocated. D5
+          closes it by construction: the thumbnail reads <code>TerrainType.atlas_col</code> and
+          <code>SideIdentity.atlas_row</code> — the board's own authorities — and the backdrop reuses
+          the thumbnail's output. There is nothing to keep in sync because there is only one of it.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R3 · The menu is a capture surface, and now it moves</h3>
+          <p class="text-sm mt-1">The <code>--co-select</code> captures shoot the select panel over
+          the live menu; a drifting backdrop or mid-blink PRESS START makes those shots
+          machine-dependent. MN2 pins both under <code>ScreenshotUtil.requested()</code> — the same
+          gate the animator's <code>capturing</code> flag set the precedent for — and the MN3
+          re-baseline is one deliberate commit, not a flaky diff that gets waved through.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R4 · The third palette</h3>
+          <p class="text-sm mt-1">Menu on <code>UiTheme</code>, select panel half-migrated, HUD on raw
+          <code>CommanderVisuals</code> — three dialects where there were two. Contained by D1's
+          re-export rule (UiTheme <em>aliases</em> the shared constants, so there is still exactly one
+          value per color) and by D6 naming the HUD follow-up out loud. The review rule after MN1: no
+          new inline hex/Color literal in <span class="gc-file">scenes/menu/</span> — every color is a
+          <code>UiTheme</code> or <code>CommanderVisuals</code> name.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R5 · Determinism, saves, sim safety</h3>
+          <p class="text-sm mt-1">Structurally safe rather than carefully safe, again: this plan
+          touches <span class="gc-file">scenes/</span> and <span class="gc-file">assets/</span> only.
+          <code>MatchConfig</code> carries the same fields, <code>Settings</code> the same keys, the
+          save format is untouched, and the single behavior change (Continue disabled vs hidden)
+          cannot reach a sim. The GUT suite neither gains nor loses a test — per the testing doctrine,
+          presentation is verified by playing it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">6</span>
+        <h2 class="text-2xl font-black">Explicitly out of scope</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">The battle HUD &amp; in-battle menus</h3>
+          <p class="text-sm mt-1">D6's line. The terrain panel, HUD chips, banners and battle menus
+          keep their dress; aligning them to <code>UiTheme</code> is its own future plan with its own
+          capture re-baselines.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Porting the React components</h3>
+          <p class="text-sm mt-1">Button/Panel/FactionTag are read for their numbers and states, then
+          closed. The Godot implementation is styleboxes and containers; no JSX concept survives the
+          crossing.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Menu audio, music, and transitions</h3>
+          <p class="text-sm mt-1">No boot jingle, no hover blips, no screen-to-screen wipes beyond
+          what exists. The spec's motion budget (90–240ms, mechanical) is honored inside controls
+          only.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Resolution, stretch, or a settings screen</h3>
+          <p class="text-sm mt-1">640×360 <code>canvas_items</code>/<code>keep</code> is the board's
+          contract and stays. No options screen rides along — the menu's five controls are the
+          options, exactly as today.</p>
+        </div>
+      </div>
+      <p class="text-xs opacity-70 mt-6">Grid Commander · menu-revamp plan rev 1 · pairs with
+      <span class="gc-file">.lavish/faction-identity-plan.html</span> (D5 vocabulary law),
+      <span class="gc-file">game-speed-plan.html</span> (speed-as-device-preference),
+      <span class="gc-file">difficulty-modes-plan.html</span> (tier roster) and
+      <span class="gc-file">advance-wars-clone-plan.html</span> (base game). Source of truth for the
+      look: the Grid Commander Design System handoff, <code>handoff/main-menu/</code> — its numbers are
+      quoted in §1–§2 so the repo never depends on the zip.</p>
+    </section>
+
+  </div>
+</body>
+</html>

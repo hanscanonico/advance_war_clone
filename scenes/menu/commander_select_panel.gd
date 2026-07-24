@@ -24,9 +24,13 @@ enum Side { RED, BLUE }
 
 const _TITLE_SIZE := 15
 const _MINI_H := 82
+## The selection accent, kept through the alignment pass (menu-revamp D6): gold is
+## this page's own signal for "locked", distinct from the faction fills.
 const GOLD := Color(0.957, 0.745, 0.196)
-const _INACTIVE := Color(0.169, 0.192, 0.212)
-const _MUTED := Color(0.639, 0.667, 0.686)
+## The private slate/muted palette swaps for the shared UiTheme tokens it already
+## sat a shade from, so the select page and the menu speak one grey (plan MN3).
+const _INACTIVE := UiTheme.SLATE_800
+const _MUTED := UiTheme.NEUTRAL_LIGHT
 
 var _db: CommanderDB
 ## faction key -> Array[CommanderType], the three members in name order.
@@ -102,7 +106,7 @@ func debug_advance_to_blue() -> void:
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
-	bg.color = Color(0.086, 0.106, 0.118, 0.98)
+	bg.color = Color(UiTheme.SLATE_900.r, UiTheme.SLATE_900.g, UiTheme.SLATE_900.b, 0.985)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -129,10 +133,13 @@ func _build() -> void:
 
 	body.add_child(_build_right_column())
 
+	# The control legend in Silkscreen — a key-hint badge is the textbook home for
+	# the design system's stat face, and it brings the second font onto the page.
 	var footer := Label.new()
-	footer.add_theme_font_size_override("font_size", 9)
-	footer.add_theme_color_override("font_color", Color(0.678, 0.706, 0.722))
-	footer.text = "Arrows / Tab  Browse      Enter  Confirm      Esc  Back      Mouse supported"
+	footer.add_theme_font_override("font", UiTheme.stat())
+	footer.add_theme_font_size_override("font_size", 8)
+	footer.add_theme_color_override("font_color", UiTheme.NEUTRAL_LIGHT)
+	footer.text = "ARROWS / TAB  BROWSE      ENTER  CONFIRM      ESC  BACK      MOUSE OK"
 	main.add_child(footer)
 
 
@@ -142,6 +149,7 @@ func _build_topbar() -> HBoxContainer:
 
 	var title := Label.new()
 	title.text = "SELECT COMMANDER"
+	title.add_theme_font_override("font", UiTheme.display(true))
 	title.add_theme_font_size_override("font_size", _TITLE_SIZE)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -170,6 +178,7 @@ func _build_right_column() -> VBoxContainer:
 		var theme := CommanderVisuals.theme_for_key(_faction_keys[i])
 		var tab := Button.new()
 		tab.text = String(theme.key).capitalize()
+		tab.add_theme_font_override("font", UiTheme.display())
 		tab.add_theme_font_size_override("font_size", 10)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tab.focus_entered.connect(_set_faction.bind(i))
@@ -212,10 +221,13 @@ func _build_right_column() -> VBoxContainer:
 	return col
 
 
+## The three footer actions wear the shared cream button — hard shadow, press-down,
+## hover brighten, all from UiTheme's one implementation, so a press feels the same
+## here as on the menu (plan MN3).
 func _action_button(text: String) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.add_theme_font_size_override("font_size", 10)
+	UiTheme.apply_button(button, UiTheme.ButtonVariant.SECONDARY, null, 10)
 	return button
 
 
@@ -467,6 +479,7 @@ func _style_tab(tab: Button, active: bool) -> void:
 
 func _small_label(size: int) -> Label:
 	var label := Label.new()
+	label.add_theme_font_override("font", UiTheme.display())
 	label.add_theme_font_size_override("font_size", size)
 	return label
 
@@ -496,4 +509,5 @@ func _hard(border: Color, width: int) -> StyleBoxFlat:
 	box.content_margin_right = 4
 	box.content_margin_top = 2
 	box.content_margin_bottom = 2
-	return box
+	# The signature hard offset shadow, from the one authority (plan MN3).
+	return UiTheme.hard_shadow(box)

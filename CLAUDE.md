@@ -9,7 +9,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.7+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** fourteen designs of record, all worth reading before an architectural decision.
+- **Status:** fifteen designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -127,6 +127,20 @@ three movement domains (land, air, sea), property capture and income, and a comp
   presentation-only (D5): clicking a unit you cannot command previews its move range and **R** paints
   its fire ring, both pure reads gated by the same `view.can_see_unit` fog rule targeting uses, so
   nothing under `core/` or `ai/` learns the overlay exists and `make screenshot` stays byte-stable.
+  `.lavish/menu-revamp-plan.html` owns the main-menu and commander-select redress — milestones
+  MN1–MN3, all shipped — and its D1: **the design-system tokens live in one code authority,
+  `scenes/common/ui_theme.gd` (`UiTheme`), never a `.tres` Theme.** `UiTheme` re-exports every colour
+  that already has an authority (faction hues stay `CommanderVisuals`/`SideIdentity`'s, cream and ink
+  stay `CommanderVisuals.PAPER`/`PAPER_INK`/`HARD_BORDER`) and declares only the shell tokens the game
+  lacked, so there is still exactly one value per colour. The whole revamp is presentation-only —
+  nothing under `core/` or `ai/` changes — and its D5 map thumbnails (`scenes/menu/map_thumbnail.gd`)
+  draw from `TerrainType.atlas_col` × `SideIdentity.atlas_row`, the board's own authorities, so a
+  miniature can never be a second opinion (R2), and the same renderer bakes the panning menu backdrop.
+  D6 is the scope line: the menu flow whole, the battle HUD not at all — the shared `CommanderCard`
+  keeps its dress until a named follow-up, because it is also the in-battle info sheet. The two fonts
+  (Pixelify Sans, Silkscreen) are vendored under `assets/fonts/`, both OFL, recorded in
+  `assets/LICENSES.md`. The design-system source is external (the handoff zip), not in the repo; its
+  numbers are quoted in the plan so the tree never depends on it.
 - **Engine:** Godot 4.7+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
