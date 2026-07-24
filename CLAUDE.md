@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** thirteen designs of record, all worth reading before an architectural decision.
+- **Status:** fourteen designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -116,6 +116,16 @@ three movement domains (land, air, sea), property capture and income, and a comp
   `tests/unit/test_commander_quotes.gd` enforces that every powered general ships quotes and
   that each line fits the 60-character cap — an editorial ruler, not a rendering fact. Its D5
   keeps it text only; voice audio and a settings toggle are explicitly out of scope.
+  `.lavish/range-preview-plan.html` owns the range preview — milestones RP1–RP3, all shipped — and
+  its D1: **the fire ring is the single authority's geometry, never a second opinion.**
+  `AttackRange.threat_cells`/`firing_cells`/`ring_cells` in `core/rules/` own "every cell a unit
+  could bring under fire this turn"; `ai/threat_map.gd` was rebuilt onto them, keeping only its own
+  dry/unarmed filter and per-enemy attribution, so the red overlay the player sees and the cells the
+  planner fears are one computation — the movement-overlay lesson (`MoveCommand.validate`) applied
+  before the bug, its merge bar a fixed-seed byte-diff of both balance reports. Everything else is
+  presentation-only (D5): clicking a unit you cannot command previews its move range and **R** paints
+  its fire ring, both pure reads gated by the same `view.can_see_unit` fog rule targeting uses, so
+  nothing under `core/` or `ai/` learns the overlay exists and `make screenshot` stays byte-stable.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 

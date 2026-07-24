@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Range Preview Plan</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+      --gc-move: rgba(89, 140, 255, .78);   /* move_overlay modulate 0.35,0.55,1,0.75 */
+      --gc-fire: rgba(255, 89, 77, .82);    /* attack_overlay modulate 1,0.35,0.3,0.8 */
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-proposed { border-color: #d58a24; box-shadow: 0 0 0 2px color-mix(in srgb, #d58a24 30%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+    .gc-crosses li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-crosses li::before { content: "✗"; color: var(--gc-red); font-weight: 900; }
+    .gc-key {
+      display: inline-grid; place-items: center;
+      min-width: 1.6rem; height: 1.6rem; padding: 0 .35rem;
+      border: 2px solid currentColor; border-radius: .3rem;
+      font: 800 .8rem ui-monospace, monospace;
+      box-shadow: 0 2px 0 currentColor;
+      vertical-align: middle;
+    }
+
+    /* --- mock boards ------------------------------------------------------- */
+    .gc-board {
+      display: grid;
+      gap: 1px;
+      background: #4c8a34;
+      border: 3px solid var(--gc-water-dark);
+      border-radius: .4rem;
+      padding: 1px;
+      width: 100%;
+      max-width: 19rem;
+      margin: 0 auto;
+    }
+    .gc-board .c {
+      aspect-ratio: 1;
+      background: var(--gc-grass);
+      position: relative;
+    }
+    .gc-board .c.alt { background: #7dbd52; }
+    .gc-board .c.b::after,
+    .gc-board .c.r::after {
+      content: "";
+      position: absolute; inset: 0;
+    }
+    .gc-board .c.b::after { background: var(--gc-move); }
+    .gc-board .c.r::after { background: var(--gc-fire); }
+    .gc-board .c.u {
+      display: grid; place-items: center;
+      font: 900 .7rem ui-monospace, monospace;
+      color: white;
+      z-index: 1;
+    }
+    .gc-board .c.u span {
+      display: grid; place-items: center;
+      width: 78%; height: 78%;
+      border-radius: .25rem;
+      border: 2px solid rgba(0,0,0,.35);
+      box-shadow: 0 1px 0 rgba(0,0,0,.4);
+    }
+    .gc-board .c.u.enemy span { background: var(--gc-red); }
+    .gc-board .c.u.own span { background: var(--gc-blue); }
+    .gc-legend { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; font-size: .78rem; }
+    .gc-legend .sw { display: inline-block; width: .95rem; height: .95rem; border-radius: .2rem; vertical-align: -.15rem; margin-right: .3rem; border: 1px solid rgba(0,0,0,.25); }
+  </style>
+</head>
+<body>
+  <div class="gc-shell">
+
+    <!-- ============================== HERO ============================== -->
+    <header class="gc-hero px-6 py-10 md:px-12">
+      <p class="gc-kicker opacity-80">Grid Commander · Stretch item · Proposed for review · rev 1</p>
+      <h1 class="text-3xl md:text-4xl font-black mt-2">Range Preview — enemy intel and the fire ring</h1>
+      <p class="mt-3 max-w-3xl opacity-90">
+        Today, clicking an enemy unit does <strong>nothing</strong> — the one question a tactics
+        player asks all game long ("how far can that thing reach?") is answered by counting tiles on
+        the wallpaper. This plan adds two moves of the same idea. <strong>Click any unit you cannot
+        command</strong> — an enemy, or one of your own that has already acted — and its movement
+        range paints in the familiar blue. <strong>Press <span class="gc-key">R</span> while any
+        move range is on screen</strong> — yours or theirs — and the cells that unit could bring
+        under fire this turn paint in red. Both are pure reads: no command is issued, nothing in the
+        sim moves, and every cell shown is computed by the same single authorities the game already
+        trusts to resolve the real thing.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <span class="badge badge-lg" style="background:var(--gc-blue); color:white; border:0;">Blue — where it can move</span>
+        <span class="badge badge-lg" style="background:var(--gc-red); color:white; border:0;">Red — where it can fire</span>
+        <span class="badge badge-lg" style="background:var(--gc-road); border:0;">R — one key, one meaning</span>
+        <span class="badge badge-lg" style="background:var(--gc-grass); border:0;">Fog-honest by the same gate as targeting</span>
+      </div>
+    </header>
+
+    <!-- ============================== 1 · SEAMS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">1</span>
+        <h2 class="text-2xl font-black">The seams already exist</h2>
+      </div>
+      <p class="max-w-3xl mb-4">
+        Almost nothing here is new machinery. The overlays, the math, the fog gate and even the free
+        key are all sitting in the codebase waiting to be introduced to each other:
+      </p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Both overlays exist, already in the right colors</h3>
+          <p class="text-sm mt-1"><span class="gc-file">battle_view.gd:275</span>
+          <code>paint_move_overlay</code> paints the blue <code>TileMapLayer</code>
+          (modulate at <span class="gc-file">battle.tscn:21</span>) and
+          <span class="gc-file">battle_view.gd:282</span> <code>paint_attack_overlay</code> the red
+          one (<span class="gc-file">battle.tscn:24</span>). Both take a cell list, both clear on an
+          empty array. The features are new <em>callers</em> of a painting API that ships today —
+          no new nodes, no new tiles.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The AI already computes the exact answer</h3>
+          <p class="text-sm mt-1"><span class="gc-file">ai/threat_map.gd:55</span>
+          <code>_firing_cells</code> + <code>_mark_ring</code> is precisely "every cell this unit
+          could bring under fire this turn": indirect units shoot only from where they stand
+          (<code>AttackRange.is_indirect</code>, <span class="gc-file">attack_range.gd:62</span>),
+          direct units from every cell they can stop on, ring clamped to
+          <code>[minimum,&nbsp;maximum]</code>. Difficult-tier AI has trusted this math for a while.
+          The plan promotes the geometry to the authority that owns "who and how far" —
+          <span class="gc-file">core/rules/attack_range.gd</span> — and has both the AI and the UI
+          ask it (D1).</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The entry point is a no-op today</h3>
+          <p class="text-sm mt-1">In <code>State.IDLE</code>, <code>confirm_at</code>
+          (<span class="gc-file">battle.gd:288-295</span>) selects only
+          <code>team == current_team and not acted</code>; an enemy unit, or your own waited unit,
+          falls through every branch and the click evaporates. The preview slots into exactly that
+          dead branch — it converts no-ops into information and changes no click that does something
+          today.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The fog gate and the key are ready</h3>
+          <p class="text-sm mt-1"><span class="gc-file">battle_view.gd:331</span>
+          <code>can_see_unit</code> is the gate targeting already uses — <span class="gc-file">battle.gd:706</span>:
+          <em>"the player cannot target what they cannot see."</em> The preview takes the same gate,
+          so a fogged or dived unit is exactly as unclickable as it is untargetable. And the input
+          map (<span class="gc-file">project.godot:30-77</span>) leaves <strong>R</strong> entirely
+          unbound — <em>R for range</em> costs nothing.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · HOW IT PLAYS ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">2</span>
+        <h2 class="text-2xl font-black">How it plays</h2>
+      </div>
+      <p class="max-w-3xl mb-5">
+        One grammar, whoever owns the unit: <strong>blue is movement, red is fire,
+        <span class="gc-key">R</span> flips the red on and off.</strong> The boards below are open
+        ground for readability — the real overlay is the same flood fill the sim uses, so terrain,
+        fuel and blockers shape it exactly as they shape a real move.
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-4 mb-6">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold text-sm mb-3 text-center">① Click the enemy tank</h3>
+          <div class="gc-board" id="board-move"></div>
+          <p class="text-xs mt-3 opacity-80">Its move range paints in the same blue yours does.
+          No command is issued — the sim never hears about it.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold text-sm mb-3 text-center">② Press R — the fire ring</h3>
+          <div class="gc-board" id="board-fire"></div>
+          <p class="text-xs mt-3 opacity-80">A direct unit can fire from any cell it can stop on,
+          so its ring is the move area grown by its range: <em>everything red can be hit this
+          turn.</em> Red paints over blue; one more press of R and you are back to blue.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold text-sm mb-3 text-center">③ The artillery lesson</h3>
+          <div class="gc-board" id="board-arty"></div>
+          <p class="text-xs mt-3 opacity-80">An indirect unit cannot move and fire, so its red ring
+          stands around its <em>current</em> cell — and the min-range hole is finally visible:
+          stand next to the gun and it cannot touch you. This one picture is the feature's best
+          argument.</p>
+        </div>
+      </div>
+      <div class="gc-legend mb-6">
+        <span><span class="sw" style="background:var(--gc-move);"></span>move overlay (blue)</span>
+        <span><span class="sw" style="background:var(--gc-fire);"></span>fire overlay (red)</span>
+        <span><span class="sw" style="background:var(--gc-red);"></span>enemy unit</span>
+        <span><span class="sw" style="background:var(--gc-grass);"></span>open ground (mock)</span>
+      </div>
+
+      <div class="card bg-base-100 border p-4">
+        <h3 class="font-black text-lg mb-2">The interaction grammar</h3>
+        <ul class="gc-checks text-sm">
+          <li><strong>Click an enemy unit, or your own waited unit</strong> → its move range paints blue and the game enters a new <code>PREVIEW</code> state. The terrain panel keeps narrating the hovered cell as it does now.</li>
+          <li><strong>Press <span class="gc-key">R</span> while any move range is on screen</strong> — your selected unit in <code>UNIT_SELECTED</code>, or a previewed unit — → that unit's fire cells paint red on the attack overlay. Press again → red clears, blue remains.</li>
+          <li><strong>Click another unit while previewing</strong> → the preview switches; clicking one of your <em>ready</em> units leaves the preview and selects it normally — intel never blocks play.</li>
+          <li><strong>Click empty ground or press cancel</strong> → the preview dismisses back to <code>IDLE</code>. Deliberately <em>not</em> the map menu: a click that clears information should not also open something.</li>
+          <li><strong>Every exit clears the red</strong> — confirming a move, opening a menu, cancelling, switching units. The ring is a momentary lens, never a stale layer.</li>
+          <li><strong>Unarmed units</strong> (transports, the lander) paint no red — same truth the terrain panel tells by omitting their "Rng" line.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">3</span>
+        <h2 class="text-2xl font-black">Decisions</h2>
+      </div>
+      <p class="max-w-3xl mb-4 text-sm opacity-80">All five are proposed, not locked — annotate the
+      ones you'd call differently. D3's toggle-versus-hold and D2's red-over-blue are the two most
+      taste-shaped calls.</p>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D1 · Where is the ring computed? One authority, promoted <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">A new static on the class that already owns "who and how far":
+        <code>AttackRange.threat_cells(state, unit) → Array[Vector2i]</code> — the deduped union of
+        <code>[minimum, maximum]</code> rings around every cell the unit could fire from this turn
+        (its own cell for an indirect unit, per <span class="gc-file">attack_range.gd:62</span>;
+        every <code>can_stop_at</code> cell of <code>MovementResolver.reachable</code> for a direct
+        one). <span class="gc-file">ai/threat_map.gd</span> then <strong>refactors to ask it</strong>
+        — <code>build()</code> keeps its own policy filter and its per-enemy cell attribution, but
+        the geometry lives in exactly one place. This is the movement-overlay lesson applied before
+        the bug instead of after: the repo already paid once for a second opinion on movement
+        (<span class="gc-file">CLAUDE.md</span>, the <code>MoveCommand.validate</code> story), and a
+        red overlay that disagreed with the AI's threat model by one cell would be the same bug
+        wearing a new color. Rejected: computing the ring in <span class="gc-file">battle.gd</span>
+        beside <code>_attackable_cells</code> — that would make the presentation layer the second
+        opinion.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D2 · One grammar of colors — blue moves, red fires, red wins on top <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">The enemy's move range paints the <strong>same blue as yours</strong>,
+        and the fire ring paints the red attack overlay <strong>above</strong> it (the layer order
+        <span class="gc-file">battle.tscn</span> already draws). The colors mean the <em>question</em>,
+        not the owner: blue answers "where can it stand", red answers "where can it hit", and the
+        clicked unit plus the terrain panel say whose answer it is. Rejected: tinting the enemy
+        preview in its faction color via <code>SideIdentity</code> — pretty on paper, but a
+        Meridian-red army's move range would sit one hue away from the fire red, and an overlay a
+        player must disambiguate by faction is worse than one they never have to think about. For a
+        direct unit the red covers the blue entirely (the ring is a superset of the move area) —
+        that is the honest picture, it is one keypress to flip back, and if playtest wants both at
+        once, painting only the fringe is a one-line variant parked for that conversation.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D3 · The key and the verb — R, as a toggle <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">A new input action <code>show_range</code> bound to <strong>R</strong>
+        (unbound today; <span class="gc-file">project.godot</span> edited minimally, per house
+        rules), handled where all board input lives — <code>_unhandled_input</code>,
+        event-driven like every other action in the file. <strong>Toggle, not hold:</strong> press
+        to show, press to clear, and any state transition clears it for you. A mouse player planning
+        a flank wants the ring to <em>stay up</em> while the cursor is busy elsewhere; hold-to-peek
+        fights the hand that is already on the mouse. The alternative — hold to peek, release to
+        restore blue — is cheap to build on the same seam if the toggle feels sticky in play.
+        The action works in exactly the two states that show a move range (<code>UNIT_SELECTED</code>
+        and the new <code>PREVIEW</code>) and is inert everywhere else.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4 mb-4">
+        <h3 class="font-black mb-2">D4 · Dry guns still show their ring — capability, not forecast <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm">A unit out of ammo paints its red ring all the same. The overlay answers
+        "what does this weapon reach", the same capability the terrain panel's
+        <code>Rng 2-3</code> line states regardless of the ammo counter beside it — and a rocket
+        truck one resupply away from full is not a safe neighbor. The AI's
+        <code>ThreatMap.build</code> <strong>keeps</strong> its dry-and-unarmed filter
+        (<span class="gc-file">threat_map.gd:43</span>): it measures expected damage <em>this
+        turn</em>, a genuinely different question, and both callers keep asking the same geometry
+        underneath. Truly unarmed units (<code>max_range&nbsp;≤&nbsp;0</code>) return an empty ring
+        from the authority itself — nothing to show, nothing shown.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-proposed p-4">
+        <h3 class="font-black mb-2">D5 · The preview reads the real state, gated by the viewer's eyes <span class="badge badge-warning badge-sm">proposed</span></h3>
+        <p class="text-sm"><strong>Entry</strong> is gated by <code>view.can_see_unit</code> — the
+        exact gate targeting uses (<span class="gc-file">battle.gd:706</span>), so under fog a
+        hidden unit is unclickable and a dived submarine reveals nothing by being probed.
+        <strong>Computation</strong> then runs against the real <code>GameState</code> through the
+        single authorities, not against a fog-redacted copy: building a second, censored board for
+        the flood fill to walk would be one more independent opinion on movement, and that is the
+        one bug this repo has promised itself never to buy twice. The cost is a leak so small it
+        needs a magnifying glass — see R3 — and the sim stays untouched either way:
+        <em>forecasting is a pure read</em>, and so is this.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">4</span>
+        <h2 class="text-2xl font-black">Milestones — each one shippable</h2>
+      </div>
+      <div class="grid gap-4">
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">RP1 · The geometry authority <span class="badge badge-sm">size S · core only</span></h3>
+          <p class="text-sm mt-1 mb-2">Promote the ring math into
+          <span class="gc-file">core/rules/attack_range.gd</span> and make the AI its first caller —
+          zero pixels change, and the class that owns "who and how far" finally owns "from where,
+          after moving" too.</p>
+          <ul class="gc-checks text-sm">
+            <li><code>AttackRange.threat_cells(state, unit) → Array[Vector2i]</code> — firing cells (indirect: standing cell; direct: every <code>can_stop_at</code> cell) dilated by the <code>[minimum, maximum]</code> ring, deduped, clipped to the board. Pure read, no RNG, no mutation.</li>
+            <li><span class="gc-file">ai/threat_map.gd</span> refactored: <code>build()</code> keeps its dry/unarmed policy filter and per-enemy attribution, the geometry comes from the authority. <code>incoming_damage</code> untouched.</li>
+            <li><span class="gc-file">tests/unit/test_attack_range.gd</span> — the authority's first dedicated test file: direct dilation on open ground, indirect ring pinned to the standing cell, the min-range hole, unarmed → empty, a friendly blocker deleting a stoppable cell and its fringe, board-edge clipping.</li>
+            <li>Proof: <code>make test</code> green, and — the balance plan's merge bar, honored — fixed-seed <code>make commander-balance</code> and <code>make difficulty-check</code> reports <strong>byte-identical</strong> before and after. A diff means the geometry changed, not merely moved.</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">RP2 · The fire ring on your own unit <span class="badge badge-sm">size S</span></h3>
+          <p class="text-sm mt-1 mb-2">The R key, wired for the selection flow that already exists —
+          useful the day it lands, before any enemy preview.</p>
+          <ul class="gc-checks text-sm">
+            <li><code>show_range</code> action in <span class="gc-file">project.godot</span>, bound to R — a minimal, reviewable hand edit in the house style of <code>confirm</code>/<code>cancel</code>.</li>
+            <li><span class="gc-file">battle.gd</span>: in <code>UNIT_SELECTED</code>, <code>show_range</code> toggles <code>view.paint_attack_overlay(AttackRange.threat_cells(game, selected))</code>; a <code>_range_shown</code> flag, nothing more. Path planning under the cursor keeps working beneath it.</li>
+            <li>Every exit clears it: <code>_clear_selection</code> already blanks the attack overlay (<span class="gc-file">battle.gd:344</span>); <code>_animate_move</code> (<span class="gc-file">battle.gd:351-354</span>) learns to — today it clears only the move overlay and path line. The state machine keeps the ring and <code>TARGETING</code>'s target cells from ever sharing the layer.</li>
+            <li>Indirect units read honestly: ring around the standing cell while blue shows the move range — "move <em>or</em> fire" in one picture.</li>
+            <li>Proof: played — tank, artillery, a transport (no ring); <code>make screenshot</code> byte-identical (no capture path presses R); <code>make test</code> green untouched.</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">RP3 · The preview — click what you cannot command <span class="badge badge-sm">size M</span></h3>
+          <p class="text-sm mt-1 mb-2">The dead click comes alive: enemies and waited units answer
+          with their move range, and R works there too.</p>
+          <ul class="gc-checks text-sm">
+            <li>New <code>State.PREVIEW</code> in the <span class="gc-file">battle.gd</span> enum, entered from the IDLE branch: <code>elif unit != null and view.can_see_unit(unit): _enter_preview(unit)</code> — slotted after the select branch, before the factory/menu fallthroughs, converting only clicks that do nothing today.</li>
+            <li><code>_enter_preview</code>: select tick, dedicated <code>_previewed</code> / <code>_preview_range</code> fields — <code>selected</code> keeps meaning "a unit I am commanding", an invariant the menu flow leans on — <code>MovementResolver.reachable</code>, blue overlay. No path line: a preview plans nothing.</li>
+            <li>In <code>PREVIEW</code>: <code>show_range</code> toggles the red ring off <code>_previewed</code>; clicking another visible unit switches the preview or selects your ready unit through the normal path; empty click and <code>cancel</code> dismiss to <code>IDLE</code>; cursor motion keeps feeding the terrain panel.</li>
+            <li>The input-block lists at <span class="gc-file">battle.gd:244/254</span> stay as they are — <code>PREVIEW</code> accepts board input like <code>IDLE</code>; the scenario driver waits on states it never enters and needs nothing.</li>
+            <li>Proof: played with fog on — a visible enemy previews, a hidden one stays a dead click, a dived sub reveals nothing; every dismissal path exercised; <code>make screenshot</code> byte-identical; suite green.</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">5</span>
+        <h2 class="text-2xl font-black">Risks</h2>
+      </div>
+      <div class="grid gap-3">
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R1 · The refactor moves the AI's aim</h3>
+          <p class="text-sm mt-1">RP1 rebuilds <code>ThreatMap</code> on the promoted authority; a
+          one-cell drift in the geometry would silently retune the Difficult tier. Mitigation is the
+          gate the balance plan already built for exactly this shape of change: both fixed-seed
+          reports byte-identical, or the milestone does not merge. Two committed documents rest on
+          those numbers; they are the tripwire.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R2 · Overlay double-booking</h3>
+          <p class="text-sm mt-1">The blue layer moonlights for drop-targeting and the red one for
+          <code>TARGETING</code>'s live target cells; a stale fire ring surviving into either would
+          show a player cells that mean something else. Mitigation: the ring exists only inside the
+          two range states, and every exit from them runs a named clear site (RP2's list). The audit
+          is a grep for <code>paint_attack_overlay</code> — a handful of call sites, all in one
+          file.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R3 · Red-over-blue swallows the move range for direct units</h3>
+          <p class="text-sm mt-1">Press R on a tank and the whole picture turns red — correct
+          (everything it can reach, it can hit) but a player who wanted both facts at once must
+          toggle. If playtest finds that annoying, the fringe-only variant (paint red just where
+          blue is not) is a one-line change at the single call site, and D2 has already argued both
+          sides so the conversation is short.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R4 · Fog leakage by absence</h3>
+          <p class="text-sm mt-1">D5 computes against the real board, so a hidden unit standing on a
+          cell the previewed enemy could otherwise stop on trims a firing position, and a
+          sharp-eyed player could read the missing fringe cell as "something is there." Bounded:
+          absence-only, one ring cell at a time, and only where the viewer already suspects.
+          The redacted-state alternative buys back this sliver at the price of a second movement
+          model — D5 declines the trade on purpose.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R5 · A new state in a ten-state machine</h3>
+          <p class="text-sm mt-1">Low: <code>PREVIEW</code> is behaviorally <code>IDLE</code> with
+          two overlays and a dismissal grammar — it issues no commands, so no transition out of it
+          can strand the sim. The scenario driver waits on named states and never enters this one;
+          the play-proof in RP3 walks every dismissal path by hand.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">6</span>
+        <h2 class="text-2xl font-black">Explicitly out of scope</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">The full danger map</h3>
+          <p class="text-sm mt-1">"Show every enemy's range at once" — the genre's other classic.
+          RP1's authority makes it a fold over visible enemies whenever we want it, but it is its
+          own UX problem (a board painted wall-to-wall red is not information) and its own plan.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Damage numbers in the preview</h3>
+          <p class="text-sm mt-1">"How hard would it hit <em>me</em>?" — <code>forecast_at</code>
+          answers it today and <code>ThreatMap.incoming_damage</code> already sums it for the AI.
+          A per-cell damage readout is a different surface (numbers, not cells) and stays parked.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Predicting intent</h3>
+          <p class="text-sm mt-1">The preview shows what a unit <em>could</em> do, never what the AI
+          <em>will</em> do. No path lines for enemy units, no "likely target" markers — capability
+          is knowledge, intent is cheating.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Rebinding and controller support</h3>
+          <p class="text-sm mt-1">R joins the fixed map beside Z and X. A key-rebinding screen or a
+          gamepad chord for <code>show_range</code> is an input-settings feature for the day the
+          input map grows one.</p>
+        </div>
+      </div>
+      <p class="text-xs opacity-70 mt-6">Grid Commander · range-preview plan rev 1 · pairs with
+      <span class="gc-file">.lavish/advance-wars-clone-plan.html</span> (base game),
+      <span class="gc-file">difficulty-modes-plan.html</span> (the ThreatMap this promotes from) and
+      <span class="gc-file">faction-identity-plan.html</span> (why the preview does not speak
+      faction colors). Presentation asks, the sim answers: every cell shown is a pure read through
+      <span class="gc-file">core/rules/</span>.</p>
+    </section>
+
+  </div>
+
+  <script>
+    // Mock boards: open ground, Manhattan geometry only — the captions say so.
+    function board(id, cols, rows, ux, uy, chip, chipClass, classify) {
+      const el = document.getElementById(id);
+      el.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const c = document.createElement("div");
+          c.className = "c" + ((x + y) % 2 ? " alt" : "");
+          const d = Math.abs(x - ux) + Math.abs(y - uy);
+          if (x === ux && y === uy) {
+            c.classList.add("u", chipClass);
+            const s = document.createElement("span");
+            s.textContent = chip;
+            c.appendChild(s);
+          } else {
+            const k = classify(d);
+            if (k) c.classList.add(k);
+          }
+          el.appendChild(c);
+        }
+      }
+    }
+    // ① enemy tank, move 3: blue diamond.
+    board("board-move", 11, 9, 5, 4, "T", "enemy", d => (d <= 3 ? "b" : ""));
+    // ② same tank, R pressed: range 1 grows the diamond; red paints over blue.
+    board("board-fire", 11, 9, 5, 4, "T", "enemy", d => (d <= 4 ? "r" : ""));
+    // ③ enemy artillery, move 2, range 2-3: ring from the standing cell, min-range hole.
+    board("board-arty", 11, 9, 5, 4, "A", "enemy",
+      d => (d >= 2 && d <= 3 ? "r" : d <= 2 ? "b" : ""));
+  </script>
+</body>
+</html>
