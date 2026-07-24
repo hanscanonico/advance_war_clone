@@ -52,6 +52,10 @@ enum Duration {
 @export_multiline var doctrine_text: String = ""
 @export var power_name: String = ""
 @export_multiline var power_text: String = ""
+## Short in-character lines spoken on the activation banner, rotated in order
+## across a match. Presentation data in the battle_style tradition — a display
+## key on a core-read resource that no rule ever reads.
+@export var power_quotes: Array[String] = []
 ## Charge points the meter must hold before the power fires. 0 means this
 ## commander has no power, which also stops its meter ever filling.
 @export var power_cost: int = 0

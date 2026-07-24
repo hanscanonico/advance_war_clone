@@ -289,15 +289,17 @@ func hide_banner() -> void:
 	turn_banner.hide()
 
 
-## The Command Power activation card: portrait, power name, and exact effect text,
-## faction-tinted. Shown when a power fires (player or AI, both through Battle's
-## _announce_power) and auto-hidden after a beat. While capturing it holds, so a
-## screenshot of the same activation is the same frame — the whole reason the two
-## open-ended animations above are suppressed for captures.
-func show_power_banner(commander: CommanderType) -> void:
+## The Command Power activation card: portrait, the general's spoken line, power
+## name, and exact effect text, faction-tinted. Shown when a power fires (player
+## or AI, both through Battle's _announce_power) and auto-hidden after a beat.
+## `team` keys the card's quote rotation, so the two sides speak independently.
+## While capturing it holds, so a screenshot of the same activation is the same
+## frame — the whole reason the two open-ended animations above are suppressed
+## for captures.
+func show_power_banner(commander: CommanderType, team: int) -> void:
 	if _power_banner_tween != null and _power_banner_tween.is_valid():
 		_power_banner_tween.kill()
-	power_banner.bind(commander)
+	power_banner.bind(commander, team)
 	power_banner.show()
 	power_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	if capturing:

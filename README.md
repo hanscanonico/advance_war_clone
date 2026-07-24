@@ -254,6 +254,13 @@ Signal Jam — exist to bother the opponent and so survive their turn, ending as
 The AI charges and fires powers too, on its own commander's judgement of the right moment. Its
 meter is shown while it plays, but the button stays disabled — it is not yours to press.
 
+**Quotes.** A power's activation card opens with the general speaking — a short in-character
+line above the power's name, beside their portrait. The lines are data like everything else
+about a general: `power_quotes` on their `.tres`, rotated in order across the match (never
+randomly, so a replay speaks the same words), each capped at 60 characters so it stays a spoken
+beat — `tests/unit/test_commander_quotes.gd` enforces both. The selection card shows the first
+line as the general's signature. The AI's generals speak through the same banner.
+
 ## Fog of war
 
 Off by default; turn it on in the menu or with `--fog`. Fogged cells are darkened and the units

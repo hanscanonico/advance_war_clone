@@ -5,9 +5,9 @@ extends PanelContainer
 ## "face before rules" reading order the supplied Claude card sheet is built on.
 ##
 ## Every value it shows is bound straight from the sim-side CommanderType
-## (display_name, faction, doctrine_text, power_name, power_text, power_cost,
-## power_duration); nothing is duplicated here, so the card can never drift from
-## the numbers the rules actually use. All styling — the faction field colour,
+## (display_name, faction, doctrine_text, power_quotes, power_name, power_text,
+## power_cost, power_duration); nothing is duplicated here, so the card can
+## never drift from the numbers the rules actually use. All styling — the faction field colour,
 ## the emblem, the portrait — comes from CommanderVisuals, the one authority on
 ## it. The card itself is pure presentation and never touches core/.
 ##
@@ -28,6 +28,7 @@ var _portrait: TextureRect
 var _emblem: TextureRect
 var _name_band: PanelContainer
 var _name_label: Label
+var _quote_label: Label
 var _doctrine_label: Label
 var _power_box: PanelContainer
 var _power_cost_label: Label
@@ -93,6 +94,15 @@ func _build() -> void:
 	var copy_wrap := _paper_panel(copy, 8, 7)
 	rows.add_child(copy_wrap)
 
+	# The general's signature line — power_quotes[0], the same words the
+	# activation banner opens with on a first firing (power-quotes plan PQ2), so
+	# the select screen introduces the character the battle then delivers.
+	_quote_label = Label.new()
+	_quote_label.add_theme_font_size_override("font_size", _BODY_SIZE)
+	_quote_label.add_theme_color_override("font_color", Color(0.408, 0.443, 0.471))
+	_quote_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.add_child(_quote_label)
+
 	_doctrine_label = _labelled_block(copy, "DOCTRINE")
 
 	_power_box = PanelContainer.new()
@@ -139,6 +149,10 @@ func _apply() -> void:
 	_name_label.text = _commander.display_name
 	_name_label.add_theme_color_override("font_color", theme.ink)
 	_name_band.add_theme_stylebox_override("panel", _flat_box(theme.color_dark))
+
+	_quote_label.visible = not _commander.power_quotes.is_empty()
+	if _quote_label.visible:
+		_quote_label.text = "“%s”" % _commander.power_quotes[0]
 
 	_doctrine_label.text = (
 		_commander.doctrine_text

@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Commander — Command Power Quotes Plan</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :where(.grid, .flex) > *,
+    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
+    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+
+    :root {
+      --gc-water: #2779b9;
+      --gc-water-dark: #155383;
+      --gc-grass: #86c95a;
+      --gc-grass-dark: #5d9f3e;
+      --gc-road: #d8c49a;
+      --gc-ink: #172838;
+      --gc-red: #d94d3f;
+      --gc-blue: #3276c6;
+      --gc-meridian: #1e3a8a;
+      --gc-iron: #7f1d1d;
+      --gc-verdant: #166534;
+      --gc-aurora: #7c3aed;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      color: var(--gc-ink);
+      background-color: var(--gc-water);
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255,255,255,.03) 25%, transparent 25%);
+      background-size: 32px 32px, 32px 32px, 64px 64px;
+    }
+    .gc-shell {
+      width: min(1180px, calc(100% - 1.25rem));
+      margin: 0 auto;
+      border-inline: 6px solid rgba(255,255,255,.16);
+      background: color-mix(in srgb, var(--color-base-200) 94%, white 6%);
+      box-shadow: 0 0 0 2px var(--gc-water-dark), 0 24px 80px rgba(7,34,55,.35);
+    }
+    .gc-hero {
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(10,33,55,.96), rgba(19,64,97,.92)),
+        repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px),
+        repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.07) 31px 32px);
+    }
+    .gc-kicker { letter-spacing: .18em; text-transform: uppercase; font: 700 .75rem/1.4 ui-monospace, monospace; }
+    .gc-section-number {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid currentColor;
+      border-radius: .35rem;
+      font: 800 .85rem ui-monospace, monospace;
+      box-shadow: 3px 3px 0 color-mix(in srgb, currentColor 22%, transparent);
+      flex: none;
+    }
+    .gc-file { font: 700 .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .88em; }
+    .gc-risk-high { border-left: 5px solid var(--gc-red); }
+    .gc-risk-medium { border-left: 5px solid #d58a24; }
+    .gc-risk-good { border-left: 5px solid var(--gc-grass-dark); }
+    .gc-locked { border-color: var(--gc-grass-dark); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-grass-dark) 30%, transparent); }
+    .gc-open { border-color: #d58a24; box-shadow: 0 0 0 2px color-mix(in srgb, #d58a24 30%, transparent); }
+    .gc-checks li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: .5rem; align-items: start; }
+    .gc-checks li::before { content: "✓"; color: var(--gc-grass-dark); font-weight: 900; }
+    .gc-faction { border: 2px solid var(--gc-water-dark); border-radius: .6rem; overflow: hidden; background: white; }
+    .gc-faction > header { color: white; padding: .65rem .9rem; font-weight: 900; display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+    .gc-faction .body { padding: .8rem .9rem; font-size: .9rem; }
+    .gc-lines { margin: .35rem 0 0; padding: 0; list-style: none; }
+    .gc-lines li { padding: .15rem 0 .15rem 1.1rem; position: relative; font-style: italic; }
+    .gc-lines li::before { content: "“"; position: absolute; left: 0; font-weight: 900; font-style: normal; opacity: .45; }
+    .gc-mock {
+      border: 3px solid var(--gc-ink);
+      border-radius: .7rem;
+      background: linear-gradient(160deg, #fdf8ec, #f3e9d2);
+      box-shadow: 6px 6px 0 rgba(23,40,56,.25);
+      padding: 1rem 1.2rem;
+      max-width: 34rem;
+    }
+    .gc-mock .row { display: flex; gap: 1rem; align-items: flex-start; }
+    .gc-mock .portrait {
+      width: 84px; aspect-ratio: 1; flex: none;
+      border: 3px solid var(--gc-ink); border-radius: .5rem;
+      background: linear-gradient(180deg, #2b4a86, var(--gc-meridian));
+      position: relative; overflow: hidden;
+    }
+    .gc-mock .portrait::before { content: ""; position: absolute; left: 50%; top: 18%; width: 36%; aspect-ratio: 1; border-radius: 50%; background: #f3e0c0; transform: translateX(-50%); }
+    .gc-mock .portrait::after { content: ""; position: absolute; left: 50%; bottom: -14%; width: 76%; height: 46%; border-radius: 50% 50% 0 0; background: #c9a227; transform: translateX(-50%); }
+    .gc-mock .eyebrow { letter-spacing: .14em; text-transform: uppercase; font: 800 .68rem/1.2 ui-monospace, monospace; color: var(--gc-meridian); }
+    .gc-mock .quote { font-style: italic; font-weight: 700; font-size: 1.25rem; line-height: 1.3; margin: .45rem 0; }
+    .gc-mock .power { font-weight: 900; font-size: .9rem; }
+    .gc-mock .powertext { font-size: .8rem; opacity: .75; }
+    table.gc-nums td, table.gc-nums th { font-size: .85rem; }
+    table.gc-nums td:first-child { font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <div class="gc-shell">
+
+    <!-- ============================== HERO ============================== -->
+    <header class="gc-hero px-6 py-10 md:px-12">
+      <p class="gc-kicker opacity-80">Grid Commander · Stretch item · Shipped · rev 1</p>
+      <h1 class="text-3xl md:text-4xl font-black mt-2">Command Power Quotes — the general speaks</h1>
+      <p class="mt-3 max-w-3xl opacity-90">
+        Today a Command Power announces itself with a fanfare and a stat card: portrait, power name,
+        rules text. Correct, and completely voiceless. This plan gives each of the twelve generals a
+        <strong>short in-character line</strong> spoken on the activation banner — the genre's
+        signature beat, the moment the player learns who they're fighting, not just what modifier
+        just turned on. It is a <strong>string on the commander's <code>.tres</code> and one new label
+        on an existing banner</strong>: no line of <span class="gc-file">core/</span> or
+        <span class="gc-file">ai/</span> ever reads a quote, no RNG is touched, and the same seam that
+        announces a player's power already announces the AI's.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <span class="badge badge-lg" style="background:var(--gc-meridian); color:white; border:0;">Meridian — “Advance as one.”</span>
+        <span class="badge badge-lg" style="background:var(--gc-iron); color:white; border:0;">Iron — “Steel does not step back.”</span>
+        <span class="badge badge-lg" style="background:var(--gc-verdant); color:white; border:0;">Verdant — “We were never here.”</span>
+        <span class="badge badge-lg" style="background:var(--gc-aurora); color:white; border:0;">Aurora — “Variance eliminated.”</span>
+      </div>
+    </header>
+
+    <!-- ============================== 1 · SEAMS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">1</span>
+        <h2 class="text-2xl font-black">The seams already exist</h2>
+      </div>
+      <p class="max-w-3xl mb-4">
+        Almost everything this feature needs was built for the Commanders plan and is sitting idle.
+        The work is one field, one label, and twelve short scripts:
+      </p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">One announce seam, both actors</h3>
+          <p class="text-sm mt-1"><span class="gc-file">battle.gd:539</span> —
+          <code>_announce_power(fired)</code> plays the fanfare, shows the banner, and emits the event.
+          The player's Fire button reaches it through <code>_fire_command_power</code>
+          (<span class="gc-file">battle.gd:526</span>) and the AI reaches the <em>same function</em>
+          from <span class="gc-file">battle_ai_runner.gd:134</span>. A quote added here covers both
+          sides by construction — no player/AI split to keep in sync, the exact failure mode the
+          hook-layer soak test exists to catch elsewhere.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The command already carries the payload</h3>
+          <p class="text-sm mt-1"><span class="gc-file">core/commands/power_command.gd:14</span> —
+          <code>PowerCommand.apply()</code> records <code>team</code> and <code>commander</code>
+          explicitly <em>for the presentation layer</em>, and
+          <span class="gc-file">tests/unit/test_power_command.gd:83</span> already asserts it.
+          <span class="gc-file">autoload/event_bus.gd:13</span> even declares
+          <code>power_activated(team, commander)</code> — emitted today, consumed by nobody. The
+          plumbing predates the feature.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">The banner card is already on screen</h3>
+          <p class="text-sm mt-1"><span class="gc-file">scenes/ui/commander_power_banner.gd:74</span> —
+          <code>CommanderPowerBanner.bind(commander)</code> already lays out the portrait
+          (<code>CommanderVisuals.portrait_for</code>), the faction tint
+          (<code>theme_for</code>), the “NAME · COMMAND POWER” eyebrow, the power name and the rules
+          text. It already holds open under the <code>capturing</code> flag
+          (<span class="gc-file">battle_animator.gd:253</span>) and already times itself through
+          <code>Settings.speed.power_banner_seconds()</code>
+          (<span class="gc-file">game_speed.gd:174</span> — 1.1&nbsp;s, 0.5&nbsp;s under Instant).
+          The quote is one more label on a card that has already solved tinting, portraits,
+          screenshots and pacing.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">Presentation keys on core resources have a precedent</h3>
+          <p class="text-sm mt-1">The battle-animations plan's D5: <code>UnitType.battle_style</code>
+          is a presentation key living on a core-read resource, exactly like <code>atlas_col</code>.
+          <span class="gc-file">core/commander_type.gd</span> already carries
+          <code>display_name</code>, <code>faction</code>, <code>doctrine_text</code> and
+          <code>power_text</code> (lines 47–54) — strings the sim never reads. A
+          <code>power_quotes</code> field is the same move, and the scenario driver's
+          <code>_stage_power_banner()</code> (<span class="gc-file">battle_scenario_driver.gd:484</span>)
+          already photographs the surface it will appear on.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 2 · THE SCRIPTS ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">2</span>
+        <h2 class="text-2xl font-black">What each general says</h2>
+      </div>
+      <p class="max-w-3xl mb-4">
+        Three lines per general, rotated in order across a match (§3 D2). A line is a
+        <strong>character beat, not rules text</strong> — the card below it still states what the
+        power does. House style: short enough to read at a 1.5&nbsp;s hold (the completeness test
+        enforces a hard length cap), voiced to the doctrine, never naming a game term the card
+        already shows. These are <strong>starting scripts</strong> — the writing pass in PQ1 owns the
+        final words the way a balance pass owns numbers.
+      </p>
+
+      <div class="grid gap-4 mb-6">
+        <div class="gc-faction">
+          <header style="background:var(--gc-meridian);">Meridian Coalition <span class="text-xs font-mono opacity-90">professional · coordination · logistics</span></header>
+          <div class="body grid md:grid-cols-3 gap-4">
+            <div>
+              <strong>Alina Ward</strong> · <em>Coordinated Push</em>
+              <ul class="gc-lines">
+                <li>All units, advance as one. No one fights alone today.</li>
+                <li>Every axis, every echelon — push!</li>
+                <li>This is what coordination buys. Forward!</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Gideon Holt</strong> · <em>Open the Depots</em>
+              <ul class="gc-lines">
+                <li>Depots open! Fuel, shells, and a hot meal all round.</li>
+                <li>Wars are won by the army still supplied to fight one.</li>
+                <li>Take what you need — today the ledger's on me.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Rhea Sol</strong> · <em>Grid Saturation</em>
+              <ul class="gc-lines">
+                <li>Firing solution ready. Saturate the grid.</li>
+                <li>Every square of this map is a coordinate of mine.</li>
+                <li>Guns free. Erase the horizon.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="gc-faction">
+          <header style="background:var(--gc-iron);">Iron Dominion <span class="text-xs font-mono opacity-90">armour · pressure · momentum</span></header>
+          <div class="body grid md:grid-cols-3 gap-4">
+            <div>
+              <strong>Viktor Draeg</strong> · <em>Armoured Breakthrough</em>
+              <ul class="gc-lines">
+                <li>Treads forward! Armour makes its own roads.</li>
+                <li>Their cover is gravel under my columns.</li>
+                <li>Breakthrough! Don't slow. Don't turn.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Mara Voss</strong> · <em>Hold the Line</em>
+              <ul class="gc-lines">
+                <li>Come on, then. The line does not move.</li>
+                <li>Every blow you land comes back with interest.</li>
+                <li>Stand fast. Steel does not step back.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Cass Orlov</strong> · <em>No Escape</em>
+              <ul class="gc-lines">
+                <li>They're bleeding. Run them down.</li>
+                <li>No retreat. No rescue. No escape.</li>
+                <li>Wounded prey runs slow.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="gc-faction">
+          <header style="background:var(--gc-verdant);">Verdant League <span class="text-xs font-mono opacity-90">rangers · terrain · the people</span></header>
+          <div class="body grid md:grid-cols-3 gap-4">
+            <div>
+              <strong>Nia Rowan</strong> · <em>Ghost March</em>
+              <ul class="gc-lines">
+                <li>The forest marches with us. Move out.</li>
+                <li>They watch the roads. We aren't on the roads.</li>
+                <li>Be somewhere else before they look up.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Tomas Reed</strong> · <em>Popular Uprising</em>
+              <ul class="gc-lines">
+                <li>The people rise! Every flag on this map comes down.</li>
+                <li>This land remembers who it belongs to.</li>
+                <li>One voice. Ten thousand boots. March!</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Sable Wren</strong> · <em>Vanish</em>
+              <ul class="gc-lines">
+                <li>Look away. We were never here.</li>
+                <li>The woods keep their secrets. Now they keep us.</li>
+                <li>You'll find us exactly when we find you.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="gc-faction">
+          <header style="background:var(--gc-aurora);">Aurora Compact <span class="text-xs font-mono opacity-90">intelligence · precision · speed</span></header>
+          <div class="body grid md:grid-cols-3 gap-4">
+            <div>
+              <strong>Lyra Quill</strong> · <em>Perfect Solution</em>
+              <ul class="gc-lines">
+                <li>Variance eliminated. Execute.</li>
+                <li>I've already computed how this ends.</li>
+                <li>Luck is for people who can't do the arithmetic.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Orin Flux</strong> · <em>Signal Jam</em>
+              <ul class="gc-lines">
+                <li>Enjoy the static.</li>
+                <li>Your orders just got lost in the noise.</li>
+                <li>All their channels, silent. All of ours, singing.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Cassian Rook</strong> · <em>Rapid Redeployment</em>
+              <ul class="gc-lines">
+                <li>New squares, everyone — the board just changed.</li>
+                <li>Speed is the one weapon that never jams.</li>
+                <li>You're aiming where I was.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 border p-4">
+        <h3 class="font-black text-lg mb-3">Where the line sits on the card</h3>
+        <div class="grid md:grid-cols-2 gap-4 items-center">
+          <div class="gc-mock">
+            <div class="row">
+              <div class="portrait" role="img" aria-label="Alina Ward portrait"></div>
+              <div>
+                <p class="eyebrow">Alina Ward · Command Power</p>
+                <p class="quote">“All units, advance as one. No one fights alone today.”</p>
+                <p class="power">Coordinated Push</p>
+                <p class="powertext">All units +1 movement, +10% attack, +10% defence this turn.</p>
+              </div>
+            </div>
+          </div>
+          <p class="text-sm">The line reads as <strong>speech, not caption</strong>: the general's
+          portrait sits beside it, face left, words right — the dialogue-box arrangement the genre
+          made canonical. This is a <em>requirement</em>, not an inherited nicety: <strong>a quote
+          never appears without the portrait on screen saying it</strong>, and
+          <code>CommanderVisuals.portrait_for</code> already guarantees a face for every id (it falls
+          back to the neutral bust). The quote is the card's headline — large, italic, in the
+          general's voice — with the power name and rules text stepping down a size beneath it. The
+          character speaks first; the rules clarify after. Everything else about the card (faction
+          tint, border, hold, centering) is untouched. An empty <code>power_quotes</code> hides the
+          label and renders today's card pixel for pixel, which is the regression story in one
+          sentence.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 3 · DECISIONS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">3</span>
+        <h2 class="text-2xl font-black">Decisions</h2>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D1 · Where does quote text live? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm">As <strong><code>@export_multiline var power_quotes: Array[String]</code> on
+        <span class="gc-file">core/commander_type.gd</span></strong>, defaulting to empty, with the
+        words in each general's <code>.tres</code> under <span class="gc-file">data/commanders/</span>.
+        This is the <code>battle_style</code> pattern: a presentation key on a core-read resource that
+        <strong>nothing in <span class="gc-file">core/</span> or <span class="gc-file">ai/</span> ever
+        reads</strong> — and it sits beside <code>doctrine_text</code> / <code>power_text</code>,
+        which are already exactly such strings. Writing a general's voice becomes editing their data
+        file, the same motion as balancing their numbers. Rejected: a parallel presentation resource
+        keyed by commander id — a thirteenth file family to keep in sync, solving a layering problem
+        this repo has already decided doesn't exist for display strings.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D2 · One line or many — and who picks? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm"><strong>Three lines each, rotated in order by that side's activation count
+        — no RNG anywhere.</strong> The banner keeps a per-team counter and shows
+        <code>quotes[count % size]</code>. Deterministic by construction: two runs of the same replay
+        speak the same lines, the scenario gallery's power-banner frame is always activation #1 and
+        so always the same words, and the sim's seeded RNG is never touched. The counter is
+        presentation state that resets on scene load — resuming a save restarts the rotation, which
+        costs nothing anyone can measure. Rejected: random pick (this repo verifies presentation by
+        diffing frames; a die roll in the theatre is a diff that lies) and a single line (the
+        charge-reset rule means a long match hears the power four or five times — one sentence five
+        times is how charm becomes wallpaper).</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D3 · Where does it render? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm"><strong>Inside the existing <code>CommanderPowerBanner</code>, as the
+        card's new headline</strong> — not a sibling speech bubble, not a new cut-in.
+        <code>bind()</code> grows a <code>team</code> parameter (for the rotation counter) and one
+        label; <code>show_power_banner</code> passes <code>fired.team</code> through from
+        <code>_announce_power</code>. The layout obligation that comes with the choice: <strong>the
+        quote renders beside the portrait, as the portrait's speech</strong> — the face must be on
+        screen whenever the line is, which the card satisfies by construction since
+        <code>bind()</code> always draws the bust. Everything hard about the surface — portrait, faction tint,
+        mirror-match colours (<code>SideIdentity</code>'s borrowed-classic rule), the
+        <code>capturing</code> hold, Instant's clamp — is inherited rather than re-solved. Rejected:
+        a full-screen letterbox cut-in in the style of the battle animation. The combat cut-in earns
+        its ceremony with art it already has; a power quote has a portrait and a sentence, and a
+        banner is the honest size for that. If portrait art ever grows animation frames, the card is
+        still where they'd land.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4 mb-4">
+        <h3 class="font-black mb-2">D4 · Does the quote block anything? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm"><strong>No.</strong> The power banner is fire-and-forget today
+        (<code>_announce_power</code> is not awaited by either caller) and stays that way — the AI
+        keeps acting under it, the player keeps their cursor. The one number that moves:
+        <code>POWER_BANNER_SECONDS</code> 1.1&nbsp;→&nbsp;<strong>1.5</strong>, because the card now
+        opens with a sentence and 1.1&nbsp;s was sized for a glance at a title. Instant's 0.5&nbsp;s
+        clamp is untouched — under Instant the quote is a flicker you can choose to read, in exactly
+        the way the game-speed plan treats all banners: information, not theatre. The retune is a
+        one-constant edit in the one place pacing lives (<span class="gc-file">game_speed.gd:44</span>),
+        settled by playing, like GS3's outstanding pass.</p>
+      </div>
+
+      <div class="card bg-base-100 border gc-locked p-4">
+        <h3 class="font-black mb-2">D5 · Is there a voice? <span class="badge badge-success badge-sm">locked</span></h3>
+        <p class="text-sm"><strong>Text only; the existing <code>&amp;"fanfare"</code> sting stays the
+        sound of a power.</strong> The door to per-commander VO is already open — <code>Sfx</code>
+        silently skips missing streams (<span class="gc-file">sfx.gd:47</span>), and the
+        BattleStyle "a style names its own sound" precedent shows how data-named audio ships — but
+        recording twelve voices is content work, and a text line that ships this week beats a voice
+        line that never does. If VO ever lands, the quote field is the script it reads from.</p>
+      </div>
+    </section>
+
+    <!-- ============================== 4 · MILESTONES ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">4</span>
+        <h2 class="text-2xl font-black">Milestones — each one shippable</h2>
+      </div>
+      <div class="grid gap-4">
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">PQ1 · The banner speaks <span class="badge badge-sm">size S</span> <span class="badge badge-success badge-sm">shipped</span></h3>
+          <p class="text-sm mt-1 mb-2">The field, the twelve scripts, and the card's new headline —
+          the whole player-facing feature in one milestone.</p>
+          <ul class="gc-checks text-sm">
+            <li><span class="gc-file">core/commander_type.gd</span> — <code>power_quotes</code> beside <code>power_text</code>, empty default. Inert to the sim by construction; the neutral commander and any quote-less <code>.tres</code> render today's card unchanged.</li>
+            <li>All twelve <span class="gc-file">data/commanders/*.tres</span> get their three lines (§2's scripts, given a writing pass as they land — final words are an editing decision, not a code one).</li>
+            <li><span class="gc-file">commander_power_banner.gd</span> — <code>bind(commander, team)</code> adds the quote headline (hidden when empty) and the per-team rotation counter; <span class="gc-file">battle_animator.gd:247</span> passes <code>fired.team</code> through <code>show_power_banner</code>.</li>
+            <li>The quote lays out <strong>beside the portrait</strong> (face left, words right) so the line reads as spoken by the general — a quote never renders without the bust, which <code>CommanderVisuals.portrait_for</code>'s neutral fallback makes unconditional.</li>
+            <li><code>POWER_BANNER_SECONDS</code> → 1.5 in <span class="gc-file">game_speed.gd</span>; Instant clamp untouched; <code>capturing</code> hold untouched.</li>
+            <li>New <span class="gc-file">tests/unit/test_commander_quotes.gd</span> — every commander <code>.tres</code> with a power ships ≥ 1 non-empty quote, and every quote respects the length cap (a test constant, the editorial ruler). Node-free resource loading, so it belongs in GUT.</li>
+            <li>Proof: fire a power as the player and watch the AI's next activation speak through the same seam; three activations rotate three lines; <code>make test</code> green; <code>make screenshot</code> byte-stable (the capture path never stages a power).</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-black">PQ2 · The voice spreads to the card family <span class="badge badge-sm">size XS</span> <span class="badge badge-success badge-sm">shipped</span></h3>
+          <p class="text-sm mt-1 mb-2">The quote exists everywhere the commander's face does, and the
+          galleries acknowledge the new card.</p>
+          <ul class="gc-checks text-sm">
+            <li>The commander info sheet (<span class="gc-file">scenes/ui/commander_info_sheet.gd</span>) shows the signature line — <code>quotes[0]</code>, the same one the gallery's power-banner frame shows — so the select screen introduces the character the battle will deliver.</li>
+            <li>Re-bless the scenario gallery's <code>power_banner</code> stage capture (<span class="gc-file">battle_scenario_driver.gd:484</span>): one expected, one-time frame change, deterministic thereafter because the stage is always activation #1.</li>
+            <li>README / docs note under the commanders section: quotes are data, where they live, the length cap, the rotation rule.</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================== 5 · RISKS ============================== -->
+    <section class="px-6 py-8 md:px-12">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">5</span>
+        <h2 class="text-2xl font-black">Risks</h2>
+      </div>
+      <div class="grid gap-3">
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R1 · The card becomes a poster</h3>
+          <p class="text-sm mt-1">Portrait, eyebrow, quote, power name, rules text — five things on
+          one banner is a real crowding risk. Mitigation is editorial, enforced mechanically: the
+          length cap lives in the completeness test, the quote gets exactly one line of visual
+          hierarchy (the headline), and nothing else on the card grows. If a line can't fit the cap,
+          the line is wrong, not the cap.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-medium p-4">
+          <h3 class="font-bold">R2 · Charm becomes wallpaper</h3>
+          <p class="text-sm mt-1">The charge-reset rule means a long match hears several activations;
+          a line that landed on Day 3 grates by Day 12. Three rotated lines is the floor that makes
+          repetition survivable, not a guarantee of delight — if playtest still tires of them, the
+          fix is more lines in the <code>.tres</code> (data, no code), not a cleverer picker.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R3 · Determinism, saves, replays</h3>
+          <p class="text-sm mt-1">Structurally safe: the only <span class="gc-file">core/</span>
+          change is an <code>@export</code> string array nobody in the sim reads, the command log and
+          save format are untouched (<span class="gc-file">save_codec.gd</span> already round-trips
+          the commander id the quote derives from), and rotation counts activations instead of
+          rolling dice. Same seed, same commands, same result — now with the same words.</p>
+        </div>
+        <div class="card bg-base-100 border gc-risk-good p-4">
+          <h3 class="font-bold">R4 · Mirror matches and attribution</h3>
+          <p class="text-sm mt-1">Both sides picking Sable Wren stays unambiguous: attribution on the
+          card is her portrait and name (unchanged), the frame's colours come from
+          <code>SideIdentity</code>'s mirror rule (the later slot borrows a hue-distinct classic),
+          and the rotation counter is keyed by <em>team</em>, not commander id, so the two Sables
+          rotate independently.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== 6 · OUT OF SCOPE ============================== -->
+    <section class="px-6 py-8 md:px-12 bg-base-200/60">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="gc-section-number">6</span>
+        <h2 class="text-2xl font-black">Explicitly out of scope</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Voice acting</h3>
+          <p class="text-sm mt-1">Rejected in D5 for now. The seams are ready when the content is:
+          <code>Sfx</code> tolerates missing streams, and the quote field is the script.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Barks at other moments</h3>
+          <p class="text-sm mt-1">Victory and defeat lines, turn-start greetings, low-HP taunts, a
+          "power expired" beat — a separate content feature with its own seams (power expiry is
+          deliberately silent in the sim today; no <code>power_deactivated</code> event exists, and
+          this plan doesn't add one for theatre).</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">A quotes toggle in Settings</h3>
+          <p class="text-sm mt-1">The quote adds no new interruption — it rides a banner that already
+          appears, for the same hold, and Instant already compresses it. If playtest disagrees,
+          <span class="gc-file">settings.gd</span>'s <code>battle_animations</code> toggle is the
+          five-line pattern to copy.</p>
+        </div>
+        <div class="card bg-base-100 border p-4">
+          <h3 class="font-bold">Localization</h3>
+          <p class="text-sm mt-1">The game ships English-only today; quotes follow the same policy as
+          every other display string (<code>doctrine_text</code>, <code>power_text</code>). A future
+          localization pass sweeps them together.</p>
+        </div>
+      </div>
+      <p class="text-xs opacity-70 mt-6">Grid Commander · power-quotes plan rev 1 · pairs with
+      <span class="gc-file">.lavish/commanders-plan.html</span> (the roster and PowerCommand),
+      <span class="gc-file">battle-animations-plan.html</span> (the <code>battle_style</code>
+      presentation-key precedent) and <span class="gc-file">game-speed-plan.html</span> (banner
+      pacing). Presentation-only by construction: the sim never reads a quote.</p>
+    </section>
+
+  </div>
+</body>
+</html>
