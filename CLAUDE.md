@@ -8,7 +8,7 @@ An **Advance Wars-style turn-based tactics game** built in **Godot 4.4+** with *
 Grid maps, terrain that shapes movement and defense, a rock-paper-scissors unit roster across
 three movement domains (land, air, sea), property capture and income, and a computer opponent.
 
-- **Status:** nine designs of record, all worth reading before an architectural decision.
+- **Status:** twelve designs of record, all worth reading before an architectural decision.
   `.lavish/advance-wars-clone-plan.html` owns the base game — milestones M0–M7 and which of them
   are done, mechanics reference, damage formula. `.lavish/commanders-plan.html` owns Commanders
   and Command Powers — milestones C1–C4, the four locked decisions (D1 subclassed `CommanderType`,
@@ -91,6 +91,25 @@ three movement domains (land, air, sea), property capture and income, and a comp
   one tint authority for every hand-authored family. It deliberately retimes its handoff reference's
   4.6s choreography to ≈2.4s house tempo, because its R1 (ceremony fatigue — captures far outnumber
   kills) is the named top risk.
+  `.lavish/power-quotes-plan.html` owns the Command Power quotes — milestones PQ1–PQ2, both
+  shipped — and its D1: **a quote is presentation data in the `battle_style` tradition.**
+  `power_quotes` is an exported string array on `CommanderType`, the words live on each general's
+  `.tres` under `data/commanders/`, and nothing in `core/` or `ai/` ever reads one — the sim, the
+  save format and the seeded RNG are untouched. Its D2 keeps the theatre deterministic: three
+  lines per general, rotated in order by a per-team activation counter on the banner, never by
+  RNG, so a replayed match speaks the same words and the scenario gallery's `power_banner` frame
+  (always activation #1) always speaks the first; the counter is scene-lifetime presentation
+  state, and a loaded save restarting the rotation is accepted as cosmetic. Its D3 renders the
+  line inside the existing `CommanderPowerBanner` as the card's headline beside the portrait — a
+  quote never appears without the bust — with the power name stepping down in size only when a
+  quote exists, so a quote-less commander (and the neutral one) renders today's card
+  pixel-identical: that conditional sizing is the regression guarantee, not an inconsistency.
+  Its D4 bumped `POWER_BANNER_SECONDS` 1.1 → 1.5 because the card now opens with a sentence,
+  leaving Instant's clamp and the day banner deliberately untouched. PQ2 puts `power_quotes[0]`
+  on the shared `CommanderCard` as the general's signature line, and
+  `tests/unit/test_commander_quotes.gd` enforces that every powered general ships quotes and
+  that each line fits the 60-character cap — an editorial ruler, not a rendering fact. Its D5
+  keeps it text only; voice audio and a settings toggle are explicitly out of scope.
 - **Engine:** Godot 4.4+ (`TileMapLayer`, custom `Resource` types).
 - **Language:** GDScript, **typed everywhere** (`class_name`, typed vars, typed signatures).
 
