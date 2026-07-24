@@ -43,9 +43,7 @@ func test_team_1_day_1_begin_turn_uses_its_real_commander() -> void:
 	var state := GameState.create(map, unit_db, chart, {1: _gideon()})
 	assert_not_null(state)
 	var copter := _copter_of(state, 1)
-	assert_eq(
-		copter.fuel, copter.type.max_fuel, "Gideon's APC resupplies from two tiles on day 1"
-	)
+	assert_eq(copter.fuel, copter.type.max_fuel, "Gideon's APC resupplies from two tiles on day 1")
 
 
 ## The mirror slot: team 2's first begin_turn, reached by ending team 1's turn,

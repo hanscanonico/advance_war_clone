@@ -481,12 +481,7 @@ func refresh_panel(cell: Vector2i) -> void:
 	# the panel never names a side change the board is still hiding.
 	var owner: int = game.owner_at(cell) if _can_see_cell(cell) else _last_seen_owner(cell)
 	terrain_panel.show_tile(
-		map.terrain_at(cell),
-		owner,
-		game.current_team,
-		capture_left,
-		hovered,
-		carrying
+		map.terrain_at(cell), owner, game.current_team, capture_left, hovered, carrying
 	)
 	terrain_panel.set_side(cursor.position.x < camera.get_screen_center_position().x)
 	# The chip is pinned to the top-left and, unlike the terrain panel, has no

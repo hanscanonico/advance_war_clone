@@ -115,7 +115,11 @@ planner and the rules disagree.
 > **Every number in this section predates the `advance_threat_tiles` split
 > described in §2, its rescaling against the HP a unit has left, and the
 > threat-map lookup being hoisted out of the per-cell attack and advance
-> loops.** It was measured against a build where Difficult's advance path could
+> loops — and, since, the bug-fix pass of 2026-07-24, which gates the threat
+> map's and the focus-fire follow-up's who-may-shoot through
+> `AttackRange.can_engage`, retreats a damaged unit only to a property that
+> repairs its domain, and plans every committed path with the mover's own
+> vision.** It was measured against a build where Difficult's advance path could
 > not give up a single tile for safety, and where Easy and Difficult rebuilt the
 > visible-enemy list and its cache key once per candidate cell. Both tiers now
 > plan differently, so **the ladder has to be re-run before any of the standings

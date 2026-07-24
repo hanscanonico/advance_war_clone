@@ -78,7 +78,9 @@ func validate(state: GameState) -> String:
 		# A friendly (always seen) blocks; a hidden enemy is left to spring the
 		# ambush on apply rather than refused, which would reveal it. A visible
 		# enemy never reaches here — validate_path_steps already caught it.
-		var visible: Dictionary = Vision.visible_cells(state, unit.team) if state.fog_enabled else {}
+		var visible: Dictionary = (
+			Vision.visible_cells(state, unit.team) if state.fog_enabled else {}
+		)
 		if (
 			dest_occupant.team == unit.team
 			or Vision.can_see_unit(state, unit.team, dest_occupant, visible)

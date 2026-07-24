@@ -32,11 +32,7 @@ const CANCEL := {"id": &"cancel", "label": "Cancel"}
 ## of them might fit the ground beside it — so a row names the unit it unloads and
 ## its id carries the passenger's index into `drop_passengers`.
 static func unit_actions(
-	game: GameState,
-	unit: Unit,
-	path: Array[Vector2i],
-	can_fire: bool,
-	drop_passengers: Array[Unit]
+	game: GameState, unit: Unit, path: Array[Vector2i], can_fire: bool, drop_passengers: Array[Unit]
 ) -> Array[Dictionary]:
 	var dest: Vector2i = path[path.size() - 1]
 	var actions: Array[Dictionary] = []

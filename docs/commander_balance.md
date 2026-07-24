@@ -112,11 +112,17 @@ batch and the 24-session human deck are release tasks** to be run against the
 candidate build; their results and any resulting `.tres` tuning are recorded here
 when that pass happens.
 
-The numbers below also predate the charge-meter fix that stopped a team from
-banking charge while its own power is active (`GameState.add_charge`,
-`tests/unit/test_charge_meter.gd`). Powers are now re-earned from empty, which
-slows every commander's power cadence, so re-run the batch before quoting these
-figures against the current build.
+**The rules under the N4 numbers below have since moved.** The numbers predate
+the charge-meter fix that stopped a team from banking charge while its own power
+is active (`GameState.add_charge`, `tests/unit/test_charge_meter.gd`), so powers
+are now re-earned from empty, slowing every commander's power cadence. The
+bug-fix pass of 2026-07-24 then runs the opening side's day-1 `begin_turn` under
+its real commander, resupplies passengers aboard a transport at their side's
+turn start, banks power charge for cargo sunk with its transport, and touched
+the planner itself (`docs/difficulty_check.md` §4 lists those changes) — all of
+which shift doctrines that read supply or charge. The standings below are kept
+as the record of what was measured, not a current claim; re-run the matrix
+before quoting them. Only the runner writes these numbers.
 
 ### Measured while adding the air and naval domains (N4)
 
