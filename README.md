@@ -423,10 +423,13 @@ download. To build from a full extracted pack instead, override the default:
 
 ### The menu design system
 
-The main menu and the commander-select page are dressed by the **Grid Commander Design System** — a
-handoff bundle (`handoff/main-menu/`: a spec, a mockup, five token sheets, three reference
-components, and a set of terrain sprites) whose palette was lifted pixel-for-pixel from this game's
-own tile and unit atlases, so adopting it was alignment, not invention. The numbers it defines live
+The main menu and the commander-select page are dressed by the **Grid Commander Design System**, an
+external design deliverable handed off as a zip — its `handoff/main-menu/` folder holds a spec, a
+mockup, five token sheets, three reference components, and a set of terrain sprites. That bundle is
+**not vendored in this repo**; its numbers were transcribed into code (below), and its palette was
+lifted pixel-for-pixel from this game's own tile and unit atlases, so adopting it was alignment, not
+invention. The design of record that adapts it to the shipped game is
+`.lavish/menu-revamp-plan.html`. The numbers it defines live
 in one place, **`scenes/common/ui_theme.gd` (`UiTheme`)**: the shell palette (the slates, neutrals
 and capture green the game had no authority for), the stylebox recipes (cream/dark panels, the hard
 offset shadow, the faction/cream/ghost button and its states, the segmented control, the checkbox,
