@@ -29,7 +29,11 @@ func setup() -> void:
 
 
 func set_zoom(zoom: float) -> void:
-	_zoom = clampf(zoom, ceilf(_min_zoom * 100.0) / 100.0, MAX_ZOOM)
+	# The floor itself is capped at MAX_ZOOM: on a map tiny enough that even the
+	# whole-map zoom exceeds it, clampf(min > max) would return the floor and the
+	# zoom keys would oscillate between it and MAX_ZOOM. Such a map pins here.
+	var floor_zoom := minf(ceilf(_min_zoom * 100.0) / 100.0, MAX_ZOOM)
+	_zoom = clampf(zoom, floor_zoom, MAX_ZOOM)
 	_view.set_zoom(_zoom)
 
 
