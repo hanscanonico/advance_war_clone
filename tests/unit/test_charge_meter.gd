@@ -87,3 +87,41 @@ func test_a_kill_charges_only_for_the_hp_on_the_board() -> void:
 	assert_true(result.defender_died)
 	assert_gt(result.attack_damage, 10, "the roll has to overkill for this test to mean anything")
 	assert_eq(state.commander_state(2).charge, INFANTRY_COST * 10 / 100)
+
+
+## Firing empties the meter (charge -> 0); the bug this pins is that the combat
+## the power enables must not refill it while it is still up, or the power is
+## never re-earned. The owner banks nothing until the power comes down again.
+func test_a_running_power_banks_nothing_for_its_owner() -> void:
+	var state := _state("[terrain]\n..\n[units]\n1 t 0 0\n2 t 1 0")
+	var alina := state.commander_state(1)
+	state.add_charge(1, alina.type.power_cost)
+	assert_true(alina.is_ready(), "team 1 opens the scenario with a full meter")
+
+	PowerCommand.new().apply(state)  # fires for the current team (team 1)
+	assert_eq(alina.charge, 0, "firing empties the meter")
+	assert_true(alina.power_active)
+
+	# The kind of exchange the power exists to win, resolved while it is up.
+	state.bank_losses(state.units[0], 100, 2)  # team 1 loses a whole tank
+	state.bank_losses(state.units[1], 100, 1)  # team 1 destroys one in reply
+	assert_eq(alina.charge, 0, "a running power banks nothing, dealt or lost")
+
+	# The opponent's meter is a separate economy and fills as usual.
+	assert_gt(state.commander_state(2).charge, 0, "the side without a power up still banks")
+
+
+## The exact reported bug: fire, fight through the power turn, end it — and the
+## meter is still down, so the power has to be charged again from empty rather
+## than coming back READY the instant it expires.
+func test_the_meter_must_be_re_earned_after_a_power() -> void:
+	var state := _state("[terrain]\n..\n[units]\n1 t 0 0\n2 t 1 0")
+	state.add_charge(1, state.commander_state(1).type.power_cost)
+	PowerCommand.new().apply(state)
+	state.bank_losses(state.units[0], 100, 2)  # combat during the active turn
+
+	EndTurnCommand.new().apply(state)  # the OWNER_TURN power expires here
+	var alina := state.commander_state(1)
+	assert_false(alina.power_active, "the power came down with the turn")
+	assert_eq(alina.charge, 0, "and the meter is empty, not refilled under the power")
+	assert_false(alina.is_ready(), "so it cannot be fired again until re-earned")

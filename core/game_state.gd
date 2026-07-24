@@ -103,10 +103,14 @@ func power_active(team: int) -> bool:
 
 ## Banks charge for a team, capped at what its power costs: an idle meter can
 ## never hold a second power's worth. A commander with no power banks nothing,
-## which is what keeps a no-CO match free of the whole economy.
+## which is what keeps a no-CO match free of the whole economy. And a team whose
+## power is *running* banks nothing either: firing empties the meter, and letting
+## the combat the power enables refill it would mean the meter never has to be
+## earned again — you fire, and it is READY the moment the power comes down. So it
+## only fills once the power is back down, which is what makes the reset stick.
 func add_charge(team: int, points: int) -> void:
 	var co_state := commander_state(team)
-	if not co_state.type.has_power() or points <= 0:
+	if not co_state.type.has_power() or points <= 0 or co_state.power_active:
 		return
 	co_state.charge = mini(co_state.charge + points, co_state.type.power_cost)
 

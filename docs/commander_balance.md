@@ -112,6 +112,12 @@ batch and the 24-session human deck are release tasks** to be run against the
 candidate build; their results and any resulting `.tres` tuning are recorded here
 when that pass happens.
 
+The numbers below also predate the charge-meter fix that stopped a team from
+banking charge while its own power is active (`GameState.add_charge`,
+`tests/unit/test_charge_meter.gd`). Powers are now re-earned from empty, which
+slows every commander's power cadence, so re-run the batch before quoting these
+figures against the current build.
+
 ### Measured while adding the air and naval domains (N4)
 
 864 matches, `clash` + `ridge`, 3 seeds, run before and after the change so the
