@@ -54,6 +54,9 @@ var power_banner: CommanderPowerBanner
 ## The full-screen battle cut-in. Every resolved attack goes through it when the
 ## player has it on and both sides are visible; see `animate_combat`.
 var cutscene: CombatCutscene
+## The full-screen capture cut-in, combat's sibling. Every completed capture
+## action goes through it under the same gate; see `animate_capture`.
+var capture_cutscene: CaptureCutscene
 ## True for a run that exists to be photographed. Suppresses the two open-ended
 ## animations — see `shake_camera` and `start_cursor_pulse` — and the cut-in.
 var capturing := false
@@ -211,6 +214,44 @@ func _punch_camera() -> void:
 ## redrawing the survivors.
 func _sync_aftermath() -> void:
 	view.sync_sprites()
+
+
+# --- capture -----------------------------------------------------------------
+
+
+## Plays out one already-applied capture: the march, the mashes, and — on a
+## completing capture — the flip to the capturer's colours. Awaitable, so the
+## flow resumes once the banner has cleared. The sibling of `animate_combat`, and
+## it obeys the same gate, the same streak pacing, and the same camera contract.
+##
+## With the cut-in gated out — animations off, while capturing, at the Instant
+## tier, or when the viewer cannot see the capturer — the map path is a single
+## `capture` thump if the cell is visible, and nothing else: the board repaint
+## the caller runs after this is what shows the result, byte-for-byte as it did
+## before the cut-in existed. Either way this returns exactly once.
+func animate_capture(result: CaptureCommand.CaptureResult, unit: Unit, cell: Vector2i) -> void:
+	if _capture_cut_in_applies(unit):
+		_pace_cut_in()
+		var resting := camera.zoom
+		await _punch_camera()
+		await capture_cutscene.play(result, unit, cell, camera, resting)
+		camera.zoom = resting  # safety net: the cut-in already eased it home on the wipe
+		_last_cut_in_ms = Time.get_ticks_msec()
+		return
+	if view.can_see_unit(unit):
+		Sfx.play(&"capture")
+
+
+## Whether this capture gets the cut-in. The same four questions as the combat
+## gate, with one unit instead of two: the capturer stands on the very cell it
+## takes, so a single visibility check answers for the whole scene (plan R6). No
+## second opinion on who can see what lives here — the view asks `Vision`.
+func _capture_cut_in_applies(unit: Unit) -> bool:
+	if capture_cutscene == null or capturing or not Settings.battle_animations:
+		return false
+	if Settings.speed.instant:
+		return false
+	return view.can_see_unit(unit)
 
 
 # --- banner ------------------------------------------------------------------
